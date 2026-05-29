@@ -77,6 +77,11 @@ async function callYandexGPT(systemText: string, userText: string): Promise<stri
         throw new Error("YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY не установлены");
     }
     const cleanFolderId = extractFolderId(folderId);
+    
+    if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
+        throw new Error(`[ОШИБКА НАСТРОЙКИ СЕРВЕРА] В переменных окружения вашего сервера (на Render.com) в ключе YANDEX_FOLDER_ID все еще указан стандартный шаблон или плейсхолдер "${cleanFolderId}". Пожалуйста, зайдите в настройки (Environment) на Render.com и замените "MY_FOLDER_ID" на реальный Идентификатор каталога (например, b1gqp...).`);
+    }
+
     const iamToken = await getYandexIamToken(saKey);
     
     const payload = {
@@ -103,7 +108,14 @@ async function callYandexGPT(systemText: string, userText: string): Promise<stri
 
     if (!res.ok) {
         const err = await res.text();
-        throw new Error(`YandexGPT API Error HTTP ${res.status}: ${err}`);
+        let diagnostic = "";
+        if (err.includes("model_uri") || err.includes("modelUri") || res.status === 400) {
+            const masked = cleanFolderId.length > 5 
+               ? `${cleanFolderId.slice(0, 4)}...${cleanFolderId.slice(-4)}` 
+               : cleanFolderId;
+            diagnostic = `\n(Диагностика: Модель YandexGPT отклонила запрос с ошибкой "invalid model_uri". Проверьте, что в переменных окружения вашего сервера (например, на Render.com) Идентификатор каталога (YANDEX_FOLDER_ID) указан абсолютно правильно. Значение, используемое сейчас сервером: "${masked}" [длина: ${cleanFolderId.length}].)`;
+        }
+        throw new Error(`YandexGPT API Error HTTP ${res.status}: ${err}${diagnostic}`);
     }
     
     const data = await res.json();
@@ -333,6 +345,9 @@ Return ONLY the raw JSON string matching this schema:
         console.log("Generating reference via YandexART...");
         try {
           const cleanFolderId = extractFolderId(yandexFolderId);
+          if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
+              throw new Error(`[ОШИБКА НАСТРОЙКИ СЕРВЕРА] В YANDEX_FOLDER_ID указан плейсхолдер "${cleanFolderId}". Пожалуйста, пропишите реальный Идентификатор каталога на Render.com.`);
+          }
           const iamToken = await getYandexIamToken(yandexServiceAccountKey);
 
           // 1. Start Async Generation
@@ -358,7 +373,14 @@ Return ONLY the raw JSON string matching this schema:
 
           if (!initRes.ok) {
             const errText = await initRes.text();
-            throw new Error(`YandexART Init Error: ${errText}`);
+            let diagnostic = "";
+            if (errText.includes("model_uri") || errText.includes("modelUri") || initRes.status === 400) {
+                const masked = cleanFolderId.length > 5 
+                   ? `${cleanFolderId.slice(0, 4)}...${cleanFolderId.slice(-4)}` 
+                   : cleanFolderId;
+                diagnostic = `\n(Диагностика: YandexART отклонил запрос. Проверьте правильность YANDEX_FOLDER_ID на вашем сервере (Render.com). Значение на сервере: "${masked}")`;
+            }
+            throw new Error(`YandexART Init Error: ${errText}${diagnostic}`);
           }
 
           const initData = await initRes.json();
