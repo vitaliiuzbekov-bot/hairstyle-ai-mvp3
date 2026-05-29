@@ -55,13 +55,28 @@ async function getYandexIamToken(serviceAccountKeyJSON: string): Promise<string>
   return cachedIamToken;
 }
 
+function extractFolderId(rawFolderId: string): string {
+  let cleaned = rawFolderId.trim().replace(/^["']|["']$/g, '');
+  if (cleaned.includes('/folders/')) {
+    const parts = cleaned.split('/folders/');
+    cleaned = parts[parts.length - 1];
+  } else if (cleaned.includes('/')) {
+    const parts = cleaned.split('/');
+    const lastPart = parts.filter(Boolean).pop();
+    if (lastPart) {
+      cleaned = lastPart;
+    }
+  }
+  return cleaned.split('?')[0].split('#')[0].trim();
+}
+
 async function callYandexGPT(systemText: string, userText: string): Promise<string> {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
     if (!folderId || !saKey) {
         throw new Error("YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY не установлены");
     }
-    const cleanFolderId = folderId.trim().replace(/^["']|["']$/g, '').split('/')[0].trim();
+    const cleanFolderId = extractFolderId(folderId);
     const iamToken = await getYandexIamToken(saKey);
     
     const payload = {
@@ -317,7 +332,7 @@ Return ONLY the raw JSON string matching this schema:
       if (yandexServiceAccountKey && yandexFolderId) {
         console.log("Generating reference via YandexART...");
         try {
-          const cleanFolderId = yandexFolderId.trim().replace(/^["']|["']$/g, '').split('/')[0].trim();
+          const cleanFolderId = extractFolderId(yandexFolderId);
           const iamToken = await getYandexIamToken(yandexServiceAccountKey);
 
           // 1. Start Async Generation
