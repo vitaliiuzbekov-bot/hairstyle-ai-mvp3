@@ -61,7 +61,7 @@ async function callYandexGPT(systemText: string, userText: string): Promise<stri
     if (!folderId || !saKey) {
         throw new Error("YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY не установлены");
     }
-    const cleanFolderId = folderId.split('/')[0];
+    const cleanFolderId = folderId.trim().replace(/^["']|["']$/g, '').split('/')[0].trim();
     const iamToken = await getYandexIamToken(saKey);
     
     const payload = {
@@ -317,7 +317,7 @@ Return ONLY the raw JSON string matching this schema:
       if (yandexServiceAccountKey && yandexFolderId) {
         console.log("Generating reference via YandexART...");
         try {
-          const cleanFolderId = yandexFolderId.split('/')[0];
+          const cleanFolderId = yandexFolderId.trim().replace(/^["']|["']$/g, '').split('/')[0].trim();
           const iamToken = await getYandexIamToken(yandexServiceAccountKey);
 
           // 1. Start Async Generation

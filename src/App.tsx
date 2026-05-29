@@ -192,8 +192,8 @@ export default function App() {
   useEffect(() => {
     // Check Telegram
     const tg = window.Telegram?.WebApp;
-    const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true';
-    if (tg && tg.initData) {
+    const isDev = (import.meta as any).env.DEV || (import.meta as any).env.VITE_DEV_MODE === 'true';
+    if (tg && (tg as any).initData) {
       setIsTelegramEnv(true);
       tg.expand?.();
       if ((tg as any).setHeaderColor) {
