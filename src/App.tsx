@@ -321,7 +321,32 @@ export default function App() {
   };
 
   const checkLimits = async () => {
-    return true;
+    if (generationsLeft !== null && generationsLeft <= 0) {
+      const tg = window.Telegram?.WebApp;
+      if (tg && tg.showPopup) {
+         tg.showPopup({
+           title: "Закончились генерации",
+           message: "У вас закончились доступные генерации. Хотите приобрести пакет из 10 генераций за 50 Telegram Stars?",
+           buttons: [
+             { id: "buy", type: "default", text: "Купить 10 генераций" },
+             { id: "cancel", type: "cancel", text: "Отмена" }
+           ]
+         }, (buttonId) => {
+           if (buttonId === "buy") {
+             buyTokens();
+           }
+         });
+      } else {
+         const confirmBuy = window.confirm("У вас закончились генерации. Хотите приобрести пакет из 10 генераций за 50 Telegram Stars?");
+         if (confirmBuy) {
+           buyTokens();
+         }
+      }
+      return false;
+    }
+    
+    const ok = await consumeToken();
+    return ok;
   };
 
   const [isBuying, setIsBuying] = useState(false);
@@ -916,8 +941,22 @@ export default function App() {
             </div>
             <h1 className="font-serif font-semibold text-2xl tracking-tight text-white/90">НейроСтилист <span className="text-white/60 italic opacity-80">AI</span></h1>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <p className="text-xs tracking-[0.2em] text-white/60 uppercase font-medium">ИИ-Подбор Причесок</p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-white/90">
+              <Coins size={14} className="text-amber-500" />
+              <span>Баланс: {generationsLeft !== null ? generationsLeft : '...'}</span>
+            </div>
+            <button 
+              onClick={buyTokens} 
+              disabled={isBuying} 
+              className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 active:scale-95 disabled:opacity-50 text-black font-semibold text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+            >
+              <Zap size={10} fill="currentColor" />
+              {isBuying ? 'Покупка...' : '+10'}
+            </button>
+            <div className="hidden md:flex flex-col items-end gap-1">
+              <p className="text-xs tracking-[0.2em] text-white/60 uppercase font-medium">ИИ-Подбор</p>
+            </div>
           </div>
         </div>
       </header>

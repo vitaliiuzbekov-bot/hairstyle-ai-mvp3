@@ -489,28 +489,28 @@ Return ONLY the raw JSON string matching this schema:
       let swappedImageUrl = "";
       const selfieImageFull = selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
 
-      let descriptor = 'человек';
+      let descriptorEng = 'person';
       const g = (gender || '').toLowerCase().trim();
       if (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy')) {
-        descriptor = 'мужчина';
+        descriptorEng = 'man';
       } else if (g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl')) {
-        descriptor = 'женщина';
+        descriptorEng = 'woman';
       }
 
-      let prompt = `Портрет крупным планом, ${descriptor}. НОВАЯ СТРИЖКА (NEW HAIRCUT): "${keyword}". `;
-      if (hairColor) prompt += `Цвет волос: ${hairColor}. `;
-      if (hairType) prompt += `Тип волос: ${hairType}. `;
+      let promptEng = `Studio portrait photograph of a ${descriptorEng}, showing off a brand new haircut style: "${keyword}". `;
+      if (hairColor) promptEng += `Hair color: ${hairColor}. `;
+      if (hairType) promptEng += `Hair details: ${hairType}. `;
       
       let fh = (facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          prompt += `Гладко выбритое лицо (clean shaven). `;
+          promptEng += `Clean shaven. `;
       } else if (fh) {
-          prompt += `Растительность на лице: ${fh}. `;
+          promptEng += `Facial hair: ${fh}. `;
       }
 
-      prompt += `КРИТИЧЕСКИ ВАЖНО: СОХРАНИТЬ ТОЧНО ТЕ ЖЕ ОДЕЖДУ (KEEP EXACTLY ORIGINAL CLOTHES), ФОН (KEEP EXACTLY ORIGINAL BACKGROUND), ТЕЛОСЛОЖЕНИЕ, ПОЗУ. ИЗМЕНИТЬ ТОЛЬКО ВОЛОСЫ НА ГОЛОВЕ.`;
+      promptEng += `CRITICAL: Replace only the hairstyle with the new hair. Keep identical head angle, identical body pose, identical background, and identical clothing as in the original picture.`;
 
-      prompt = prompt.substring(0, 480).trim();
+      promptEng = promptEng.substring(0, 480).trim();
 
       try {
         console.log("Generating reference via FAL.AI (Flux I2I)...");
@@ -522,8 +522,8 @@ Return ONLY the raw JSON string matching this schema:
           },
           body: JSON.stringify({
             image_url: selfieImageFull,
-            prompt: prompt,
-            strength: 0.50, 
+            prompt: promptEng,
+            strength: 0.82, 
             num_inference_steps: 30
           })
         });
