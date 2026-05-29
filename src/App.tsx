@@ -894,7 +894,7 @@ export default function App() {
           Это необходимо для обеспечения безопасности данных и доступа к функциям оплаты.
         </p>
         <a 
-          href="https://t.me/neural_stylist_bot" 
+          href="https://t.me/neirostilist_bot" 
           target="_blank" 
           rel="noreferrer" 
           className="px-8 py-4 bg-white text-black hover:bg-white/90 rounded-full font-medium transition-colors text-sm uppercase tracking-wider"
