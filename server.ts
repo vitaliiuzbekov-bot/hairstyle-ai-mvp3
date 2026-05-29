@@ -57,17 +57,30 @@ async function getYandexIamToken(serviceAccountKeyJSON: string): Promise<string>
 
 function extractFolderId(rawFolderId: string): string {
   let cleaned = rawFolderId.trim().replace(/^["']|["']$/g, '');
+  
+  // Cut query strings & hashes first
+  cleaned = cleaned.split('?')[0].split('#')[0].trim();
+  
+  // Extract the ID after /folders/ or folders/ if present
   if (cleaned.includes('/folders/')) {
     const parts = cleaned.split('/folders/');
-    cleaned = parts[parts.length - 1];
+    const folderPart = parts[parts.length - 1]; // e.g. "b1gels913826k38vrotg/overview" or "b1gels913826k38vrotg"
+    cleaned = folderPart.split('/')[0];
+  } else if (cleaned.includes('folders/')) {
+    const parts = cleaned.split('folders/');
+    const folderPart = parts[parts.length - 1];
+    cleaned = folderPart.split('/')[0];
   } else if (cleaned.includes('/')) {
-    const parts = cleaned.split('/');
-    const lastPart = parts.filter(Boolean).pop();
-    if (lastPart) {
-      cleaned = lastPart;
+    const parts = cleaned.split('/').filter(Boolean);
+    const folderIdCandidate = parts.find(p => p.startsWith('b1') && p.length >= 10);
+    if (folderIdCandidate) {
+      cleaned = folderIdCandidate;
+    } else {
+      cleaned = parts[parts.length - 1] || cleaned;
     }
   }
-  return cleaned.split('?')[0].split('#')[0].trim();
+  
+  return cleaned.trim();
 }
 
 async function callYandexGPT(systemText: string, userText: string): Promise<string> {
