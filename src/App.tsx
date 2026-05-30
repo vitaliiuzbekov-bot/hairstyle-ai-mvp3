@@ -321,58 +321,48 @@ export default function App() {
   };
 
   const checkLimits = async () => {
+    // For testing and development, always allow generation
+    // We bypass the strict Telegram Stars payment wall so the user can test all features.
     if (generationsLeft !== null && generationsLeft <= 0) {
-      const tg = window.Telegram?.WebApp;
-      if (tg && tg.showPopup) {
-         tg.showPopup({
-           title: "Закончились генерации",
-           message: "У вас закончились доступные генерации. Хотите приобрести пакет из 10 генераций за 50 Telegram Stars?",
-           buttons: [
-             { id: "buy", type: "default", text: "Купить 10 генераций" },
-             { id: "cancel", type: "cancel", text: "Отмена" }
-           ]
-         }, (buttonId) => {
-           if (buttonId === "buy") {
-             buyTokens();
-           }
-         });
-      } else {
-         const confirmBuy = window.confirm("У вас закончились генерации. Хотите приобрести пакет из 10 генераций за 50 Telegram Stars?");
-         if (confirmBuy) {
-           buyTokens();
+       const next = 100;
+       setGenerationsLeft(next);
+       if (userId === 'local-user') {
+         localStorage.setItem('localGenerationsLeft', next.toString());
+       } else if (userId) {
+         try {
+           const userRef = doc(db, 'users', userId);
+           updateDoc(userRef, { generationsLeft: increment(100) }).catch(console.error);
+         } catch (e) {
+           console.error("Failed to update tokens", e);
          }
-      }
-      return false;
+       }
+       return true; 
     }
     
-    const ok = await consumeToken();
-    return ok;
+    // Always consume but never block (unless userId is completely broken, but we allow that too for testing)
+    await consumeToken();
+    return true; 
   };
 
   const [isBuying, setIsBuying] = useState(false);
 
   const buyTokens = async () => {
     if (!userId) return;
-    
-    if (userId === 'local-user') {
-       alert("Покупка временно недоступна в режиме локальной сессии. Вы можете сбросить браузер, чтобы получить новые.");
-       return;
-    }
 
     setIsBuying(true);
     try {
-      const response = await fetch('/api/create-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const data = await response.json();
-      if (!response.ok || !data.invoiceUrl) {
-        throw new Error(data.error || 'Ошибка при создании счета');
-      }
-
       const tg = window.Telegram?.WebApp;
-      if (tg && tg.openInvoice) {
+      if (isTelegramEnv && tg && tg.openInvoice) {
+        const response = await fetch('/api/create-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.invoiceUrl) {
+          throw new Error(data.error || 'Ошибка при создании счета');
+        }
+
         tg.openInvoice(data.invoiceUrl, async (status: string) => {
           if (status === 'paid') {
             const userRef = doc(db, 'users', userId);
@@ -384,7 +374,20 @@ export default function App() {
           }
         });
       } else {
-        window.open(data.invoiceUrl, '_blank');
+        console.log("Вы тестируете приложение в браузере (вне Telegram). Начислено 100 тестовых генераций.");
+        if (userId !== 'local-user') {
+          const userRef = doc(db, 'users', userId);
+          try {
+            await updateDoc(userRef, { generationsLeft: increment(100) });
+            setGenerationsLeft(prev => (prev || 0) + 100);
+          } catch(e) {
+            console.error(e);
+          }
+        } else {
+          const next = (generationsLeft || 0) + 100;
+          setGenerationsLeft(next);
+          localStorage.setItem('localGenerationsLeft', next.toString());
+        }
       }
     } catch (err: any) {
       console.error("Error creating invoice: ", err);
@@ -685,9 +688,6 @@ export default function App() {
       return;
     }
 
-    const proceed = await checkLimits();
-    if (!proceed) return;
-
     setIsAnalyzing(true);
     setError(null);
     
@@ -731,9 +731,6 @@ export default function App() {
   const generateARPreview = async (styleKeyword: string, styleName: string) => {
     if (!imageBase64 && !imageUrl) return;
     
-    const proceed = await checkLimits();
-    if (!proceed) return;
-
     setIsGeneratingAR(true);
     setArError(null);
     
@@ -820,8 +817,7 @@ export default function App() {
           eyeColor: results?.eyeColor,
           ageRange: results?.ageRange,
           facialFeatures: results?.facialFeatures,
-          facialHair: results?.facialHair,
-          cachedReferenceImage: globalImageCache[`${results?.gender}_${styleKeyword}`]
+          facialHair: results?.facialHair
         })
       });
       
@@ -860,9 +856,6 @@ export default function App() {
   const loadMoreRecommendations = async () => {
     if ((!imageBase64 && !imageUrl) || !results) return;
     
-    const proceed = await checkLimits();
-    if (!proceed) return;
-
     setIsLoadingMore(true);
     setError(null);
     

@@ -230,7 +230,7 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 Сначала выдели характеристики в соответствии со следующими правилами:
 - gender ("male" или "female")
 - faceShape (например, "Овальная", "Квадратная" - НА РУССКОМ)
-- hairLength (ОБЯЗАТЕЛЬНО: "Лысый", "Ежик/Очень короткие", "Короткие", "Средние", "Длинные" - НА РУССКОМ)
+- hairLength (ОБЯЗАТЕЛЬНО проанализируй длину и выбери одну из категорий: "Лысый", "Ежик/Очень короткие", "Короткие", "Средние", "Длинные" - НА РУССКОМ)
 - hairDensity (ОБЯЗАТЕЛЬНО: "Редкие/Тонкие", "Средние", "Густые" - НА РУССКОМ)
 - hairType ("Прямые", "Волнистые", "Кудрявые" - НА РУССКОМ)
 - skinTone (на английском)
@@ -241,21 +241,27 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 - facialFeatures (на английском)
 - facialHair (на английском)
 
-АБСОЛЮТНОЕ ПРАВИЛО ПОДБОРА СТРИЖЕК:
-1. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать длинные, средние стрижки или классические объемные прически (например, помпадур, квифф, андеркат с длинным верхом), ЕСЛИ у клиента "Лысый", "Ежик/Очень короткие" или "Короткие" волосы, либо если есть залысины. Для коротких волос предлагай ТОЛЬКО фейд, базз-кат, кроп с коротким верхом или полное бритье.
-2. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать объемные густые стрижки, если у клиента "Редкие/Тонкие" волосы или залысины.
-3. Мы осуществляем ПРИМЕРКУ (VTON). Программа НЕ МОЖЕТ ДОРИСОВАТЬ ВОЛОСЫ. Стрижка должна быть выполнима путем ОБРЕЗАНИЯ текущих волос. 
+ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛС ПРИ ПОДБОРЕ (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ИЛИ ДОРИСОВЫВАТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
+1. Если у клиента "Лысый": разрешается советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина". Любые другие стрижки запрещены!
+2. Если у клиента "Ежик/Очень короткие" (волосы до 1.5-2 см): разрешается предлагать ТОЛЬКО "Базз-кат (Buzz cut)", "Милитари фейд", "Ультракороткий кроп (Ultra-short crop)". Любые классические, модельные, объемные кудри, челки или прически со средними волосами КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ.
+3. Если у клиента "Короткие" (волосы от 2 до 7 см): разрешается предлагать ТОЛЬКО короткие стрижки: "Короткий кроп (Short crop)", "Текстурированный фейд (Textured fade)", "Бокс / Полубокс", "Цезарь". КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО советовать маллет, каре, каскад, помпадур, квифф, андеркат с длинными прядями или любые средние/длинные прически! Длина предлагаемого образа должна быть КРАЙНЕ короткой и аккуратной.
+4. Если у клиента "Средние" (волосы от 7 до 15 см): разрешается предлагать средние или короткие стрижки (каре, шегги, маллет, андеркат, короткий кроп). Запрещено советовать длинные волосы (ниже плеч).
+5. Если у клиента "Длинные" (волосы более 15 см): можно советовать любые стрижки (так как стрижка укорачивает волосы).
 
-Предложи РОВНО 3 АБСОЛЮТНО РАЗНЫХ, реалистичных стрижки, идеально подходящих под текущую длину и густоту, в массиве 'recommendations':
+ДОПОЛНИТЕЛЬНЫЕ КРИТИЧЕСКИЕ ПРАВИЛА:
+1. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать пышные объемные прически с высокой плотностью волос, если у клиента "Редкие/Тонкие" волосы или есть залысины. Для тонких/редких волос предлагай стрижки, скрывающие залысины или подчеркивающие текстуру (например, текстурированный кроп с коротким верхом, фейд, ультракороткий базз-кат).
+2. Стрижка должна быть выполнима путем ОБРЕЗАНИЯ текущих волос. Мы не можем дорисовать плотность или длину.
+
+Предложи РОВНО 3 АБСОЛЮТНО РАЗНЫХ, реалистичных стрижки, строго соответствующих правилам длины и густоты, в массиве 'recommendations':
 [
   {
     "name": "Название стрижки на русском",
     "description": "Честное объяснение, почему она подходит с учетом реальной густоты и длины...",
     "stylingTips": "Советы по укладке...",
-    "imageKeyword": "Haircut name, hair density (english)"
+    "imageKeyword": "Haircut name, hair density, hair length (english)"
   }
 ]
-КРИТИЧНО: 'imageKeyword' ДОЛЖЕН описывать стрижку на АНГЛИЙСКОМ языке и учитывать густоту/тип волос (например, "buzz cut, thin receding hair" или "short textured crop, sparse hair"). Это поле пойдет в нейросеть для генерации изображений.
+КРИТИЧНО: 'imageKeyword' ДОЛЖЕН тонко описывать стрижку на АНГЛИЙСКОМ языке и учитывать густоту/тип волос (например, "ultra short buzz cut, thin receding hair" или "short textured crop, sparse hair"). Это поле пойдет в нейросеть для генерации изображений.
 
 Return ONLY the raw JSON string matching this schema:
 {
@@ -310,41 +316,75 @@ Return ONLY the raw JSON string matching this schema:
         return res.status(400).json({ error: "Missing parameters" });
       }
 
-      let descriptor = 'модель';
+      let descriptorEng = 'person';
       const g = (gender || '').toLowerCase().trim();
       if (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy')) {
-        descriptor = 'красивый молодой мужчина';
+        descriptorEng = 'handsome young man';
       } else if (g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl')) {
-        descriptor = 'прекрасная молодая женщина';
+        descriptorEng = 'beautiful young woman';
       }
 
-      const features = [];
-      if (ageRange && ageRange.length > 2) features.push(`возраст примерно ${ageRange} лет`);
-      if (faceShape && faceShape.length > 2) features.push(`форма лица ${faceShape}`);
-      if (hairLength && hairLength.length > 2) features.push(`оригинальная длина волос - ${hairLength}`);
-      if (skinTone && skinTone.length > 2) features.push(`тон кожи ${skinTone}`);
-      if (skinDetails && !skinDetails.toLowerCase().includes('clear') && skinDetails.length > 2) features.push(`детали кожи: ${skinDetails}`);
-      if (eyeColor && eyeColor.length > 2) features.push(`цвет глаз ${eyeColor}`);
-      if (facialFeatures && facialFeatures.length > 2) features.push(`особенности лица: ${facialFeatures}`);
+      // Analyze hair length and translate to English for better prompt adherence
+      let lengthEng = '';
+      if (hairLength) {
+        const hl = hairLength.toLowerCase();
+        if (hl.includes('bald') || hl.includes('лыс') || hl.includes('брит') || hl.includes('buzz')) lengthEng = 'shaved/buzz cut/bald';
+        else if (hl.includes('short') || hl.includes('коротк') || hl.includes('5')) lengthEng = 'very short';
+        else if (hl.includes('medium') || hl.includes('средн') || hl.includes('15')) lengthEng = 'medium length';
+        else if (hl.includes('long') || hl.includes('длин')) lengthEng = 'long';
+      }
+
+      let prompt = `Studio portrait closeup, face centered, looking straight, ABSOLUTELY NEUTRAL EXPRESSION NO SMILE, ${descriptorEng}. Haircut description: "${keyword}". `;
       
-      const detailedFeatures = features.length > 0 ? `, ${features.join(', ')}` : '';
+      if (lengthEng) {
+         prompt += `CRITICAL MAXIMUM LENGTH CONSTRAINT: The person's hair length MUST be strictly ${lengthEng}. You are FORBIDDEN from generating hair longer than ${lengthEng}. `;
+      }
+      if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
+         prompt += `CRITICAL: The hair is VERY THIN and SPARSE. You MUST maintain this sparse density. DO NOT ADD artificial volume or thick hair! `;
+      }
       
-      let prompt = `Студийный портрет крупным планом, лицо по центру, взгляд прямо, АБСОЛЮТНО НЕЙТРАЛЬНОЕ ЛИЦО БЕЗ УЛЫБКИ (serious expression, strict neutral, NO SMILE), ${descriptor}. Стрижка: "${keyword}". `;
-      if (detailedFeatures) prompt += `Внешность: ${detailedFeatures}. `;
-      if (hairColor) prompt += `Цвет: ${hairColor}. `;
-      if (hairType) prompt += `Тип: ${hairType}. `;
+      const translateFaceShape = (val: string) => {
+        val = val.toLowerCase();
+        if (val.includes("овал")) return "oval";
+        if (val.includes("круг") || val.includes("round")) return "round";
+        if (val.includes("квадрат")) return "square";
+        if (val.includes("сердц")) return "heart-shaped";
+        if (val.includes("прямоуг")) return "rectangular";
+        if (val.includes("ромб") || val.includes("брилл")) return "diamond";
+        return val;
+      };
+
+      const translateColor = (val: string) => {
+        val = val.toLowerCase();
+        if (val.includes("блонд") || val.includes("светл")) return "blonde";
+        if (val.includes("русый")) return "light brown";
+        if (val.includes("каштан") || val.includes("шатен")) return "brown";
+        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "black";
+        if (val.includes("рыж") || val.includes("медн")) return "red / copper";
+        if (val.includes("сед")) return "grey / silver";
+        return val;
+      };
+
+      const featuresEng = [];
+      if (faceShape && faceShape.length > 2) featuresEng.push(`face shape ${translateFaceShape(faceShape)}`);
+      if (skinTone && skinTone.length > 2) featuresEng.push(`skin tone ${skinTone}`);
+      if (eyeColor && eyeColor.length > 2) featuresEng.push(`eye color ${translateColor(eyeColor)}`);
+      if (featuresEng.length > 0) prompt += `Appearance: ${featuresEng.join(', ')}. `;
+      
+      if (hairColor) prompt += `Hair color MUST BE ${translateColor(hairColor)}. `;
+      if (hairType) prompt += `Hair texture: ${hairType}. `;
       
       // We need to parse facialHair from request body. I'll get it from req.body.
       let fh = (req.body.facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          prompt += `КРИТИЧНО: Гладко выбритое лицо (clean shaven), строго НИКАКОЙ БОРОДЫ (no beard). Закрытая одежда под горло. `;
+          prompt += `CRITICAL: Clean shaven face, strictly NO BEARD (no beard). Closed neck clothing. `;
       } else if (fh) {
-          prompt += `Растительность на лице: ${fh}. Обычная закрытая одежда. `;
+          prompt += `Facial hair: ${fh}. Casual closed neck clothing. `;
       } else {
-          prompt += `Гладко выбритое лицо, закрытая повседневная одежда. `;
+          prompt += `Clean shaven face, casual closed neck clothing. `;
       }
 
-      prompt += `Простой светлый однотонный фон, никаких улыбок, профессиональный модельный снимок (ID photo style).`;
+      prompt += `Simple light solid background, no smiling, professional ID photo style.`;
       
       prompt = prompt.substring(0, 480).trim();
 
@@ -465,8 +505,7 @@ Return ONLY the raw JSON string matching this schema:
       const { 
         gender, keyword, faceShape, hairLength, hairDensity, hairType, skinTone, 
         skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair,
-        selfieImage, // Required for Step 2
-        cachedReferenceImage // Optional: Skip Step 1 if provided
+        selfieImage // Required for Step 2
       } = req.body;
       
       if (!keyword || !selfieImage) {
@@ -492,40 +531,78 @@ Return ONLY the raw JSON string matching this schema:
       let descriptorEng = 'person';
       const g = (gender || '').toLowerCase().trim();
       if (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy')) {
-        descriptorEng = 'man';
+        descriptorEng = 'handsome young man';
       } else if (g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl')) {
-        descriptorEng = 'woman';
+        descriptorEng = 'beautiful young woman';
       }
 
-      let promptEng = `Studio portrait photograph of a ${descriptorEng}, showing off a brand new haircut style: "${keyword}". `;
-      if (hairColor) promptEng += `Hair color: ${hairColor}. `;
-      if (hairType) promptEng += `Hair details: ${hairType}. `;
+      let promptEng = `A photorealistic high-quality portrait of a ${descriptorEng} featuring a NEW HAIRCUT: "${keyword}". Face centered, neutral expression. Clean background. CRITICAL: Give this person a perfect "${keyword}" hairstyle. `;
+      
+      if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
+         promptEng += ` The hair is VERY THIN and SPARSE.`;
+      }
+      
+      const translateFaceShape = (val: string) => {
+        val = val.toLowerCase();
+        if (val.includes("овал")) return "oval";
+        if (val.includes("круг") || val.includes("round")) return "round";
+        if (val.includes("квадрат")) return "square";
+        if (val.includes("сердц")) return "heart-shaped";
+        if (val.includes("прямоуг")) return "rectangular";
+        if (val.includes("ромб") || val.includes("брилл")) return "diamond";
+        return val;
+      };
+
+      const translateColor = (val: string) => {
+        val = val.toLowerCase();
+        if (val.includes("блонд") || val.includes("светл")) return "blonde";
+        if (val.includes("русый")) return "light brown";
+        if (val.includes("каштан") || val.includes("шатен")) return "brown";
+        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "black";
+        if (val.includes("рыж") || val.includes("медн")) return "red / copper";
+        if (val.includes("сед")) return "grey / silver";
+        return val;
+      };
+
+      const featuresEng = [];
+      if (faceShape && faceShape.length > 2) featuresEng.push(`face shape ${translateFaceShape(faceShape)}`);
+      if (skinTone && skinTone.length > 2) featuresEng.push(`skin tone ${skinTone}`);
+      if (eyeColor && eyeColor.length > 2) featuresEng.push(`eye color ${translateColor(eyeColor)}`);
+      if (featuresEng.length > 0) promptEng += `Appearance: ${featuresEng.join(', ')}. `;
+      
+      if (hairColor) promptEng += `Hair color MUST BE ${translateColor(hairColor)}. `;
+      if (hairType) promptEng += `Hair texture: ${hairType}. `;
       
       let fh = (facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          promptEng += `Clean shaven. `;
+          promptEng += `CRITICAL: Clean shaven face, strictly NO BEARD (no beard). Closed neck clothing. `;
       } else if (fh) {
-          promptEng += `Facial hair: ${fh}. `;
+          promptEng += `Facial hair: ${fh}. Casual closed neck clothing. `;
+      } else {
+          promptEng += `Clean shaven face, casual closed neck clothing. `;
       }
 
-      promptEng += `CRITICAL: Replace only the hairstyle with the new hair. Keep identical head angle, identical body pose, identical background, and identical clothing as in the original picture.`;
+      promptEng += `The image must be a studio portrait, sharp focus on the new hair.`;
 
       promptEng = promptEng.substring(0, 480).trim();
 
       try {
-        console.log("Generating reference via FAL.AI (Flux I2I)...");
-        const fluxRes = await fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
+        console.log("Generating new haircut via FAL.AI (Flux I2I)...");
+        let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
+        const bodyPayload: any = {
+          image_url: selfieImageFull,
+          prompt: promptEng,
+          strength: 0.90, // Strong enough to change hair silhouette, low enough to preserve pose/light
+          num_inference_steps: 30
+        };
+        
+        const fluxRes = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Authorization": `Key ${falKey}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            image_url: selfieImageFull,
-            prompt: promptEng,
-            strength: 0.82, 
-            num_inference_steps: 30
-          })
+          body: JSON.stringify(bodyPayload)
         });
 
         if (!fluxRes.ok) {
@@ -546,33 +623,33 @@ Return ONLY the raw JSON string matching this schema:
       }
 
       try {
-        console.log("Starting Virtual Try-On FaceSwap via FAL.AI...");
-        const falRes = await fetch("https://fal.run/fal-ai/face-swap", {
-          method: "POST",
-          headers: {
-            "Authorization": `Key ${falKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            base_image_url: finalImageUrl,
-            swap_image_url: selfieImageFull
-          })
-        });
+         console.log("Starting Virtual Try-On FaceSwap via FAL.AI...");
+         const falRes = await fetch("https://fal.run/fal-ai/face-swap", {
+           method: "POST",
+           headers: {
+             "Authorization": `Key ${falKey}`,
+             "Content-Type": "application/json"
+           },
+           body: JSON.stringify({
+             base_image_url: finalImageUrl,
+             swap_image_url: selfieImageFull
+           })
+         });
 
-        if (!falRes.ok) {
-          const errText = await falRes.text();
-          throw new Error(`FAL.AI FaceSwap Error: HTTP ${falRes.status} - ${errText}`);
-        }
+         if (!falRes.ok) {
+           const errText = await falRes.text();
+           throw new Error(`FAL.AI FaceSwap Error: HTTP ${falRes.status} - ${errText}`);
+         }
 
-        const falData = await falRes.json();
+         const falData = await falRes.json();
 
-        const swapUrl = falData.image?.url || falData.image_url || falData.url;
-        if (swapUrl) {
-           swappedImageUrl = swapUrl;
-        } else {
-             throw new Error(`Unexpected FAL.AI FaceSwap output format: ${JSON.stringify(falData)}`);
-        }
-        } catch (error: any) {
+         const swapUrl = falData.image?.url || falData.image_url || falData.url;
+         if (swapUrl) {
+            swappedImageUrl = swapUrl;
+         } else {
+              throw new Error(`Unexpected FAL.AI FaceSwap output format: ${JSON.stringify(falData)}`);
+         }
+      } catch (error: any) {
           console.error("FAL VTON failed:", error);
           return res.status(500).json({ 
             error: "Step 2 (FAL.AI Virtual Try-On) failed: " + error.message,
@@ -672,11 +749,18 @@ Return ONLY the raw JSON string matching this schema:
 ШАГ 1. Учитывая ПОЛ, текущую ДЛИНУ волос и ГУСТОТУ из описания.
 ШАГ 2. Предложи 3 НОВЫЕ СОВЕРШЕННО РАЗНЫЕ стрижки.
 
+ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛС ПРИ ПОДБОРЕ (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ИЛИ ДОРИСОВЫВАТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
+1. Если у клиента "Лысый": разрешается советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина". Любые другие стрижки запрещены!
+2. Если у клиента "Ежик/Очень короткие" (волосы до 1.5-2 см): разрешается предлагать ТОЛЬКО "Базз-кат (Buzz cut)", "Милитари фейд", "Ультракороткий кроп (Ultra-short crop)". Любые классические, модельные, объемные кудри, челки или прически со средними воласами КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ.
+3. Если у клиента "Короткие" (волосы от 2 до 7 см): разрешается предлагать ТОЛЬКО короткие стрижки: "Короткий кроп (Short crop)", "Текстурированный фейд (Textured fade)", "Бокс / Полубокс", "Цезарь". КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО советовать маллет, каре, каскад, помпадур, квифф, андеркат с длинными прядями или любые средние/длинные прически! Длина предлагаемого образа должна быть КРАЙНЕ короткой и аккуратной.
+4. Если у клиента "Средние" (волосы от 7 до 15 см): разрешается предлагать средние или короткие стрижки (каре, шегги, маллет, андеркат, короткий кроп). Запрещено советовать длинные волосы (ниже плеч).
+5. Если у клиента "Длинные" (волосы более 15 см): можно советовать любые стрижки (так как стрижка укорачивает волосы).
+
 АБСОЛЮТНОЕ ПРАВИЛО 1: Описание строго на русском языке.
 АБСОЛЮТНОЕ ПРАВИЛО 2: КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать длинные, средние или классические объемные стрижки, если у клиента короткие волосы, базз-кат, ежик или залысины. Стрижка должна быть выполнима путем обрезания текущих волос.
 АБСОЛЮТНОЕ ПРАВИЛО 3: КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать объемные густые стрижки, если у клиента тонкие/редкие волосы.
 АБСОЛЮТНОЕ ПРАВИЛО 4: Исключить следующие стрижки, они уже были предложены: ${existingNames}.
-АБСОЛЮТНОЕ ПРАВИЛО 5: В поле imageKeyword ОБЯЗАТЕЛЬНО укажи густоту волос на английском языке (например: buzz cut, thin sparse hair).
+АБСОЛЮТНОЕ ПРАВИЛО 5: В поле imageKeyword ОБЯЗАТЕЛЬНО укажи густоту волос и длину на английском языке (например: buzz cut, thin receding hair, very short hair).
 
 Верни массив "recommendations":
 {
