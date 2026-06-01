@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, Scissors, Sparkles, RefreshCw, AlertCircle, Image as ImageIcon, ChevronRight, X, Maximize2, Zap, Coins } from 'lucide-react';
-import { auth, db, storage } from './firebase';
+import { Camera, Upload, Scissors, Sparkles, RefreshCw, AlertCircle, Image as ImageIcon, ChevronRight, X, Maximize2, Zap, Coins, Download } from 'lucide-react';
+import { auth, db } from './firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { handleFirestoreError, OperationType } from './firebase';
 
 declare global {
@@ -97,11 +96,20 @@ const LazyImage = ({ keyword, gender, uniqueName, description, className, autoLo
 
   if (loadedUrl) {
     return (
-      <img 
-        src={loadedUrl} 
-        alt={uniqueName} 
-        className={className} 
-      />
+      <div className="relative w-full h-full group/lazy flex">
+        <img 
+          src={loadedUrl} 
+          alt={uniqueName} 
+          className={`w-full h-full ${className || 'object-cover'}`} 
+        />
+        <button
+          onClick={(e) => { e.stopPropagation(); downloadImage(loadedUrl, 'reference_style.jpg'); }}
+          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white cursor-pointer hover:bg-black/80 transition-opacity z-10 opacity-100 sm:opacity-0 group-hover/lazy:opacity-100"
+          title="Сохранить референс"
+        >
+          <Download size={14} />
+        </button>
+      </div>
     );
   }
 
@@ -160,6 +168,36 @@ const FallbackImage = 'https://images.unsplash.com/photo-1560066984-138dadb4c035
 // Removed queue for simpler operation
 
 
+const downloadImage = async (url: string, filename: string) => {
+  try {
+    if (url.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const objUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(objUrl);
+      } catch (e) {
+        window.open(url, '_blank');
+      }
+    }
+  } catch (e) {
+    console.error("Download failed", e);
+  }
+};
+
 export default function App() {
   const [tryOnStyle, setTryOnStyle] = useState<any | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -179,6 +217,8 @@ export default function App() {
   const [isGeneratingVTON, setIsGeneratingVTON] = useState(false);
   const [vtonResultUrl, setVtonResultUrl] = useState<string | null>(null);
   const [vtonError, setVtonError] = useState<string | null>(null);
+  const [customHairColor, setCustomHairColor] = useState<string | null>(null);
+  const [vtonStrength, setVtonStrength] = useState<number>(85);
   
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -192,7 +232,6 @@ export default function App() {
   useEffect(() => {
     // Check Telegram
     const tg = window.Telegram?.WebApp;
-    const isDev = (import.meta as any).env.DEV || (import.meta as any).env.VITE_DEV_MODE === 'true';
     if (tg && (tg as any).initData) {
       setIsTelegramEnv(true);
       tg.expand?.();
@@ -202,7 +241,7 @@ export default function App() {
       if ((tg as any).setBackgroundColor) {
         (tg as any).setBackgroundColor('#050508');
       }
-    } else if (!isDev) {
+    } else {
       setIsTelegramEnv(false);
     }
 
@@ -321,26 +360,26 @@ export default function App() {
   };
 
   const checkLimits = async () => {
-    // For testing and development, always allow generation
-    // We bypass the strict Telegram Stars payment wall so the user can test all features.
     if (generationsLeft !== null && generationsLeft <= 0) {
-       const next = 100;
-       setGenerationsLeft(next);
-       if (userId === 'local-user') {
-         localStorage.setItem('localGenerationsLeft', next.toString());
-       } else if (userId) {
-         try {
-           const userRef = doc(db, 'users', userId);
-           updateDoc(userRef, { generationsLeft: increment(100) }).catch(console.error);
-         } catch (e) {
-           console.error("Failed to update tokens", e);
-         }
-       }
-       return true; 
+      const tg = window.Telegram?.WebApp;
+      if (tg && tg.showPopup) {
+        tg.showPopup({
+          title: 'Закончились генерации',
+          message: 'Пополните баланс, чтобы продолжить использование.',
+          buttons: [{ type: 'ok', id: 'ok' }]
+        }, () => {
+          buyTokens();
+        });
+      } else {
+        alert("Закончились генерации. Пополните баланс.");
+        buyTokens();
+      }
+      return false;
     }
     
-    // Always consume but never block (unless userId is completely broken, but we allow that too for testing)
-    await consumeToken();
+    // Consume a token before proceeding
+    const success = await consumeToken();
+    if (!success) return false;
     return true; 
   };
 
@@ -374,24 +413,16 @@ export default function App() {
           }
         });
       } else {
-        console.log("Вы тестируете приложение в браузере (вне Telegram). Начислено 100 тестовых генераций.");
-        if (userId !== 'local-user') {
-          const userRef = doc(db, 'users', userId);
-          try {
-            await updateDoc(userRef, { generationsLeft: increment(100) });
-            setGenerationsLeft(prev => (prev || 0) + 100);
-          } catch(e) {
-            console.error(e);
-          }
-        } else {
-          const next = (generationsLeft || 0) + 100;
-          setGenerationsLeft(next);
-          localStorage.setItem('localGenerationsLeft', next.toString());
-        }
+        alert("Оплата поддерживается только в Telegram.");
       }
     } catch (err: any) {
       console.error("Error creating invoice: ", err);
-      alert("Ошибка создания счета: " + (err.message || 'Неизвестная ошибка'));
+      const tg = window.Telegram?.WebApp;
+      if (tg && tg.showAlert) {
+        tg.showAlert(err.message || "Ошибка при оплате");
+      } else {
+        alert("Ошибка создания счета: " + (err.message || 'Неизвестная ошибка'));
+      }
     } finally {
       setIsBuying(false);
     }
@@ -452,22 +483,7 @@ export default function App() {
 
         const b64 = compressedDataUrl.split(',')[1];
         setImageBase64(b64); // Show preview immediately
-
-        try {
-          // Send to Firebase Storage in background without blocking
-          const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-          const storageRef = ref(storage, fileName);
-          uploadString(storageRef, compressedDataUrl, 'data_url')
-            .then(async () => {
-              const uploadedUrl = await getDownloadURL(storageRef);
-              setImageUrl(uploadedUrl);
-            })
-            .catch(err => console.error("Firebase Storage Upload Error:", err));
-        } catch(err: any) {
-          console.error("Firebase Storage Setup Error:", err);
-        } finally {
-          setIsUploadingImage(false);
-        }
+        setIsUploadingImage(false);
       };
       img.onerror = () => {
         setIsUploadingImage(false);
@@ -787,7 +803,7 @@ export default function App() {
     }
   };
 
-  const generateVirtualTryOn = async (styleKeyword: string, styleName: string) => {
+  const generateVirtualTryOn = async (styleKeyword: string, styleName: string, selectedColor: string | null = null) => {
     if (!imageBase64) return;
     
     const proceed = await checkLimits();
@@ -806,6 +822,8 @@ export default function App() {
         body: JSON.stringify({ 
           selfieImage: imageBase64,
           keyword: styleKeyword, 
+          customHairColor: selectedColor,
+          vtonStrength: vtonStrength,
           gender: results?.gender,
           faceShape: results?.faceShape,
           hairLength: results?.hairLength,
@@ -1363,32 +1381,91 @@ export default function App() {
                     {vtonResultUrl && (
                       <div className="mb-4 bg-white/5 border border-white/10 rounded-2xl p-2 text-white/90">
                         <div className="flex flex-col sm:flex-row w-full gap-4 overflow-hidden rounded-xl border border-white/10 select-none bg-black/20 p-2">
-                          <div className="relative flex-1 rounded-xl overflow-hidden border border-white/5 bg-black/40 flex items-center justify-center">
+                          <div className="relative flex-1 rounded-xl overflow-hidden border border-white/5 bg-black/40 flex items-center justify-center group">
                             <img 
                               src={imageUrl || `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`} 
                               alt="До" 
                               className="w-full h-auto max-h-[60vh] object-contain" 
                             />
-                            <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-semibold tracking-wide text-white border border-white/10 pointer-events-none shadow-md">
+                            <div className="absolute bottom-3 left-3 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-semibold tracking-wide text-white border border-white/10 pointer-events-none shadow-md">
                               ВАШЕ ФОТО
                             </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); downloadImage(imageUrl || `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`, 'original_photo.jpg'); }}
+                              className="absolute top-3 right-3 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white cursor-pointer hover:bg-black/80 sm:opacity-0 sm:group-hover:opacity-100 transition-all opacity-100"
+                              title="Сохранить фото"
+                            >
+                              <Download size={16} />
+                            </button>
                           </div>
                           
-                          <div className="relative flex-1 rounded-xl overflow-hidden border border-emerald-500/30 bg-black/40 flex items-center justify-center">
+                          <div className="relative flex-1 rounded-xl overflow-hidden border border-emerald-500/30 bg-black/40 flex items-center justify-center group">
                             <img 
                               src={vtonResultUrl} 
                               alt="После" 
                               className="w-full h-auto max-h-[60vh] object-contain"
                             />
-                            <div className="absolute top-3 right-3 bg-emerald-500/20 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-semibold tracking-wide text-emerald-100 border border-emerald-500/30 pointer-events-none shadow-md">
+                            <div className="absolute bottom-3 left-3 bg-emerald-500/20 backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-semibold tracking-wide text-emerald-100 border border-emerald-500/30 pointer-events-none shadow-md">
                               РЕЗУЛЬТАТ (ИИ)
                             </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); downloadImage(vtonResultUrl, 'ai_result.jpg'); }}
+                              className="absolute top-3 right-3 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white cursor-pointer hover:bg-black/80 sm:opacity-0 sm:group-hover:opacity-100 transition-all opacity-100"
+                              title="Сохранить результат"
+                            >
+                              <Download size={16} />
+                            </button>
                            </div>
                         </div>
                       </div>
                     )}
+                    <div className="flex flex-wrap gap-2 pb-3 justify-center mb-3">
+                      {['Блонд', 'Русый', 'Каштановый', 'Черный', 'Рыжий', 'Седой'].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setCustomHairColor(color)}
+                          className={`px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-medium transition-all border ${
+                            customHairColor === color 
+                              ? 'bg-blue-500 text-white border-blue-400' 
+                              : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                      {customHairColor && (
+                        <button
+                           onClick={() => setCustomHairColor(null)}
+                           className="px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-medium transition-all border bg-red-500/20 text-red-200 border-red-500/30 hover:bg-red-500/30"
+                        >
+                          Сбросить
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Slider for transformation strength */}
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-1 text-xs text-gray-300">
+                        <span>Уровень вмешательства ИИ:</span>
+                        <span className="font-semibold">{vtonStrength}%</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="5"
+                        value={vtonStrength}
+                        onChange={(e) => setVtonStrength(Number(e.target.value))}
+                        className="w-full accent-blue-500 bg-white/10 rounded-lg appearance-none h-1.5 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                        <span className="max-w-[70px] text-left leading-tight">Сохраняет ваш фон (Легкая нейро-укладка)</span>
+                        <span className="max-w-[70px] text-right leading-tight">Студийный кадр (Идеальная прическа)</span>
+                      </div>
+                    </div>
+
                     <button 
-                      onClick={() => generateVirtualTryOn(tryOnStyle.imageKeyword, tryOnStyle.name)}
+                      onClick={() => generateVirtualTryOn(tryOnStyle.imageKeyword, tryOnStyle.name, customHairColor)}
                       disabled={isGeneratingVTON}
                       className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium py-4 px-6 rounded-full transition-all shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 text-sm sm:text-base"
                     >

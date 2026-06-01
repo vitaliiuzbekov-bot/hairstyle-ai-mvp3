@@ -316,92 +316,76 @@ Return ONLY the raw JSON string matching this schema:
         return res.status(400).json({ error: "Missing parameters" });
       }
 
-      let descriptorEng = 'person';
+      let descriptorRu = 'человек';
       const g = (gender || '').toLowerCase().trim();
       if (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy')) {
-        descriptorEng = 'handsome young man';
+        descriptorRu = 'молодой мужчина';
       } else if (g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl')) {
-        descriptorEng = 'beautiful young woman';
+        descriptorRu = 'молодая женщина';
       }
 
-      // Analyze hair length and translate to English for better prompt adherence
-      let lengthEng = '';
+      let lengthRu = '';
       if (hairLength) {
         const hl = hairLength.toLowerCase();
-        if (hl.includes('bald') || hl.includes('лыс') || hl.includes('брит') || hl.includes('buzz')) lengthEng = 'shaved/buzz cut/bald';
-        else if (hl.includes('short') || hl.includes('коротк') || hl.includes('5')) lengthEng = 'very short';
-        else if (hl.includes('medium') || hl.includes('средн') || hl.includes('15')) lengthEng = 'medium length';
-        else if (hl.includes('long') || hl.includes('длин')) lengthEng = 'long';
+        if (hl.includes('bald') || hl.includes('лыс') || hl.includes('брит') || hl.includes('buzz')) lengthRu = 'бритая налысо голова, под ноль';
+        else if (hl.includes('short') || hl.includes('коротк') || hl.includes('5')) lengthRu = 'короткие волосы';
+        else if (hl.includes('medium') || hl.includes('средн') || hl.includes('15')) lengthRu = 'волосы средней длины';
+        else if (hl.includes('long') || hl.includes('длин')) lengthRu = 'длинные волосы';
       }
 
-      let prompt = `Studio portrait closeup, face centered, looking straight, ABSOLUTELY NEUTRAL EXPRESSION NO SMILE, ${descriptorEng}. Haircut description: "${keyword}". `;
+      let prompt = `Профессиональный студийный портрет крупным планом, ровно по центру кадра, смотрит прямо в камеру. Выражение лица АБСОЛЮТНО НЕЙТРАЛЬНОЕ, БЕЗ УЛЫБКИ. Модель: ${descriptorRu}. Прическа/стрижка строго: "${keyword}". `;
       
-      if (lengthEng) {
-         prompt += `CRITICAL MAXIMUM LENGTH CONSTRAINT: The person's hair length MUST be strictly ${lengthEng}. You are FORBIDDEN from generating hair longer than ${lengthEng}. `;
+      if (lengthRu) {
+         prompt += `КРИТИЧЕСКОЕ ПРАВИЛО: Длина волос ДОЛЖНА БЫТЬ СТРОГО "${lengthRu}". Запрещено рисовать волосы другой длины! `;
       }
       if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
-         prompt += `CRITICAL: The hair is VERY THIN and SPARSE. You MUST maintain this sparse density. DO NOT ADD artificial volume or thick hair! `;
+         prompt += `ВНИМАНИЕ: Очень тонкие, редкие волосы. Обязательно передать низкую густоту, БЕЗ ОБЪЕМА! `;
+      } else {
+         prompt += `Умеренная, естественная густота волос. `;
       }
       
-      const translateFaceShape = (val: string) => {
+      const translateColorRu = (val: string) => {
         val = val.toLowerCase();
-        if (val.includes("овал")) return "oval";
-        if (val.includes("круг") || val.includes("round")) return "round";
-        if (val.includes("квадрат")) return "square";
-        if (val.includes("сердц")) return "heart-shaped";
-        if (val.includes("прямоуг")) return "rectangular";
-        if (val.includes("ромб") || val.includes("брилл")) return "diamond";
+        if (val.includes("блонд") || val.includes("светл")) return "светлый блонд";
+        if (val.includes("русый")) return "светло-русый";
+        if (val.includes("каштан") || val.includes("шатен")) return "каштановый";
+        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "черный, брюнет";
+        if (val.includes("рыж") || val.includes("медн")) return "ярко-рыжий";
+        if (val.includes("сед")) return "седой, пепельный";
         return val;
       };
 
-      const translateColor = (val: string) => {
-        val = val.toLowerCase();
-        if (val.includes("блонд") || val.includes("светл")) return "blonde";
-        if (val.includes("русый")) return "light brown";
-        if (val.includes("каштан") || val.includes("шатен")) return "brown";
-        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "black";
-        if (val.includes("рыж") || val.includes("медн")) return "red / copper";
-        if (val.includes("сед")) return "grey / silver";
-        return val;
-      };
-
-      const featuresEng = [];
-      if (faceShape && faceShape.length > 2) featuresEng.push(`face shape ${translateFaceShape(faceShape)}`);
-      if (skinTone && skinTone.length > 2) featuresEng.push(`skin tone ${skinTone}`);
-      if (eyeColor && eyeColor.length > 2) featuresEng.push(`eye color ${translateColor(eyeColor)}`);
-      if (featuresEng.length > 0) prompt += `Appearance: ${featuresEng.join(', ')}. `;
+      if (hairColor) prompt += `КРИТИЧЕСКИ ВАЖНО: ЦВЕТ ВОЛОС СТРОГО "${translateColorRu(hairColor).toUpperCase()}"! ЖЕСТКОЕ ОГРАНИЧЕНИЕ ЦВЕТА! `;
+      if (hairType) prompt += `Текстура волос: ${hairType}. `;
       
-      if (hairColor) prompt += `Hair color MUST BE ${translateColor(hairColor)}. `;
-      if (hairType) prompt += `Hair texture: ${hairType}. `;
-      
-      // We need to parse facialHair from request body. I'll get it from req.body.
       let fh = (req.body.facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          prompt += `CRITICAL: Clean shaven face, strictly NO BEARD (no beard). Closed neck clothing. `;
+          prompt += `КРИТИЧЕСКИ: ГЛАДКО ВЫБРИТОЕ ЛИЦО, ПОЛНОСТЬЮ БЕЗ БОРОДЫ И БЕЗ УСОВ. Обычная закрытая одежда. `;
       } else if (fh) {
-          prompt += `Facial hair: ${fh}. Casual closed neck clothing. `;
+          prompt += `Растительность на лице: ${fh}. Обычная закрытая одежда. `;
       } else {
-          prompt += `Clean shaven face, casual closed neck clothing. `;
+          prompt += `Гладко выбритое лицо, закрытая темная одежда. `;
       }
 
-      prompt += `Simple light solid background, no smiling, professional ID photo style.`;
+      prompt += `Простой светлый однотонный фон, в стиле фото на паспорт.`;
       
       prompt = prompt.substring(0, 480).trim();
 
       let finalImageUrl = "";
       let lastError = "";
 
+      // Fallback to YandexART
       const yandexServiceAccountKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
       const yandexFolderId = process.env.YANDEX_FOLDER_ID;
 
       if (yandexServiceAccountKey && yandexFolderId) {
-        console.log("Generating reference via YandexART...");
+        console.log("Generating reference via YandexART as fallback... prompt:", prompt);
         try {
-          const cleanFolderId = extractFolderId(yandexFolderId);
-          if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
-              throw new Error(`[ОШИБКА НАСТРОЙКИ СЕРВЕРА] В YANDEX_FOLDER_ID указан плейсхолдер "${cleanFolderId}". Пожалуйста, пропишите реальный Идентификатор каталога на Render.com.`);
-          }
-          const iamToken = await getYandexIamToken(yandexServiceAccountKey);
+            const cleanFolderId = extractFolderId(yandexFolderId);
+            if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
+                throw new Error(`[ОШИБКА НАСТРОЙКИ СЕРВЕРА] В YANDEX_FOLDER_ID указан плейсхолдер "${cleanFolderId}". Пожалуйста, пропишите реальный Идентификатор каталога на Render.com.`);
+            }
+            const iamToken = await getYandexIamToken(yandexServiceAccountKey);
 
           // 1. Start Async Generation
           const reqBody = {
@@ -504,27 +488,26 @@ Return ONLY the raw JSON string matching this schema:
     try {
       const { 
         gender, keyword, faceShape, hairLength, hairDensity, hairType, skinTone, 
-        skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair,
-        selfieImage // Required for Step 2
+        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair,
+        selfieImage, // Required for Step 2
+        vtonStrength // Number from 50 to 100
       } = req.body;
       
       if (!keyword || !selfieImage) {
         return res.status(400).json({ error: "Missing parameters: keyword and selfieImage are required." });
       }
 
-      /* 
-        ========================================================================
-        STEP 1 & 2: Generate Virtual Try-On (FAL.ai Inpainting/I2I + FaceSwap)
-        ========================================================================
-      */
-      let finalImageUrl = "";
-      let lastError = "";
-      
       const falKey = process.env.FAL_KEY;
       if (!falKey) {
         return res.status(500).json({ error: "Отсутствует FAL_KEY в переменных окружения." });
       }
 
+      // Convert vtonStrength (50-100) to actual flux strength (0.50 - 0.95)
+      const requestedStrength = typeof vtonStrength === 'number' ? vtonStrength : 85;
+      const fluxStrength = Math.min(Math.max(requestedStrength / 100, 0.50), 0.95);
+
+      let finalImageUrl = "";
+      let lastError = "";
       let swappedImageUrl = "";
       const selfieImageFull = selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
 
@@ -536,7 +519,14 @@ Return ONLY the raw JSON string matching this schema:
         descriptorEng = 'beautiful young woman';
       }
 
-      let promptEng = `A photorealistic high-quality portrait of a ${descriptorEng} featuring a NEW HAIRCUT: "${keyword}". Face centered, neutral expression. Clean background. CRITICAL: Give this person a perfect "${keyword}" hairstyle. `;
+      // Extract english keyword from something like "Пляжные волны (Beach Waves)"
+      let englishKeyword = keyword;
+      const bracketMatch = keyword.match(/\(([^)]+)\)/);
+      if (bracketMatch && bracketMatch[1]) {
+         englishKeyword = bracketMatch[1];
+      }
+
+      let promptEng = `A photorealistic high-quality portrait of a ${descriptorEng} with a NEW HAIRCUT: "${englishKeyword}". CRITICAL: KEEP the person's face, pose, clothing, and background EXACTLY the same, but COMPLETELY REPLACE the hair with a perfect "${englishKeyword}" hairstyle. `;
       
       if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
          promptEng += ` The hair is VERY THIN and SPARSE.`;
@@ -570,21 +560,53 @@ Return ONLY the raw JSON string matching this schema:
       if (eyeColor && eyeColor.length > 2) featuresEng.push(`eye color ${translateColor(eyeColor)}`);
       if (featuresEng.length > 0) promptEng += `Appearance: ${featuresEng.join(', ')}. `;
       
-      if (hairColor) promptEng += `Hair color MUST BE ${translateColor(hairColor)}. `;
+      const targetHairColor = customHairColor || hairColor;
+
+      if (customHairColor) {
+         promptEng += `CRITICAL: HAIR COLOR MUST BE STRICTLY ${translateColor(customHairColor)}! Do not use any other color. `;
+      } else if (targetHairColor) {
+         promptEng += `CRITICAL: Preserve original hair color: ${translateColor(targetHairColor)}. `;
+      }
+      
       if (hairType) promptEng += `Hair texture: ${hairType}. `;
       
       let fh = (facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          promptEng += `CRITICAL: Clean shaven face, strictly NO BEARD (no beard). Closed neck clothing. `;
+          promptEng += `CRITICAL: Clean shaven face, strictly NO BEARD (no beard). `;
       } else if (fh) {
-          promptEng += `Facial hair: ${fh}. Casual closed neck clothing. `;
+          promptEng += `Facial hair: ${fh}. `;
       } else {
-          promptEng += `Clean shaven face, casual closed neck clothing. `;
+          promptEng += `Clean shaven face. `;
       }
 
-      promptEng += `The image must be a studio portrait, sharp focus on the new hair.`;
+      promptEng += `CRITICAL: PRESERVE EXACT CLOTHING AND SHOULDERS FROM ORIGINAL IMAGE. DO NOT CHANGE SHIRT OR OUTFIT. Neutral simple background. KEEP FACE COMPLETELY UNCHANGED.`;
 
-      promptEng = promptEng.substring(0, 480).trim();
+      // Describe clothing and background via Fal Vision to freeze it in the prompt
+      try {
+        console.log("Extracting clothing and background context to preserve it...");
+        const visionRes = await fetch("https://fal.run/fal-ai/any-llm/vision", {
+           method: "POST",
+           headers: {
+             "Authorization": `Key ${falKey}`,
+             "Content-Type": "application/json"
+           },
+           body: JSON.stringify({
+             image_url: selfieImageFull,
+             prompt: "Describe ONLY the clothing (exact color, type, neckline) and the background (color, setting) in one concise sentence. Do not describe the person's face, hair, or pose."
+           })
+        });
+        if (visionRes.ok) {
+           const visionData = await visionRes.json();
+           if (visionData.output) {
+              promptEng += ` Exact Scene Constraints: ${visionData.output}.`;
+              console.log("Detected Scene:", visionData.output);
+           }
+        }
+      } catch (e) {
+        console.log("Vision clothing extraction failed, continuing...", e);
+      }
+
+      promptEng = promptEng.substring(0, 700).trim();
 
       try {
         console.log("Generating new haircut via FAL.AI (Flux I2I)...");
@@ -592,7 +614,7 @@ Return ONLY the raw JSON string matching this schema:
         const bodyPayload: any = {
           image_url: selfieImageFull,
           prompt: promptEng,
-          strength: 0.90, // Strong enough to change hair silhouette, low enough to preserve pose/light
+          strength: fluxStrength,
           num_inference_steps: 30
         };
         
