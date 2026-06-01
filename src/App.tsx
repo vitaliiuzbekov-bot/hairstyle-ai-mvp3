@@ -170,6 +170,16 @@ const FallbackImage = 'https://images.unsplash.com/photo-1560066984-138dadb4c035
 
 const downloadImage = async (url: string, filename: string) => {
   try {
+    const tg = window.Telegram?.WebApp;
+    if (tg && tg.initData) {
+      if (tg.showAlert) {
+         tg.showAlert("В Telegram: нажмите на фото и удерживайте пару секунд, затем выберите «Сохранить» или «Поделиться».");
+      } else {
+         alert("В Telegram: нажмите на фото и удерживайте пару секунд, затем выберите «Сохранить».");
+      }
+      return;
+    }
+
     if (url.startsWith('data:')) {
       const link = document.createElement('a');
       link.href = url;
@@ -249,14 +259,17 @@ export default function App() {
       const unsubscribe = auth.onAuthStateChanged(async (user) => {
         if (!user) {
           try {
-            await signInAnonymously(auth);
+            await Promise.race([
+              signInAnonymously(auth),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+            ]);
           } catch (e: any) {
             console.error("Auth Error", e);
             // Fallback to local storage if anon auth fails
             const localGens = localStorage.getItem('localGenerationsLeft');
             if (localGens === null) {
-              localStorage.setItem('localGenerationsLeft', '3');
-              setGenerationsLeft(3);
+              localStorage.setItem('localGenerationsLeft', '10');
+              setGenerationsLeft(10);
             } else {
               setGenerationsLeft(parseInt(localGens, 10));
             }
@@ -273,7 +286,10 @@ export default function App() {
           const userRef = doc(db, 'users', currentUid);
           let userDoc;
           try {
-            userDoc = await getDoc(userRef);
+            userDoc = await Promise.race([
+              getDoc(userRef),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+            ]);
           } catch (e: any) {
             console.warn(`getDoc failed: ${e.message || e}.`);
             // Always fallback to local storage if DB fails to initialize properly
@@ -284,13 +300,16 @@ export default function App() {
           if (!userDoc || !userDoc.exists()) {
             const tgUser = tg?.initDataUnsafe?.user;
             try {
-              await setDoc(userRef, {
-                generationsLeft: 3,
-                createdAt: serverTimestamp(),
-                ...(tgUser?.id ? { tgId: tgUser.id } : {}),
-                ...(tgUser?.username ? { tgUsername: tgUser.username } : {})
-              });
-              setGenerationsLeft(3);
+              await Promise.race([
+                setDoc(userRef, {
+                  generationsLeft: 10,
+                  createdAt: serverTimestamp(),
+                  ...(tgUser?.id ? { tgId: tgUser.id } : {}),
+                  ...(tgUser?.username ? { tgUsername: tgUser.username } : {})
+                }),
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+              ]);
+              setGenerationsLeft(10);
             } catch (createErr: any) {
               console.warn("setDoc create failed:", createErr?.message || createErr);
               throw new Error("fallback_to_local");
@@ -302,8 +321,8 @@ export default function App() {
           if (err.message === "fallback_to_local" || (err.message && err.message.includes("permissions"))) {
             const localGens = localStorage.getItem('localGenerationsLeft');
             if (localGens === null) {
-              localStorage.setItem('localGenerationsLeft', '3');
-              setGenerationsLeft(3);
+              localStorage.setItem('localGenerationsLeft', '10');
+              setGenerationsLeft(10);
             } else {
               setGenerationsLeft(parseInt(localGens, 10));
             }
@@ -1176,11 +1195,11 @@ export default function App() {
                   <div className="h-px bg-white/10 flex-1"></div>
                 </div>
                 
-                <div className="flex flex-col gap-5 lg:gap-6">
+                <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-col sm:gap-5 lg:gap-6">
                   {results.recommendations.map((rec, idx) => (
                     <div 
                       key={idx} 
-                      className="glass-panel border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all duration-500 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] group flex flex-col sm:flex-row items-stretch"
+                      className="min-w-[85vw] sm:min-w-0 snap-center glass-panel border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all duration-500 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] group flex flex-col sm:flex-row items-stretch"
                       style={{ animationDelay: `${300 + idx * 150}ms` }}
                     >
                       <div className="w-full sm:w-[300px] shrink-0 relative overflow-hidden bg-transparent text-white/90 border-b sm:border-b-0 sm:border-r border-white/10">
@@ -1241,9 +1260,9 @@ export default function App() {
 
       {/* Barber Blueprint Modal */}
       {tryOnStyle && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/10 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="glass-panel border border-white/10 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-5 sm:p-6 border-b border-white/10 flex justify-between items-center bg-transparent text-white/90">
+        <div className="fixed inset-0 z-[100] flex sm:items-center sm:justify-center bg-black/60 sm:bg-white/10 sm:backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-[#0f0c1b] sm:glass-panel border-t sm:border border-white/10 sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-5xl sm:max-h-[90vh] flex flex-col shadow-2xl relative">
+            <div className="p-4 sm:p-6 border-b border-white/10 flex justify-between items-center bg-[#0f0c1b] sm:bg-transparent sticky top-0 z-50">
               <h3 className="font-serif text-xl sm:text-2xl text-white/90 flex items-center gap-3 tracking-tight">
                 <Scissors className="text-white/60" size={24} />
                 Детальный гайд для парикмахера
