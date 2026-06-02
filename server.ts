@@ -135,6 +135,27 @@ async function callYandexGPT(systemText: string, userText: string): Promise<stri
     return data.result.alternatives[0].message.text;
 }
 
+export async function logToTelegram(message: string) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  if (!botToken || !adminChatId) return;
+
+  try {
+    const text = `🕒 ${new Date().toISOString()}\n\n${message}`;
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: adminChatId,
+        text,
+        parse_mode: "HTML"
+      })
+    });
+  } catch (e) {
+    console.error("Failed to send log to Telegram", e);
+  }
+}
+
 async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
@@ -184,6 +205,18 @@ async function startServer() {
   }
 
   // callYandexGPT removed
+
+  app.post("/api/log", async (req, res) => {
+    try {
+      const { level = 'info', message, userId } = req.body;
+      const emoji = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : 'ℹ️';
+      await logToTelegram(`<b>[Client ${emoji}]</b> ${userId ? `User: <code>${userId}</code>\n` : ''}${message}`);
+      res.json({ success: true });
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to log" });
+    }
+  });
 
   app.post("/api/analyze", async (req, res) => {
     try {
@@ -291,6 +324,7 @@ Return ONLY the raw JSON string matching this schema:
       }
 
       const parsedResults = JSON.parse(textOutput);
+      logToTelegram(`🔍 <b>Анализ лица (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
       res.json(parsedResults);
 
     } catch (err: any) {
@@ -304,6 +338,8 @@ Return ONLY the raw JSON string matching this schema:
         } catch(e) {}
       }
       if (typeof errorMsg === "object") errorMsg = JSON.stringify(errorMsg);
+
+      logToTelegram(`❌ <b>Ошибка Анализа Лица (${req.body.userId || 'unknown'})</b>\n<code>${errorMsg}</code>`).catch(console.error);
 
       res.status(500).json({ error: errorMsg });
     }
@@ -680,6 +716,7 @@ Return ONLY the raw JSON string matching this schema:
         }
 
       // Final success
+      logToTelegram(`🎨 <b>Генерация (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
       res.json({ 
         imageUrl: swappedImageUrl,            // Final processed image (face swapped)
         referenceImage: finalImageUrl,        // Original generation
@@ -688,6 +725,7 @@ Return ONLY the raw JSON string matching this schema:
 
     } catch (err: any) {
       console.error("Full pipeline error:", err);
+      logToTelegram(`❌ <b>Ошибка Генерации (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Pipeline error'}</code>`).catch(console.error);
       res.status(500).json({ error: err.message || "Pipeline error" });
     }
   });
@@ -716,6 +754,8 @@ Return ONLY the raw JSON string matching this schema:
       let consultationHtml = await callYandexGPT(systemInstruction, `Физические особенности клиента: ${faceDescription}`);
       
       consultationHtml = consultationHtml.replace(/```html\s*/g, "").replace(/```\s*$/g, "").trim();
+
+      logToTelegram(`👔 <b>Консультация (${req.body.userId || 'unknown'})</b>\nСгенерирована для: ${styleName}`).catch(console.error);
 
       return res.json({ 
         consultationHtml,
@@ -750,6 +790,9 @@ Return ONLY the raw JSON string matching this schema:
       ) {
         errorMsg = "Сервер перегружен (503). Повторите попытку.";
       }
+
+      logToTelegram(`❌ <b>Ошибка Консультации (${req.body.userId || 'unknown'})</b>\n<code>${errorMsg}</code>`).catch(console.error);
+
       res.status(500).json({ error: errorMsg });
     }
   });
@@ -806,6 +849,7 @@ Return ONLY the raw JSON string matching this schema:
       }
 
       const parsedResults = JSON.parse(textOutput);
+      logToTelegram(`🔄 <b>Новые стрижки (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
       res.json(parsedResults);
     } catch (err: any) {
       console.error(err);
@@ -817,6 +861,9 @@ Return ONLY the raw JSON string matching this schema:
         } catch(e) {}
       }
       if (typeof errorMsg === "object") errorMsg = JSON.stringify(errorMsg);
+      
+      logToTelegram(`❌ <b>Ошибка Новых Стрижек (${req.body.userId || 'unknown'})</b>\n<code>${errorMsg}</code>`).catch(console.error);
+
       if (
         typeof errorMsg === "string" &&
         (errorMsg.includes("429") ||
@@ -880,14 +927,17 @@ Return ONLY the raw JSON string matching this schema:
 
       const data = await response.json();
       if (data.ok) {
+        logToTelegram(`💳 <b>Создан счет (${userId})</b>`).catch(console.error);
         res.json({ invoiceUrl: data.result });
       } else {
+        logToTelegram(`❌ <b>Ошибка создания счета (${userId})</b>\n${data.description}`).catch(console.error);
         res
           .status(400)
           .json({ error: data.description || "Failed to create invoice" });
       }
     } catch (err: any) {
       console.error(err);
+      logToTelegram(`❌ <b>Ошибка генерации инвойса (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Error'}</code>`).catch(console.error);
       res.status(500).json({ error: err.message });
     }
   });

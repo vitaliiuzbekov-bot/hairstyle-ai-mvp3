@@ -310,6 +310,11 @@ export default function App() {
                 new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
               ]);
               setGenerationsLeft(10);
+              fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: 'info', message: `👋 <b>Новый пользователь</b>\nUsername: ${tgUser?.username || 'нет'}\nID: ${tgUser?.id || currentUid}`, userId: currentUid })
+              }).catch(console.error);
             } catch (createErr: any) {
               console.warn("setDoc create failed:", createErr?.message || createErr);
               throw new Error("fallback_to_local");
@@ -330,6 +335,11 @@ export default function App() {
             setInitError(null);
           } else {
             console.error("Firebase Init Error", err);
+            fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: 'warn', message: `⚠️ <b>Ошибка инициализации Firebase</b>\nФолбэк на локальное хранилище.\n<code>${err.message || 'Unknown Error'}</code>`, userId: currentUid })
+            }).catch(console.error);
             // Fallback too to just prevent blocking UI completely if possible
             const localGens = localStorage.getItem('localGenerationsLeft');
             setGenerationsLeft(localGens ? parseInt(localGens, 10) : 3);
@@ -428,7 +438,18 @@ export default function App() {
             if (snap.exists()) {
               await updateDoc(userRef, { generationsLeft: increment(10) });
               setGenerationsLeft(prev => (prev || 0) + 10);
+              fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: 'info', message: '💰 Оплата успешно завершена (10 генераций)', userId })
+              }).catch(console.error);
             }
+          } else {
+             fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: 'warn', message: `Оплата отменена или не прошла, статус: ${status}`, userId })
+             }).catch(console.error);
           }
         });
       } else {
@@ -732,7 +753,7 @@ export default function App() {
         headers: { 
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ imageBase64, imageUrl, mimeType })
+        body: JSON.stringify({ imageBase64, imageUrl, mimeType, userId })
       });
       
       if (!response.ok) {
@@ -839,6 +860,7 @@ export default function App() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ 
+          userId,
           selfieImage: imageBase64,
           keyword: styleKeyword, 
           customHairColor: selectedColor,
@@ -905,6 +927,7 @@ export default function App() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ 
+          userId,
           imageBase64, 
           imageUrl, 
           mimeType: mimeType || "image/jpeg", 
