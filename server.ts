@@ -1072,7 +1072,7 @@ Return ONLY the raw JSON string matching this schema:
         try {
           // Initialize Firebase if not already initialized
           const { initializeApp, getApps } = await import("firebase/app");
-          const { getFirestore, doc, updateDoc, increment, getDoc } = await import("firebase/firestore");
+          const { getFirestore, doc, setDoc, increment } = await import("firebase/firestore");
           
           let appInstance;
           if (getApps().length === 0) {
@@ -1092,14 +1092,11 @@ Return ONLY the raw JSON string matching this schema:
             const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
             const db = getFirestore(appInstance, config.firestoreDatabaseId);
             const userRef = doc(db, "users", firebaseUserId.toString());
-            const snap = await getDoc(userRef);
-            if (snap.exists()) {
-              await updateDoc(userRef, {
-                generationsLeft: increment(100),
-                fullAccess: true,
-              });
-              console.log(`Updated Firestore for user ${firebaseUserId}`);
-            }
+            await setDoc(userRef, {
+              generationsLeft: increment(100),
+              fullAccess: true,
+            }, { merge: true });
+            console.log(`Updated Firestore for user ${firebaseUserId}`);
           }
         } catch (dbErr) {
           console.error("Failed to update Firestore:", dbErr);

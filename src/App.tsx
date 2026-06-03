@@ -608,24 +608,23 @@ export default function App() {
         if (tg.openInvoice) {
           tg.openInvoice(data.invoiceUrl, async (status: string) => {
             if (status === "paid") {
-              const userRef = doc(db, "users", userId);
-              const snap = await getDoc(userRef);
-              if (snap.exists()) {
-                await updateDoc(userRef, {
-                  generationsLeft: increment(100),
-                  fullAccess: true,
-                });
+              if (userId === "local-user") {
+                const next = (generationsLeft || 10) + 100;
+                localStorage.setItem("localGenerationsLeft", next.toString());
+                setGenerationsLeft(next);
+              } else {
                 setGenerationsLeft((prev) => (prev || 0) + 100);
-                fetch("/api/log", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    level: "info",
-                    message: "💰 Оплата успешно завершена (Полный доступ, 100 Stars)",
-                    userId,
-                  }),
-                }).catch(console.error);
               }
+              
+              fetch("/api/log", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  level: "info",
+                  message: "💰 Оплата успешно завершена (Полный доступ, 100 Stars)",
+                  userId,
+                }),
+              }).catch(console.error);
             } else {
               fetch("/api/log", {
                 method: "POST",
