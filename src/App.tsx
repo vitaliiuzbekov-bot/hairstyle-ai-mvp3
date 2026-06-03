@@ -581,11 +581,12 @@ export default function App() {
     setIsBuying(true);
     try {
       const tg = window.Telegram?.WebApp;
-      if (isTelegramEnv && tg) {
+      const tgUserId = (tg as any)?.initDataUnsafe?.user?.id;
+      if (isTelegramEnv && tg && tgUserId) {
         const response = await fetch("/api/create-invoice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ userId, tgUserId }),
         });
         const data = await response.json();
         if (!response.ok) {
@@ -600,7 +601,7 @@ export default function App() {
           alert("Счет отправлен в чат бота. Вернитесь туда для оплаты!");
         }
       } else {
-        alert("Оплата поддерживается только в Telegram.");
+        alert("Оплата поддерживается только в Telegram. (Telegram User ID не найден)");
       }
     } catch (err: any) {
       console.error("Error creating invoice: ", err);

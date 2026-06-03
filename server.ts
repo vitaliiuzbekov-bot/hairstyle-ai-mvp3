@@ -940,7 +940,7 @@ Return ONLY the raw JSON string matching this schema:
 
   app.post("/api/create-invoice", async (req, res) => {
     try {
-      const { userId } = req.body;
+      const { userId, tgUserId } = req.body;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       if (!botToken) {
         return res
@@ -954,10 +954,10 @@ Return ONLY the raw JSON string matching this schema:
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: userId,
+            chat_id: tgUserId || userId, // Use tgUserId for chat_id
             title: "Доступ к боту",
             description: "Полный доступ ко всем функциям",
-            payload: JSON.stringify({ userId, package: 100 }),
+            payload: JSON.stringify({ userId, tgUserId, package: 100 }), // Important: We still include the Firebase UID
             provider_token: "", // Empty for Telegram Stars
             currency: "XTR",
             prices: [{ label: "Полный доступ", amount: 100 }], // 100 Stars
@@ -1007,10 +1007,16 @@ Return ONLY the raw JSON string matching this schema:
 
       // Handle Successful Payment
       if (update.message && update.message.successful_payment) {
-        const userId = update.message.from?.id;
-        const payload = update.message.successful_payment.invoice_payload;
+        const tgUserId = update.message.from?.id;
+        const payloadStr = update.message.successful_payment.invoice_payload;
         
-        logToTelegram(`✅ <b>Оплата успешна!</b> Пользователь: ${userId}. payload: ${payload}`).catch(console.error);
+        let firebaseUserId = null;
+        try {
+          const payloadObj = JSON.parse(payloadStr);
+          firebaseUserId = payloadObj.userId;
+        } catch(e) {}
+        
+        logToTelegram(`✅ <b>Оплата успешна!</b> Пользователь: ${tgUserId}. payload: ${payloadStr}`).catch(console.error);
 
         try {
           // Initialize Firebase if not already initialized
@@ -1029,32 +1035,32 @@ Return ONLY the raw JSON string matching this schema:
             appInstance = getApps()[0];
           }
 
-          if (appInstance && userId) {
+          if (appInstance && firebaseUserId) {
             const configPath = "./firebase-applet-config.json";
             const fs = await import("fs");
             const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
             const db = getFirestore(appInstance, config.firestoreDatabaseId);
-            const userRef = doc(db, "users", userId.toString());
+            const userRef = doc(db, "users", firebaseUserId.toString());
             const snap = await getDoc(userRef);
             if (snap.exists()) {
               await updateDoc(userRef, {
                 generationsLeft: increment(100),
                 fullAccess: true,
               });
-              console.log(`Updated Firestore for user ${userId}`);
+              console.log(`Updated Firestore for user ${firebaseUserId}`);
             }
           }
         } catch (dbErr) {
           console.error("Failed to update Firestore:", dbErr);
         }
 
-        if (botToken && userId) {
+        if (botToken && tgUserId) {
           // Send success message to user
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              chat_id: userId,
+              chat_id: tgUserId,
               text: "✅ Доступ открыт! Поздравляем с успешной оплатой и приобретением полного доступа ко всем функциям."
             })
           });
