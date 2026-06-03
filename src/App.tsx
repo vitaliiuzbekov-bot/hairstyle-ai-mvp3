@@ -368,7 +368,7 @@ export default function App() {
         setUserAvatar(tgUser.photo_url);
       }
     } else {
-      setIsTelegramEnv(false); // Temporarily disabled for testing in browser preview
+      setIsTelegramEnv(false);
     }
 
     const initUser = async () => {
@@ -397,8 +397,7 @@ export default function App() {
               );
               setHistory(localHistory);
             } catch (e) {}
-            setUserId("local-user");
-            setInitError(null); // Bypass error to let user try the app
+            setInitError("App must be initialized in Telegram to work properly.");
           }
           return;
         }
@@ -582,50 +581,24 @@ export default function App() {
     setIsBuying(true);
     try {
       const tg = window.Telegram?.WebApp;
-      if (isTelegramEnv && tg && tg.openInvoice) {
+      if (isTelegramEnv && tg) {
         const response = await fetch("/api/create-invoice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
         });
         const data = await response.json();
-        if (!response.ok || !data.invoiceUrl) {
+        if (!response.ok) {
           throw new Error(data.error || "Ошибка при создании счета");
         }
 
-        tg.openInvoice(data.invoiceUrl, async (status: string) => {
-          if (status === "paid") {
-            const userRef = doc(db, "users", userId);
-            const snap = await getDoc(userRef);
-            if (snap.exists()) {
-              await updateDoc(userRef, {
-                generationsLeft: increment(100),
-                fullAccess: true,
-              });
-              setGenerationsLeft((prev) => (prev || 0) + 100);
-              fetch("/api/log", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  level: "info",
-                  message:
-                    "💰 Оплата успешно завершена (Полный доступ, 100 Stars)",
-                  userId,
-                }),
-              }).catch(console.error);
-            }
-          } else {
-            fetch("/api/log", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                level: "warn",
-                message: `Оплата отменена или не прошла, статус: ${status}`,
-                userId,
-              }),
-            }).catch(console.error);
-          }
-        });
+        if (tg.showAlert) {
+          tg.showAlert("Счет на 100 ⭐️ отправлен в чат! Закройте это окно и перейдите в чат с ботом для оплаты.", () => {
+            if (tg.close) tg.close();
+          });
+        } else {
+          alert("Счет отправлен в чат бота. Вернитесь туда для оплаты!");
+        }
       } else {
         alert("Оплата поддерживается только в Telegram.");
       }
@@ -1365,29 +1338,29 @@ export default function App() {
     >
       {/* Header */}
       <header className="border-b border-white/10 glass-header backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 glass-button rounded-full flex items-center justify-center text-white/90 shadow-[0_8px_32px_rgba(0,0,0,0.37)] border border-white/20">
-              <Scissors size={20} className="opacity-90" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 glass-button rounded-full flex items-center justify-center text-white/90 shadow-[0_8px_32px_rgba(0,0,0,0.37)] border border-white/20">
+              <Scissors size={16} className="opacity-90 sm:w-5 sm:h-5 w-4 h-4" />
             </div>
-            <h1 className="font-serif font-semibold text-2xl tracking-tight text-white/90">
+            <h1 className="font-serif font-semibold text-lg sm:text-2xl tracking-tight text-white/90 truncate max-w-[140px] sm:max-w-none">
               НейроСтилист{" "}
-              <span className="text-white/60 italic opacity-80">AI</span>
+              <span className="text-white/60 italic opacity-80 hidden sm:inline">AI</span>
             </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-white/90">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-xs font-mono text-white/90">
               <Coins size={14} className="text-amber-500" />
               <span>
-                Баланс: {generationsLeft !== null ? generationsLeft : "..."}
+                <span className="hidden sm:inline">Баланс: </span>{generationsLeft !== null ? generationsLeft : "..."}
               </span>
             </div>
             <button
               onClick={buyTokens}
               disabled={isBuying}
-              className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 active:scale-95 disabled:opacity-50 text-black font-bold text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+              className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 active:scale-95 disabled:opacity-50 text-black font-bold text-[9px] sm:text-[11px] uppercase tracking-wider px-2 sm:px-3 py-1.5 rounded-full transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] whitespace-nowrap"
             >
-              <Zap size={10} fill="currentColor" />
+              <Zap size={10} fill="currentColor" className="sm:inline hidden" />
               {isBuying ? "Загрузка..." : "Купить"}
             </button>
             <div className="hidden md:flex flex-col items-end gap-1">
@@ -1879,11 +1852,11 @@ export default function App() {
                   <div className="h-px bg-white/10 flex-1"></div>
                 </div>
 
-                <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-col sm:gap-5 lg:gap-6">
+                <div className="flex flex-col gap-5 lg:gap-6 pb-6">
                   {results.recommendations.map((rec, idx) => (
                     <div
                       key={idx}
-                      className="opacity-0 animate-fade-in-up min-w-[85vw] sm:min-w-0 snap-center glass-panel border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all duration-500 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] group flex flex-col sm:flex-row items-stretch"
+                      className="opacity-0 animate-fade-in-up glass-panel border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition-all duration-500 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] group flex flex-col sm:flex-row items-stretch"
                       style={{ animationDelay: `${300 + idx * 150}ms` }}
                     >
                       <div className="w-full sm:w-[300px] shrink-0 relative overflow-hidden bg-transparent text-white/90 border-b sm:border-b-0 sm:border-r border-white/10">

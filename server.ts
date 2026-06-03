@@ -284,19 +284,27 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 ДОПОЛНИТЕЛЬНЫЕ КРИТИЧЕСКИЕ ПРАВИЛА:
 1. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать пышные объемные прически с высокой плотностью волос, если у клиента "Редкие/Тонкие" волосы или есть залысины. Для тонких/редких волос предлагай стрижки, скрывающие залысины или подчеркивающие текстуру (например, текстурированный кроп с коротким верхом, фейд, ультракороткий базз-кат).
 2. Стрижка должна быть выполнима путем ОБРЕЗАНИЯ текущих волос. Мы не можем дорисовать плотность или длину.
-3. Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. Если стиль указан и не равен "На твое усмотрение", КАТЕГОРИЧЕСКИ ВАЖНО подобрать 3 СОВЕРШЕННО РАЗНЫЕ, УНИКАЛЬНЫЕ стрижки, которые на 100% передают настроение и эстетику стиля "${preferredStyle}". НЕ предлагай стандартные повторяющиеся варианты, прояви креатив и предложи именно стрижки в стиле "${preferredStyle}", строго соблюдая правила длины и густоты.
+3. Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. Если стиль указан и не равен "На твое усмотрение", предложи креативные варианты в стиле "${preferredStyle}".
 
-Предложи РОВНО 3 АБСОЛЮТНО РАЗНЫХ, реалистичных стрижки, строго соответствующих правилам длины и густоты, в массиве 'recommendations':
-[
-  {
-    "name": "Название стрижки на русском",
-    "description": "Честное объяснение, почему она подходит с учетом реальной густоты и длины...",
-    "stylingTips": "Советы по укладке...",
-    "imageKeyword": "Haircut name, hair density, hair length (english)"
-  }
-]
-КРИТИЧНО: 'imageKeyword' ДОЛЖЕН тонко описывать стрижку на АНГЛИЙСКОМ языке и учитывать густоту/тип волос (например, "ultra short buzz cut, thin receding hair" или "short textured crop, sparse hair"). Это поле пойдет в нейросеть для генерации изображений.
+ВНИМАНИЕ: ТЫ ОБЯЗАН ВЕРНУТЬ РОВНО ТРИ (3) ВАРИАНТА СТРИЖКИ. СТРОГО 3 ВАРИАНТА, НЕ МЕНЬШЕ И НЕ БОЛЬШЕ.
+ЕСЛИ ТЫ НЕ ВЕРНЕШЬ 3 ВАРИАНТА, ПРИЛОЖЕНИЕ СЛОМАЕТСЯ.
 
+Твой ответ должен быть СТРОГО в формате валидного JSON объекта:
+{
+  "warning": "Предупредите мягко, если запрос недостижим" (или пустая строка),
+  "recommendations": [
+    // В ЭТОМ МАССИВЕ ДОЛЖНО БЫТЬ СТРОГО 3 (ТРИ) ОБЪЕКТА С РАЗНЫМИ СТРИЖКАМИ!
+    {
+      "name": "Название стрижки на русском",
+      "description": "Честное объяснение, почему она подходит...",
+      "stylingTips": "Советы по укладке...",
+      "imageKeyword": "Haircut name, hair density, hair length (english)"
+    },
+    { ...второй вариант... },
+    { ...третий вариант... }
+  ]
+}
+КРИТИЧНО: 'imageKeyword' ДОЛЖЕН тонко описывать стрижку на АНГЛИЙСКОМ языке.
 Return ONLY the raw JSON string matching this schema:
 {
   "gender": "",
@@ -941,11 +949,12 @@ Return ONLY the raw JSON string matching this schema:
       }
 
       const response = await fetch(
-        `https://api.telegram.org/bot${botToken}/createInvoiceLink`,
+        `https://api.telegram.org/bot${botToken}/sendInvoice`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            chat_id: userId,
             title: "Доступ к боту",
             description: "Полный доступ ко всем функциям",
             payload: JSON.stringify({ userId, package: 100 }),
@@ -958,13 +967,13 @@ Return ONLY the raw JSON string matching this schema:
 
       const data = await response.json();
       if (data.ok) {
-        logToTelegram(`💳 <b>Создан счет (${userId}) на 100 Stars</b>`).catch(console.error);
-        res.json({ invoiceUrl: data.result });
+        logToTelegram(`💳 <b>Отправлен счет (${userId}) на 100 Stars</b>`).catch(console.error);
+        res.json({ success: true, message: "Счет отправлен в чат" });
       } else {
-        logToTelegram(`❌ <b>Ошибка создания счета (${userId})</b>\n${data.description}`).catch(console.error);
+        logToTelegram(`❌ <b>Ошибка отправки счета (${userId})</b>\n${data.description}`).catch(console.error);
         res
           .status(400)
-          .json({ error: data.description || "Failed to create invoice" });
+          .json({ error: data.description || "Failed to send invoice" });
       }
     } catch (err: any) {
       console.error(err);
