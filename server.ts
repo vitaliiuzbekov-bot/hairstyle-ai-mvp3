@@ -101,7 +101,7 @@ async function callYandexGPT(systemText: string, userText: string): Promise<stri
       modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
       completionOptions: {
         stream: false,
-        temperature: 0.3,
+        temperature: 0.7,
         maxTokens: 2000
       },
       messages: [
@@ -218,9 +218,9 @@ async function startServer() {
     }
   });
 
-  app.post("/api/analyze", async (req, res) => {
+    app.post("/api/analyze", async (req, res) => {
     try {
-      const { imageBase64, imageUrl, mimeType } = req.body;
+      const { imageBase64, imageUrl, mimeType, preferredStyle } = req.body;
       const targetBase64 = await fetchImageAsBase64(imageUrl, imageBase64);
       if (!targetBase64) {
         return res.status(400).json({ error: "No image provided" });
@@ -284,6 +284,7 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 ДОПОЛНИТЕЛЬНЫЕ КРИТИЧЕСКИЕ ПРАВИЛА:
 1. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать пышные объемные прически с высокой плотностью волос, если у клиента "Редкие/Тонкие" волосы или есть залысины. Для тонких/редких волос предлагай стрижки, скрывающие залысины или подчеркивающие текстуру (например, текстурированный кроп с коротким верхом, фейд, ультракороткий базз-кат).
 2. Стрижка должна быть выполнима путем ОБРЕЗАНИЯ текущих волос. Мы не можем дорисовать плотность или длину.
+3. Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. Если стиль указан и не равен "На твое усмотрение", КАТЕГОРИЧЕСКИ ВАЖНО подобрать 3 СОВЕРШЕННО РАЗНЫЕ, УНИКАЛЬНЫЕ стрижки, которые на 100% передают настроение и эстетику стиля "${preferredStyle}". НЕ предлагай стандартные повторяющиеся варианты, прояви креатив и предложи именно стрижки в стиле "${preferredStyle}", строго соблюдая правила длины и густоты.
 
 Предложи РОВНО 3 АБСОЛЮТНО РАЗНЫХ, реалистичных стрижки, строго соответствующих правилам длины и густоты, в массиве 'recommendations':
 [
@@ -363,21 +364,21 @@ Return ONLY the raw JSON string matching this schema:
       let lengthRu = '';
       if (hairLength) {
         const hl = hairLength.toLowerCase();
-        if (hl.includes('bald') || hl.includes('лыс') || hl.includes('брит') || hl.includes('buzz')) lengthRu = 'бритая налысо голова, под ноль';
+        if (hl.includes('bald') || hl.includes('лыс') || hl.includes('брит') || hl.includes('buzz')) lengthRu = 'очень короткая стрижка';
         else if (hl.includes('short') || hl.includes('коротк') || hl.includes('5')) lengthRu = 'короткие волосы';
         else if (hl.includes('medium') || hl.includes('средн') || hl.includes('15')) lengthRu = 'волосы средней длины';
         else if (hl.includes('long') || hl.includes('длин')) lengthRu = 'длинные волосы';
       }
 
-      let prompt = `Профессиональный студийный портрет крупным планом, ровно по центру кадра, смотрит прямо в камеру. Выражение лица АБСОЛЮТНО НЕЙТРАЛЬНОЕ, БЕЗ УЛЫБКИ. Модель: ${descriptorRu}. Прическа/стрижка строго: "${keyword}". `;
+      let prompt = `Студийный портрет крупным планом, по центру кадра, смотрит прямо в камеру, нейтральное выражение лица. Модель: ${descriptorRu}. Прическа и стрижка: "${keyword}". `;
       
       if (lengthRu) {
-         prompt += `КРИТИЧЕСКОЕ ПРАВИЛО: Длина волос ДОЛЖНА БЫТЬ СТРОГО "${lengthRu}". Запрещено рисовать волосы другой длины! `;
+         prompt += `Длина волос: ${lengthRu}. `;
       }
       if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
-         prompt += `ВНИМАНИЕ: Очень тонкие, редкие волосы. Обязательно передать низкую густоту, БЕЗ ОБЪЕМА! `;
+         prompt += `Тонкие волосы, низкая густота. `;
       } else {
-         prompt += `Умеренная, естественная густота волос. `;
+         prompt += `Естественная густота волос, без излишеств. `;
       }
       
       const translateColorRu = (val: string) => {
@@ -385,25 +386,25 @@ Return ONLY the raw JSON string matching this schema:
         if (val.includes("блонд") || val.includes("светл")) return "светлый блонд";
         if (val.includes("русый")) return "светло-русый";
         if (val.includes("каштан") || val.includes("шатен")) return "каштановый";
-        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "черный, брюнет";
-        if (val.includes("рыж") || val.includes("медн")) return "ярко-рыжий";
-        if (val.includes("сед")) return "седой, пепельный";
+        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "черный цвет";
+        if (val.includes("рыж") || val.includes("медн")) return "рыжий цвет";
+        if (val.includes("сед")) return "пепельный цвет";
         return val;
       };
 
-      if (hairColor) prompt += `КРИТИЧЕСКИ ВАЖНО: ЦВЕТ ВОЛОС СТРОГО "${translateColorRu(hairColor).toUpperCase()}"! ЖЕСТКОЕ ОГРАНИЧЕНИЕ ЦВЕТА! `;
-      if (hairType) prompt += `Текстура волос: ${hairType}. `;
+      if (hairColor) prompt += `Цвет волос: ${translateColorRu(hairColor)}. `;
+      if (hairType) prompt += `Тип волос: ${hairType}. `;
       
       let fh = (req.body.facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          prompt += `КРИТИЧЕСКИ: ГЛАДКО ВЫБРИТОЕ ЛИЦО, ПОЛНОСТЬЮ БЕЗ БОРОДЫ И БЕЗ УСОВ. Обычная закрытая одежда. `;
+          prompt += `Без бороды и усов. Обычная одежда. `;
       } else if (fh) {
-          prompt += `Растительность на лице: ${fh}. Обычная закрытая одежда. `;
+          prompt += `Особенности: ${fh}. Обычная одежда. `;
       } else {
-          prompt += `Гладко выбритое лицо, закрытая темная одежда. `;
+          prompt += `Без бороды и усов. Повседневная одежда. `;
       }
 
-      prompt += `Простой светлый однотонный фон, в стиле фото на паспорт.`;
+      prompt += `Светлый однотонный фон, нейтральное освещение.`;
       
       prompt = prompt.substring(0, 480).trim();
 
@@ -435,7 +436,7 @@ Return ONLY the raw JSON string matching this schema:
             ]
           };
 
-          const initRes = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync', {
+          let initRes = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${iamToken}`,
@@ -445,15 +446,38 @@ Return ONLY the raw JSON string matching this schema:
           });
 
           if (!initRes.ok) {
-            const errText = await initRes.text();
-            let diagnostic = "";
-            if (errText.includes("model_uri") || errText.includes("modelUri") || initRes.status === 400) {
-                const masked = cleanFolderId.length > 5 
-                   ? `${cleanFolderId.slice(0, 4)}...${cleanFolderId.slice(-4)}` 
-                   : cleanFolderId;
-                diagnostic = `\n(Диагностика: YandexART отклонил запрос. Проверьте правильность YANDEX_FOLDER_ID на вашем сервере (Render.com). Значение на сервере: "${masked}")`;
+            let errText = await initRes.text();
+            
+            // Retry with a safer, simplified prompt if we hit safety filters (often code 3)
+            if (errText.includes("не могу сгенерировать") || errText.includes("другую тему") || errText.includes("code\":3")) {
+              console.log("YandexART rejected the prompt. Retrying with a simplified, safe prompt...");
+              const safePrompt = `Мужская или женская стрижка ${keyword}, портретное фото, нейтральный фон`;
+              reqBody.messages[0].text = safePrompt.substring(0, 480).trim();
+              
+              initRes = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${iamToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reqBody)
+              });
+              
+              if (!initRes.ok) {
+                errText = await initRes.text();
+              }
             }
-            throw new Error(`YandexART Init Error: ${errText}${diagnostic}`);
+            
+            if (!initRes.ok) {
+              let diagnostic = "";
+              if (errText.includes("model_uri") || errText.includes("modelUri") || initRes.status === 400) {
+                  const masked = cleanFolderId.length > 5 
+                     ? `${cleanFolderId.slice(0, 4)}...${cleanFolderId.slice(-4)}` 
+                     : cleanFolderId;
+                  diagnostic = `\n(Диагностика: YandexART отклонил запрос. Проверьте правильность YANDEX_FOLDER_ID на вашем сервере (Render.com). Значение на сервере: "${masked}")`;
+              }
+              throw new Error(`YandexART Init Error: ${errText}${diagnostic}`);
+            }
           }
 
           const initData = await initRes.json();
@@ -617,7 +641,8 @@ Return ONLY the raw JSON string matching this schema:
 
       promptEng += `CRITICAL: PRESERVE EXACT CLOTHING AND SHOULDERS FROM ORIGINAL IMAGE. DO NOT CHANGE SHIRT OR OUTFIT. Neutral simple background. KEEP FACE COMPLETELY UNCHANGED.`;
 
-      // Describe clothing and background via Fal Vision to freeze it in the prompt
+      // Skip clothing describing to save time and avoid 504 Gateway Timeout
+      /*
       try {
         console.log("Extracting clothing and background context to preserve it...");
         const visionRes = await fetch("https://fal.run/fal-ai/any-llm/vision", {
@@ -641,6 +666,7 @@ Return ONLY the raw JSON string matching this schema:
       } catch (e) {
         console.log("Vision clothing extraction failed, continuing...", e);
       }
+      */
 
       promptEng = promptEng.substring(0, 700).trim();
 
@@ -651,7 +677,7 @@ Return ONLY the raw JSON string matching this schema:
           image_url: selfieImageFull,
           prompt: promptEng,
           strength: fluxStrength,
-          num_inference_steps: 30
+          num_inference_steps: 15
         };
         
         const fluxRes = await fetch(endpoint, {
@@ -682,16 +708,19 @@ Return ONLY the raw JSON string matching this schema:
 
       try {
          console.log("Starting Virtual Try-On FaceSwap via FAL.AI...");
+         const faceSwapPayload = {
+           base_image_url: finalImageUrl,
+           swap_image_url: selfieImageFull
+         };
+         console.log("FaceSwap Payload:", JSON.stringify(faceSwapPayload).substring(0, 500) + "... (truncated)");
+         
          const falRes = await fetch("https://fal.run/fal-ai/face-swap", {
            method: "POST",
            headers: {
              "Authorization": `Key ${falKey}`,
              "Content-Type": "application/json"
            },
-           body: JSON.stringify({
-             base_image_url: finalImageUrl,
-             swap_image_url: selfieImageFull
-           })
+           body: JSON.stringify(faceSwapPayload)
          });
 
          if (!falRes.ok) {
@@ -799,7 +828,7 @@ Return ONLY the raw JSON string matching this schema:
 
   app.post("/api/load-more", async (req, res) => {
     try {
-      const { existingNames, features } = req.body;
+      const { existingNames, features, preferredStyle } = req.body;
 
       console.log("Generating more recommendations via YandexGPT using cached features...");
 
@@ -811,8 +840,10 @@ Return ONLY the raw JSON string matching this schema:
 Внимательно изучи описание внешности клиента (ТЕКУЩАЯ ДЛИНА И ГУСТОТА):
 "${faceDescription}"
 
+Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. Если стиль указан и не равен "На твое усмотрение", КАТЕГОРИЧЕСКИ ВАЖНО подобрать 3 СОВЕРШЕННО РАЗНЫЕ, УНИКАЛЬНЫЕ стрижки, которые на 100% передают настроение и эстетику стиля "${preferredStyle}". НЕ предлагай стандартные повторяющиеся варианты, прояви креатив и предложи именно стрижки в стиле "${preferredStyle}", строго соблюдая правила длины и густоты.
+
 ШАГ 1. Учитывая ПОЛ, текущую ДЛИНУ волос и ГУСТОТУ из описания.
-ШАГ 2. Предложи 3 НОВЫЕ СОВЕРШЕННО РАЗНЫЕ стрижки.
+ШАГ 2. Предложи 3 НОВЫЕ СОВЕРШЕННО РАЗНЫЕ стрижки (не повторять: ${existingNames}).
 
 ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛС ПРИ ПОДБОРЕ (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ИЛИ ДОРИСОВЫВАТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
 1. Если у клиента "Лысый": разрешается советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина". Любые другие стрижки запрещены!
@@ -915,19 +946,19 @@ Return ONLY the raw JSON string matching this schema:
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            title: "Генерации нейростилиста",
-            description: "Пакет 10 генераций",
-            payload: JSON.stringify({ userId, package: 10 }),
+            title: "Доступ к боту",
+            description: "Полный доступ ко всем функциям",
+            payload: JSON.stringify({ userId, package: 100 }),
             provider_token: "", // Empty for Telegram Stars
             currency: "XTR",
-            prices: [{ label: "10 генераций", amount: 50 }], // 50 Stars
+            prices: [{ label: "Полный доступ", amount: 100 }], // 100 Stars
           }),
         },
       );
 
       const data = await response.json();
       if (data.ok) {
-        logToTelegram(`💳 <b>Создан счет (${userId})</b>`).catch(console.error);
+        logToTelegram(`💳 <b>Создан счет (${userId}) на 100 Stars</b>`).catch(console.error);
         res.json({ invoiceUrl: data.result });
       } else {
         logToTelegram(`❌ <b>Ошибка создания счета (${userId})</b>\n${data.description}`).catch(console.error);
@@ -939,6 +970,98 @@ Return ONLY the raw JSON string matching this schema:
       console.error(err);
       logToTelegram(`❌ <b>Ошибка генерации инвойса (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Error'}</code>`).catch(console.error);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Telegram Webhook for processing payments
+  app.post("/api/telegram-webhook", async (req, res) => {
+    try {
+      const update = req.body;
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+      // Handle Pre-checkout Query
+      if (update.pre_checkout_query) {
+        const preCheckoutQueryId = update.pre_checkout_query.id;
+        
+        if (botToken) {
+          await fetch(`https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pre_checkout_query_id: preCheckoutQueryId,
+              ok: true
+            })
+          });
+        }
+        return res.sendStatus(200);
+      }
+
+      // Handle Successful Payment
+      if (update.message && update.message.successful_payment) {
+        const userId = update.message.from?.id;
+        const payload = update.message.successful_payment.invoice_payload;
+        
+        logToTelegram(`✅ <b>Оплата успешна!</b> Пользователь: ${userId}. payload: ${payload}`).catch(console.error);
+
+        try {
+          // Initialize Firebase if not already initialized
+          const { initializeApp, getApps } = await import("firebase/app");
+          const { getFirestore, doc, updateDoc, increment, getDoc } = await import("firebase/firestore");
+          
+          let appInstance;
+          if (getApps().length === 0) {
+            const fs = await import("fs");
+            const configPath = "./firebase-applet-config.json";
+            if (fs.existsSync(configPath)) {
+              const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+              appInstance = initializeApp(config);
+            }
+          } else {
+            appInstance = getApps()[0];
+          }
+
+          if (appInstance && userId) {
+            const configPath = "./firebase-applet-config.json";
+            const fs = await import("fs");
+            const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+            const db = getFirestore(appInstance, config.firestoreDatabaseId);
+            const userRef = doc(db, "users", userId.toString());
+            const snap = await getDoc(userRef);
+            if (snap.exists()) {
+              await updateDoc(userRef, {
+                generationsLeft: increment(100),
+                fullAccess: true,
+              });
+              console.log(`Updated Firestore for user ${userId}`);
+            }
+          }
+        } catch (dbErr) {
+          console.error("Failed to update Firestore:", dbErr);
+        }
+
+        if (botToken && userId) {
+          // Send success message to user
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: userId,
+              text: "✅ Доступ открыт! Поздравляем с успешной оплатой и приобретением полного доступа ко всем функциям."
+            })
+          });
+        }
+        
+        // Note: The actual database addition usually goes here. 
+        // e.g. updateDoc(doc(db, "users", userId), { generationsLeft: increment(100), fullAccess: true });
+        
+        return res.sendStatus(200);
+      }
+
+      // Keep it alive for other updates
+      res.sendStatus(200);
+    } catch (err) {
+      console.error("Webhook error:", err);
+      res.sendStatus(500);
     }
   });
 
