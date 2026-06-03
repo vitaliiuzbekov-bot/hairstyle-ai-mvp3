@@ -948,16 +948,17 @@ Return ONLY the raw JSON string matching this schema:
           .json({ error: "Telegram Bot Token is not configured" });
       }
 
+      const payloadString = JSON.stringify({ userId, tgUserId, package: 100 });
+      
       const response = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendInvoice`,
+        `https://api.telegram.org/bot${botToken}/createInvoiceLink`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: tgUserId || userId, // Use tgUserId for chat_id
             title: "Доступ к боту",
             description: "Полный доступ ко всем функциям",
-            payload: JSON.stringify({ userId, tgUserId, package: 100 }), // Important: We still include the Firebase UID
+            payload: payloadString,
             provider_token: "", // Empty for Telegram Stars
             currency: "XTR",
             prices: [{ label: "Полный доступ", amount: 100 }], // 100 Stars
@@ -966,19 +967,69 @@ Return ONLY the raw JSON string matching this schema:
       );
 
       const data = await response.json();
+      
+      // Fallback for ToS acceptance: If createInvoiceLink fails because the bot owner
+      // hasn't accepted Stars ToS, try to send an invoice to them directly to trigger it.
+      if (!data.ok && data.description?.includes("PROVIDER_ACCOUNT_INVALID")) {
+        console.log("Triggering sendInvoice fallback for ToS acceptance...");
+        const sendResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/sendInvoice`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: tgUserId || userId, // Admin or current user
+              title: "Доступ к боту (Принятие условий)",
+              description: "Нажмите оплатить, чтобы принять условия Telegram Stars (если вы владелец бота)",
+              payload: payloadString,
+              provider_token: "",
+              currency: "XTR",
+              prices: [{ label: "Полный доступ", amount: 100 }]
+            }),
+          }
+        );
+        const sendData = await sendResponse.json();
+        if (sendData.ok) {
+           return res.status(400).json({ error: "Для приема платежей звездами необходимо принять условия Telegram! Мы отправили вам счет в чат с ботом. Закройте это окно, перейдите в чат с ботом и нажмите 'Оплатить', чтобы принять условия Telegram Stars." });
+        }
+      }
+
       if (data.ok) {
-        logToTelegram(`💳 <b>Отправлен счет (${userId}) на 100 Stars</b>`).catch(console.error);
-        res.json({ success: true, message: "Счет отправлен в чат" });
+        logToTelegram(`💳 <b>Создан счет (${userId}) на 100 Stars</b>`).catch(console.error);
+        res.json({ invoiceUrl: data.result });
       } else {
-        logToTelegram(`❌ <b>Ошибка отправки счета (${userId})</b>\n${data.description}`).catch(console.error);
+        logToTelegram(`❌ <b>Ошибка создания счета (${userId})</b>\n${data.description}`).catch(console.error);
         res
           .status(400)
-          .json({ error: data.description || "Failed to send invoice" });
+          .json({ error: data.description || "Failed to create invoice" });
       }
     } catch (err: any) {
       console.error(err);
       logToTelegram(`❌ <b>Ошибка генерации инвойса (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Error'}</code>`).catch(console.error);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/set-telegram-webhook", async (req, res) => {
+    try {
+      const { webAppUrl } = req.body;
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (!botToken || !webAppUrl) {
+         return res.status(400).json({ error: "Missing botToken or webAppUrl" });
+      }
+      
+      const webhookUrl = `${webAppUrl}/api/telegram-webhook`;
+      
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl })
+      });
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 

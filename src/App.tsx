@@ -320,7 +320,7 @@ export default function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const [isGeneratingAR, setIsGeneratingAR] = useState(false);
+  const [loadingARStyles, setLoadingARStyles] = useState<Record<string, boolean>>({});
   const [arGeneratedImageUrl, setArGeneratedImageUrl] = useState<
     Record<string, string>
   >({});
@@ -329,7 +329,7 @@ export default function App() {
   >({});
   const [arError, setArError] = useState<string | null>(null);
 
-  const [isGeneratingVTON, setIsGeneratingVTON] = useState(false);
+  const [loadingVTONStyles, setLoadingVTONStyles] = useState<Record<string, boolean>>({});
   const [vtonResultUrl, setVtonResultUrl] = useState<string | null>(null);
   const [vtonError, setVtonError] = useState<string | null>(null);
   const [customHairColor, setCustomHairColor] = useState<string | null>(null);
@@ -583,22 +583,63 @@ export default function App() {
       const tg = window.Telegram?.WebApp;
       const tgUserId = (tg as any)?.initDataUnsafe?.user?.id;
       if (isTelegramEnv && tg && tgUserId) {
+        
+        // Ensure webhook is set before creating invoice
+        try {
+           await fetch('/api/set-telegram-webhook', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ webAppUrl: window.location.origin })
+           });
+        } catch(e) {
+           console.error("Failed to setup webhook", e);
+        }
+
         const response = await fetch("/api/create-invoice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, tgUserId }),
         });
         const data = await response.json();
-        if (!response.ok) {
+        if (!response.ok || !data.invoiceUrl) {
           throw new Error(data.error || "Ошибка при создании счета");
         }
 
-        if (tg.showAlert) {
-          tg.showAlert("Счет на 100 ⭐️ отправлен в чат! Закройте это окно и перейдите в чат с ботом для оплаты.", () => {
-            if (tg.close) tg.close();
+        if (tg.openInvoice) {
+          tg.openInvoice(data.invoiceUrl, async (status: string) => {
+            if (status === "paid") {
+              const userRef = doc(db, "users", userId);
+              const snap = await getDoc(userRef);
+              if (snap.exists()) {
+                await updateDoc(userRef, {
+                  generationsLeft: increment(100),
+                  fullAccess: true,
+                });
+                setGenerationsLeft((prev) => (prev || 0) + 100);
+                fetch("/api/log", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    level: "info",
+                    message: "💰 Оплата успешно завершена (Полный доступ, 100 Stars)",
+                    userId,
+                  }),
+                }).catch(console.error);
+              }
+            } else {
+              fetch("/api/log", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  level: "warn",
+                  message: `Оплата отменена или не прошла, статус: ${status}`,
+                  userId,
+                }),
+              }).catch(console.error);
+            }
           });
         } else {
-          alert("Счет отправлен в чат бота. Вернитесь туда для оплаты!");
+           alert("Невозможно открыть счет. Пожалуйста, обновите Telegram.");
         }
       } else {
         alert("Оплата поддерживается только в Telegram. (Telegram User ID не найден)");
@@ -1090,7 +1131,7 @@ export default function App() {
   const generateARPreview = async (styleKeyword: string, styleName: string) => {
     if (!imageBase64 && !imageUrl) return;
 
-    setIsGeneratingAR(true);
+    setLoadingARStyles((prev) => ({ ...prev, [styleKeyword]: true }));
     setArError(null);
 
     try {
@@ -1148,7 +1189,7 @@ export default function App() {
           "Ошибка генерации примерки. Попробуйте снова чуть позже.",
       );
     } finally {
-      setIsGeneratingAR(false);
+      setLoadingARStyles((prev) => ({ ...prev, [styleKeyword]: false }));
     }
   };
 
@@ -1162,7 +1203,7 @@ export default function App() {
     const proceed = await checkLimits();
     if (!proceed) return;
 
-    setIsGeneratingVTON(true);
+    setLoadingVTONStyles((prev) => ({ ...prev, [styleKeyword]: true }));
     setVtonError(null);
     setVtonResultUrl(null);
 
@@ -1246,7 +1287,7 @@ export default function App() {
           "Ошибка виртуальной примерки. Попробуйте снова чуть позже.",
       );
     } finally {
-      setIsGeneratingVTON(false);
+      setLoadingVTONStyles((prev) => ({ ...prev, [styleKeyword]: false }));
     }
   };
 
@@ -2096,11 +2137,11 @@ export default function App() {
                         tryOnStyle.name,
                       )
                     }
-                    disabled={isGeneratingAR}
+                    disabled={loadingARStyles[tryOnStyle.imageKeyword]}
                     className="w-full glass-button hover:bg-white/10 text-white/90 font-medium py-4 px-6 rounded-full transition-all shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/20 text-sm sm:text-base"
                   >
                     <Sparkles size={18} />
-                    {isGeneratingAR
+                    {loadingARStyles[tryOnStyle.imageKeyword]
                       ? "Генерация..."
                       : styleConsultations[tryOnStyle.imageKeyword]
                         ? "🔄 Обновить персональный гайд"
@@ -2232,12 +2273,12 @@ export default function App() {
                           customHairColor,
                         )
                       }
-                      disabled={isGeneratingVTON}
+                      disabled={loadingVTONStyles[tryOnStyle.imageKeyword]}
                       style={{ color: "#ffffff" }}
                       className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-medium py-4 px-6 rounded-full transition-all shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 text-sm sm:text-base vton-generate-btn"
                     >
                       <Sparkles size={18} fill="currentColor" />
-                      {isGeneratingVTON
+                      {loadingVTONStyles[tryOnStyle.imageKeyword]
                         ? "Генерация виртуальной примерки..."
                         : "📸 Виртуальная примерка (Beta)"}
                     </button>
