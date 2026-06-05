@@ -83,6 +83,51 @@ function extractFolderId(rawFolderId: string): string {
   return cleaned.trim();
 }
 
+async function callYandexGPTChat(systemText: string, messages: {role: string, text: string}[]): Promise<string> {
+    const folderId = process.env.YANDEX_FOLDER_ID;
+    const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
+    if (!folderId || !saKey) {
+        throw new Error("YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY не установлены");
+    }
+    const cleanFolderId = extractFolderId(folderId);
+    
+    if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
+        throw new Error(`[ОШИБКА НАСТРОЙКИ СЕРВЕРА] В переменных окружения вашего сервера (на Render.com) в ключе YANDEX_FOLDER_ID все еще указан стандартный шаблон или плейсхолдер "${cleanFolderId}". Пожалуйста, зайдите в настройки (Environment) на Render.com и замените "MY_FOLDER_ID" на реальный Идентификатор каталога (например, b1gqp...).`);
+    }
+
+    const iamToken = await getYandexIamToken(saKey);
+    
+    const payload = {
+      modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
+      completionOptions: {
+        stream: false,
+        temperature: 0.85,
+        maxTokens: 2000
+      },
+      messages: [
+        { role: "system", text: systemText },
+        ...messages
+      ]
+    };
+
+    const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${iamToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Ответ YandexGPT: ${err}`);
+    }
+
+    const data = await res.json();
+    return data.result.alternatives[0].message.text;
+}
+
 async function callYandexGPT(systemText: string, userText: string): Promise<string> {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
@@ -101,7 +146,7 @@ async function callYandexGPT(systemText: string, userText: string): Promise<stri
       modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
       completionOptions: {
         stream: false,
-        temperature: 0.7,
+        temperature: 0.85,
         maxTokens: 2000
       },
       messages: [
@@ -242,7 +287,7 @@ async function startServer() {
         },
         body: JSON.stringify({
           image_url: `data:image/jpeg;base64,${targetBase64.replace(/^data:image\/\w+;base64,/, "")}`,
-          prompt: "You are an expert trichologist and physiognomist. Analyze this person's face and hair with ultimate precision. Provide a very detailed clinical description: 1) EXACT gender. 2) Precise face shape. 3) EXACT hair length in cm (e.g. skin fade / bald, buzz cut 1cm, short 5cm, medium 15cm, long 30+cm). 4) EXACT hair density at the scalp (scalp visibility, sparse, medium, thick). 5) Hair texture (straight, wavy, curly). 6) Skin tone and facial hair style. If the person has very short hair or is balding, STATE IT EXPLICITLY. Be brutally honest, do not hallucinate thick hair if it is thin/short."
+          prompt: "You are an expert trichologist, physiognomist and master hair stylist. Analyze this person's face and hair with ultimate precision from the photo. Provide a very detailed clinical description: 1) EXACT gender and estimated age. 2) Precise face shape. 3) EXACT hair length in cm and category (bald, buzz, short, medium, long). 4) EXACT hair density (thick, medium, thin, sparse, balding) and exact status of the hairline (is there a receding hairline, temporal thinning, bald spots?). 5) Hair texture (straight, wavy, curly, coily). 6) Current hair color. 7) Skin tone and facial hair style (beard, mustache, clean shaven). 8) ONLY a concise description of clothing (exact color, type) and background (color/setting). Evaluate hair quality objectively. Be brutally honest."
         })
       });
 
@@ -257,14 +302,14 @@ async function startServer() {
       console.time("YandexGPT");
       console.log("Generating recommendations via YandexGPT...");
 
-      const systemText = `Ты строгий парикмахер-стилист. Твоя задача — проанализировать описание внешности клиента и подобрать стрижки. 
+      const systemText = `Ты топовый и очень креативный парикмахер-стилист. Твоя задача — проанализировать детальное клиническое описание внешности клиента и предложить 3 СОВЕРШЕННО РАЗНЫХ И НЕСТАНДАРТНЫХ варианта стрижки. 
 Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable JSON).
 
 Сначала выдели характеристики в соответствии со следующими правилами:
 - gender ("male" или "female")
 - faceShape (например, "Овальная", "Квадратная" - НА РУССКОМ)
-- hairLength (ОБЯЗАТЕЛЬНО проанализируй длину и выбери одну из категорий: "Лысый", "Ежик/Очень короткие", "Короткие", "Средние", "Длинные" - НА РУССКОМ)
-- hairDensity (ОБЯЗАТЕЛЬНО: "Редкие/Тонкие", "Средние", "Густые" - НА РУССКОМ)
+- hairLength (ОБЯЗАТЕЛЬНО проанализируй длину из описания и выбери одну из: "Лысый", "Ежик/Очень короткие", "Короткие", "Средние", "Длинные" - НА РУССКОМ)
+- hairDensity (ОБЯЗАТЕЛЬНО: "Редкие/Тонкие", "Средние", "Густые" - НА РУССКОМ. Если есть залысины, укажи это)
 - hairType ("Прямые", "Волнистые", "Кудрявые" - НА РУССКОМ)
 - skinTone (на английском)
 - skinDetails (на английском)
@@ -273,32 +318,32 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 - ageRange (на английском, e.g., "20-30")
 - facialFeatures (на английском)
 - facialHair (на английском)
+- clothingContext (на английском - точная одежда и фон)
 
-ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛС ПРИ ПОДБОРЕ (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ИЛИ ДОРИСОВЫВАТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
-1. Если у клиента "Лысый": разрешается советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина". Любые другие стрижки запрещены!
-2. Если у клиента "Ежик/Очень короткие" (волосы до 1.5-2 см): разрешается предлагать ТОЛЬКО "Базз-кат (Buzz cut)", "Милитари фейд", "Ультракороткий кроп (Ultra-short crop)". Любые классические, модельные, объемные кудри, челки или прически со средними волосами КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ.
-3. Если у клиента "Короткие" (волосы от 2 до 7 см): разрешается предлагать ТОЛЬКО короткие стрижки: "Короткий кроп (Short crop)", "Текстурированный фейд (Textured fade)", "Бокс / Полубокс", "Цезарь". КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО советовать маллет, каре, каскад, помпадур, квифф, андеркат с длинными прядями или любые средние/длинные прически! Длина предлагаемого образа должна быть КРАЙНЕ короткой и аккуратной.
-4. Если у клиента "Средние" (волосы от 7 до 15 см): разрешается предлагать средние или короткие стрижки (каре, шегги, маллет, андеркат, короткий кроп). Запрещено советовать длинные волосы (ниже плеч).
-5. Если у клиента "Длинные" (волосы более 15 см): можно советовать любые стрижки (так как стрижка укорачивает волосы).
+ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛОС (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
+1. Если у клиента "Лысый": советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина".
+2. Если у клиента "Ежик/Очень короткие" (до 2 см): предлагай только ультракороткие стрижки (Базз-кат, Милитари фейд, Ультракороткий кроп, Френч кроп).
+3. Если у клиента "Короткие" (от 2 до 7 см): предлагайте самые разнообразные варианты (Текстурированный кроп, Фейд с зачесом, Андеркат, Квифф, Цезарь и др.).
+4. Если у клиента "Средние" (от 7 до 15 см): предлагайте любые средние или короткие стрижки.
+5. Если у клиента "Длинные" (более 15 см): можно советовать любые стрижки.
 
 ДОПОЛНИТЕЛЬНЫЕ КРИТИЧЕСКИЕ ПРАВИЛА:
-1. КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать пышные объемные прически с высокой плотностью волос, если у клиента "Редкие/Тонкие" волосы или есть залысины. Для тонких/редких волос предлагай стрижки, скрывающие залысины или подчеркивающие текстуру (например, текстурированный кроп с коротким верхом, фейд, ультракороткий базз-кат).
-2. Стрижка должна быть выполнима путем ОБРЕЗАНИЯ текущих волос. Мы не можем дорисовать плотность или длину.
-3. Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. Если стиль указан и не равен "На твое усмотрение", предложи креативные варианты в стиле "${preferredStyle}".
+1. Обрати абсолютное внимание на первоначальный анализ внешности: залысины, редкие волосы, высокий лоб. Адаптируй результат под них категорически! Если волосы "Редкие/Тонкие" - предлагай стрижки, скрывающие залысины (текстурированные, кроп, короткие). СТРОГО ОБЯЗАТЕЛЬНО включать слова 'thin hair' или 'receding hairline' в 'imageKeyword'.
+2. Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. ЭТО КРИТИЧЕСКИ ВАЖНО. Все 3 стрижки ДОЛЖНЫ 100% соответствовать этому стилю. Подбери три совершенно уникальных, не похожих друг на друга прически именно в этом стиле. Учитывай КОЛИЧЕСТВО И КАЧЕСТВО ВОЛОС (густоту, залысины) при выборе — стрижка должна быть реалистично выполнима на текущих волосах. Делай их максимально разнообразными внутри выбранного стиля. Никаких клише!
+3. Каждый запрос должен возвращать НОВЫЕ варианты в рамках стиля, не повторяйся со стандартным "Фейдом".
+4. ОЧЕНЬ ВАЖНО: 'imageKeyword' ДОЛЖЕН содержать точное английское название стрижки, длину волос (например, 'short hair') и густоту (например, 'thin hair', 'thick hair').
 
 ВНИМАНИЕ: ТЫ ОБЯЗАН ВЕРНУТЬ РОВНО ТРИ (3) ВАРИАНТА СТРИЖКИ. СТРОГО 3 ВАРИАНТА, НЕ МЕНЬШЕ И НЕ БОЛЬШЕ.
-ЕСЛИ ТЫ НЕ ВЕРНЕШЬ 3 ВАРИАНТА, ПРИЛОЖЕНИЕ СЛОМАЕТСЯ.
 
 Твой ответ должен быть СТРОГО в формате валидного JSON объекта:
 {
   "warning": "Предупредите мягко, если запрос недостижим" (или пустая строка),
   "recommendations": [
-    // В ЭТОМ МАССИВЕ ДОЛЖНО БЫТЬ СТРОГО 3 (ТРИ) ОБЪЕКТА С РАЗНЫМИ СТРИЖКАМИ!
     {
-      "name": "Название стрижки на русском",
-      "description": "Честное объяснение, почему она подходит...",
-      "stylingTips": "Советы по укладке...",
-      "imageKeyword": "Haircut name, hair density, hair length (english)"
+      "name": "Название стрижки на русском (уникальное!)",
+      "description": "Точное объяснение, почему она скрывает недостатки и подчеркивает достоинства клиента...",
+      "stylingTips": "Специфичные советы по укладке для его типа волос...",
+      "imageKeyword": "Exact english haircut name, hair length, hair density/status"
     },
     { ...второй вариант... },
     { ...третий вариант... }
@@ -319,6 +364,7 @@ Return ONLY the raw JSON string matching this schema:
   "ageRange": "",
   "facialFeatures": "",
   "facialHair": "",
+  "clothingContext": "",
   "recommendations": []
 }`;
 
@@ -356,7 +402,11 @@ Return ONLY the raw JSON string matching this schema:
 
   app.post("/api/generate-reference", async (req, res) => {
     try {
-      const { gender, keyword, faceShape, hairLength, hairDensity, hairType, skinTone, skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair } = req.body;
+      const { 
+        gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
+        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext
+      } = req.body;
+      
       if (!keyword) {
         return res.status(400).json({ error: "Missing parameters" });
       }
@@ -378,33 +428,50 @@ Return ONLY the raw JSON string matching this schema:
         else if (hl.includes('long') || hl.includes('длин')) lengthRu = 'длинные волосы';
       }
 
-      let prompt = `Студийный портрет крупным планом, по центру кадра, смотрит прямо в камеру, нейтральное выражение лица. Модель: ${descriptorRu}. Прическа и стрижка: "${keyword}". `;
+      let prompt = `Профессиональная портретная фотография из глянцевого журнала. Крупный план, главный акцент на прическе. Название стрижки/прически (строго): "${keyword}". `;
       
-      if (lengthRu) {
-         prompt += `Длина волос: ${lengthRu}. `;
+      if (description) {
+         prompt += `Стиль стрижки: ${description.substring(0, 80)}. `;
       }
-      if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
-         prompt += `Тонкие волосы, низкая густота. `;
+      
+      prompt += `Модель: ${descriptorRu}. `;
+
+      if (ageRange) {
+        prompt += `Возраст: ${ageRange}. `;
+      }
+      if (faceShape) {
+        prompt += `Форма лица: ${faceShape}. `;
+      }
+      
+      if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк") || hairDensity.includes("balding"))) {
+         prompt += `Особенность: тонкие/редкие волосы. `;
       } else {
-         prompt += `Естественная густота волос, без излишеств. `;
+         prompt += `Естественная густота волос. `;
       }
       
       const translateColorRu = (val: string) => {
         val = val.toLowerCase();
-        if (val.includes("блонд") || val.includes("светл")) return "светлый блонд";
-        if (val.includes("русый")) return "светло-русый";
-        if (val.includes("каштан") || val.includes("шатен")) return "каштановый";
-        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "черный цвет";
-        if (val.includes("рыж") || val.includes("медн")) return "рыжий цвет";
-        if (val.includes("сед")) return "пепельный цвет";
+        if (val.includes("dark brown") || val.includes("тёмно-каштанов")) return "тёмно-каштановый";
+        if (val.includes("light brown") || val.includes("светло-рус")) return "светло-русый";
+        if (val.includes("блонд") || val.includes("светл") || val.includes("blond")) return "светлый блонд";
+        if (val.includes("рус") || val.includes("ash")) return "русый";
+        if (val.includes("каштан") || val.includes("шатен") || val.includes("brown") || val.includes("brunet")) return "каштановый";
+        if (val.includes("черн") || val.includes("black")) return "черный цвет";
+        if (val.includes("рыж") || val.includes("медн") || val.includes("red") || val.includes("copper") || val.includes("ginger")) return "рыжий цвет";
+        if (val.includes("сед") || val.includes("пепел") || val.includes("grey") || val.includes("gray") || val.includes("white")) return "седой/пепельный цвет";
         return val;
       };
 
-      if (hairColor) prompt += `Цвет волос: ${translateColorRu(hairColor)}. `;
+      const isCustomColorRequestedRef = customHairColor && customHairColor !== "Любой";
+      if (isCustomColorRequestedRef) {
+          prompt += `КРИТИЧЕСКИ ВАЖНО: Цвет волос строго ${translateColorRu(customHairColor).toUpperCase()}. `;
+      } else if (hairColor) {
+          prompt += `Цвет волос: ${translateColorRu(hairColor)}. `;
+      }
       if (hairType) prompt += `Тип волос: ${hairType}. `;
       
-      let fh = (req.body.facialHair || '').toLowerCase();
-      if (fh && (fh.includes('clean') || fh.includes('shave'))) {
+      let fh = (facialHair || '').toLowerCase();
+      if (fh && (fh.includes('clean') || fh.includes('shave') || fh.includes('без'))) {
           prompt += `Без бороды и усов. Обычная одежда. `;
       } else if (fh) {
           prompt += `Особенности: ${fh}. Обычная одежда. `;
@@ -419,12 +486,11 @@ Return ONLY the raw JSON string matching this schema:
       let finalImageUrl = "";
       let lastError = "";
 
-      // Fallback to YandexART
       const yandexServiceAccountKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
       const yandexFolderId = process.env.YANDEX_FOLDER_ID;
 
       if (yandexServiceAccountKey && yandexFolderId) {
-        console.log("Generating reference via YandexART as fallback... prompt:", prompt);
+        console.log("Generating reference via YandexART... prompt:", prompt);
         try {
             const cleanFolderId = extractFolderId(yandexFolderId);
             if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
@@ -437,7 +503,7 @@ Return ONLY the raw JSON string matching this schema:
             modelUri: `art://${cleanFolderId}/yandex-art/latest`,
             generationOptions: {
               seed: Math.floor(Math.random() * 10000000).toString(),
-              aspectRatio: { widthRatio: "1", heightRatio: "1" }
+              aspectRatio: { widthRatio: "3", heightRatio: "4" }
             },
             messages: [
               { weight: 1, text: prompt }
@@ -482,7 +548,7 @@ Return ONLY the raw JSON string matching this schema:
                   const masked = cleanFolderId.length > 5 
                      ? `${cleanFolderId.slice(0, 4)}...${cleanFolderId.slice(-4)}` 
                      : cleanFolderId;
-                  diagnostic = `\n(Диагностика: YandexART отклонил запрос. Проверьте правильность YANDEX_FOLDER_ID на вашем сервере (Render.com). Значение на сервере: "${masked}")`;
+                  diagnostic = `\n(Диагностика: YandexART отклонил запрос. Проверьте правильность YANDEX_FOLDER_ID на вашем сервере. Значение на сервере: "${masked}")`;
               }
               throw new Error(`YandexART Init Error: ${errText}${diagnostic}`);
             }
@@ -541,8 +607,8 @@ Return ONLY the raw JSON string matching this schema:
 
       // Fallback
       if (!finalImageUrl) {
-          console.error(`Не удалось сгенерировать изображение в Yandex Cloud: ${lastError}. Используем fallback-изображение.`);
-          finalImageUrl = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80';
+          console.error(`Не удалось сгенерировать изображение: ${lastError}. Используем fallback-изображение.`);
+          finalImageUrl = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80';
       }
 
       res.json({ imageUrl: finalImageUrl, debugError: lastError });
@@ -555,10 +621,11 @@ Return ONLY the raw JSON string matching this schema:
   app.post("/api/generate-full", async (req, res) => {
     try {
       const { 
-        gender, keyword, faceShape, hairLength, hairDensity, hairType, skinTone, 
-        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair,
+        gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
+        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
         selfieImage, // Required for Step 2
-        vtonStrength // Number from 50 to 100
+        vtonStrength, // Number from 50 to 100
+        targetImageUrl // Optional, generated reference image URL
       } = req.body;
       
       if (!keyword || !selfieImage) {
@@ -570,14 +637,70 @@ Return ONLY the raw JSON string matching this schema:
         return res.status(500).json({ error: "Отсутствует FAL_KEY в переменных окружения." });
       }
 
-      // Convert vtonStrength (50-100) to actual flux strength (0.50 - 0.95)
-      const requestedStrength = typeof vtonStrength === 'number' ? vtonStrength : 85;
-      const fluxStrength = Math.min(Math.max(requestedStrength / 100, 0.50), 0.95);
-
       let finalImageUrl = "";
       let lastError = "";
       let swappedImageUrl = "";
       const selfieImageFull = selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
+
+      const translateColor = (val: string) => {
+        val = val.toLowerCase();
+        if (val.includes("тёмно-каштан") || val.includes("темно-каштан")) return "dark brown";
+        if (val.includes("блонд") || val.includes("светл")) return "BRIGHT PLATINUM BLONDE";
+        if (val.includes("рус")) return "light brown";
+        if (val.includes("каштан") || val.includes("шатен")) return "brown (brunette)";
+        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "deep dark black";
+        if (val.includes("рыж") || val.includes("медн")) return "vivid intense copper red / ginger";
+        if (val.includes("сед") || val.includes("пепел")) return "PURE WHITE / BRIGHT SILVER GREY";
+        if (val.includes("розов")) return "vibrant pastel pink";
+        if (val.includes("син") || val.includes("голуб")) return "vivid blue";
+        if (val.includes("зелен") || val.includes("зелён")) return "vivid green";
+        if (val.includes("фиолет")) return "vivid purple";
+        if (val.includes("красн")) return "vivid red";
+        return val;
+      };
+
+      // 0 means only change hair color, preserve original hairstyle exactly.
+      // 1-74 means change shape keeping background.
+      // 75-100 means studio shot (use reference image)
+      const requestedStrength = Math.min(Math.max(typeof vtonStrength === 'number' ? vtonStrength : 50, 0), 100);
+      
+      let isStudioShot = requestedStrength >= 75;
+      const isCustomColorRequested = customHairColor && customHairColor !== "Любой";
+      const targetHairColor = isCustomColorRequested ? customHairColor : hairColor;
+      const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
+      
+      let baseImageForFlux = selfieImageFull;
+      let fluxStrength = 0.40;
+      
+      if (!isStudioShot) {
+          baseImageForFlux = selfieImageFull;
+          if (requestedStrength === 0) {
+              fluxStrength = isCustomColorRequested ? 0.60 : 0.15; 
+          } else {
+              if (isCustomColorRequested) {
+                  fluxStrength = 0.60 + (requestedStrength / 74) * 0.25; // 0.60 to 0.85
+              } else {
+                  fluxStrength = 0.35 + (requestedStrength / 74) * 0.40; // 0.35 to 0.75
+              }
+          }
+      } else {
+          if (targetImageUrl) {
+              baseImageForFlux = targetImageUrl.startsWith('http') || targetImageUrl.startsWith('data:') 
+                  ? targetImageUrl 
+                  : `data:image/jpeg;base64,${targetImageUrl}`;
+              
+              if (isCustomColorRequested) {
+                  fluxStrength = 0.80 + ((requestedStrength - 75) / 25) * 0.15; // 0.80 to 0.95
+              } else {
+                  fluxStrength = requestedStrength === 75 ? 0.05 : 0.40 + ((requestedStrength - 75) / 25) * 0.40; // 0.40 to 0.80
+              }
+          } else {
+              baseImageForFlux = selfieImageFull;
+              fluxStrength = isCustomColorRequested 
+                  ? 0.80 + ((requestedStrength - 75) / 25) * 0.15
+                  : 0.50 + ((requestedStrength - 75) / 25) * 0.30; // 0.50 to 0.80
+          }
+      }
 
       let descriptorEng = 'person';
       const g = (gender || '').toLowerCase().trim();
@@ -594,10 +717,31 @@ Return ONLY the raw JSON string matching this schema:
          englishKeyword = bracketMatch[1];
       }
 
-      let promptEng = `A photorealistic high-quality portrait of a ${descriptorEng} with a NEW HAIRCUT: "${englishKeyword}". CRITICAL: KEEP the person's face, pose, clothing, and background EXACTLY the same, but COMPLETELY REPLACE the hair with a perfect "${englishKeyword}" hairstyle. `;
+      let promptEng = "";
       
+      let extraColorPrompt = "";
+      if (isCustomColorRequested && finalColor) {
+         extraColorPrompt = ` The person has ${finalColor.toUpperCase()} hair. The hair is STRICTLY AND ABSOLUTELY ${finalColor.toUpperCase()} IN COLOR.`;
+      } else if (finalColor) {
+         extraColorPrompt = ` The person naturally has ${finalColor} hair. Maintain this underlying hair color gracefully.`;
+      }
+
+      // For english translation of the russian description, we provide a structured request to flux
+      let fluxHairDetails = `Hairstyle specs: ${englishKeyword}.`;
+      if (hairType) fluxHairDetails += ` Hair Texture: ${hairType}.`;
+      if (hairLength) fluxHairDetails += ` Hair Length Constraint (from the guide): ${hairLength}.`;
       if (hairDensity && (hairDensity.includes("thin") || hairDensity.includes("sparse") || hairDensity.includes("редк"))) {
-         promptEng += ` The hair is VERY THIN and SPARSE.`;
+          fluxHairDetails += ` Hair Density: very thin, fine, sparse hair volume.`;
+      }
+      
+      if (!isStudioShot) {
+          if (requestedStrength === 0) {
+             promptEng = `The exact same person from the original image, KEEP THE EXACT SAME HAIRSTYLE PRECISELY, but change the hair color. ${extraColorPrompt} Keep EVERYTHING ELSE EXACTLY the same: background, clothing, lighting, face, and pose.`;
+          } else {
+             promptEng = `The exact same person from the original image, but with a NEW HAIRSTYLE. ${fluxHairDetails} ${extraColorPrompt} Keep the same background, clothing, lighting, face, and pose. Context: ${description || ""}`;
+          }
+      } else {
+          promptEng = `A photorealistic portrait of a ${descriptorEng}. NEW HAIRSTYLE TO APPLY: ${fluxHairDetails} ${extraColorPrompt} Context: ${description || ""}`;
       }
       
       const translateFaceShape = (val: string) => {
@@ -610,110 +754,88 @@ Return ONLY the raw JSON string matching this schema:
         if (val.includes("ромб") || val.includes("брилл")) return "diamond";
         return val;
       };
-
-      const translateColor = (val: string) => {
-        val = val.toLowerCase();
-        if (val.includes("блонд") || val.includes("светл")) return "blonde";
-        if (val.includes("русый")) return "light brown";
-        if (val.includes("каштан") || val.includes("шатен")) return "brown";
-        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "black";
-        if (val.includes("рыж") || val.includes("медн")) return "red / copper";
-        if (val.includes("сед")) return "grey / silver";
-        return val;
-      };
-
+      
       const featuresEng = [];
       if (faceShape && faceShape.length > 2) featuresEng.push(`face shape ${translateFaceShape(faceShape)}`);
       if (skinTone && skinTone.length > 2) featuresEng.push(`skin tone ${skinTone}`);
       if (eyeColor && eyeColor.length > 2) featuresEng.push(`eye color ${translateColor(eyeColor)}`);
-      if (featuresEng.length > 0) promptEng += `Appearance: ${featuresEng.join(', ')}. `;
       
-      const targetHairColor = customHairColor || hairColor;
-
-      if (customHairColor) {
-         promptEng += `CRITICAL: HAIR COLOR MUST BE STRICTLY ${translateColor(customHairColor)}! Do not use any other color. `;
-      } else if (targetHairColor) {
-         promptEng += `CRITICAL: Preserve original hair color: ${translateColor(targetHairColor)}. `;
+      if (featuresEng.length > 0) {
+        promptEng += ` The person has ${featuresEng.join(', ')}.`;
       }
-      
-      if (hairType) promptEng += `Hair texture: ${hairType}. `;
       
       let fh = (facialHair || '').toLowerCase();
       if (fh && (fh.includes('clean') || fh.includes('shave'))) {
-          promptEng += `CRITICAL: Clean shaven face, strictly NO BEARD (no beard). `;
+          promptEng += ` Clean shaven face.`;
       } else if (fh) {
-          promptEng += `Facial hair: ${fh}. `;
+          promptEng += ` Facial hair: ${fh}.`;
+      }
+
+      if (!isStudioShot) {
+          if (clothingContext) {
+              promptEng += ` EXACT SAME CLOTHING: ${clothingContext}.`;
+          }
+          if (requestedStrength === 0) {
+              promptEng += ` CRITICAL: ONLY change the hair color. Do NOT change the hairstyle. Keep EVERYTHING exactly the same.`;
+          } else {
+              promptEng += ` CRITICAL: Keep EXACTLY the same background, clothing, environment, and pose as the original image. ONLY modify the hairstyle and color.`;
+          }
       } else {
-          promptEng += `Clean shaven face. `;
+          promptEng += ` CRITICAL: Create a beautiful studio portrait or matching scene. Perfect lighting.`;
+      }
+      
+      promptEng += ` Высокодетализированная естественная текстура кожи, видимые поры, без ретуши, несовершенства кожи. Amateur phone snapshot, high quality raw photography.`;
+      
+      if (finalColor) {
+          promptEng += ` CRITICAL REQUIREMENT: THIS PERSON MUST HAVE ${finalColor.toUpperCase()} HAIR. DO NOT MAKE THE HAIR ANY OTHER COLOR. ${finalColor.toUpperCase()} HAIR ONLY!`;
       }
 
-      promptEng += `CRITICAL: PRESERVE EXACT CLOTHING AND SHOULDERS FROM ORIGINAL IMAGE. DO NOT CHANGE SHIRT OR OUTFIT. Neutral simple background. KEEP FACE COMPLETELY UNCHANGED.`;
+      promptEng = promptEng.substring(0, 1500).trim();
 
-      // Skip clothing describing to save time and avoid 504 Gateway Timeout
-      /*
-      try {
-        console.log("Extracting clothing and background context to preserve it...");
-        const visionRes = await fetch("https://fal.run/fal-ai/any-llm/vision", {
-           method: "POST",
-           headers: {
-             "Authorization": `Key ${falKey}`,
-             "Content-Type": "application/json"
-           },
-           body: JSON.stringify({
-             image_url: selfieImageFull,
-             prompt: "Describe ONLY the clothing (exact color, type, neckline) and the background (color, setting) in one concise sentence. Do not describe the person's face, hair, or pose."
-           })
-        });
-        if (visionRes.ok) {
-           const visionData = await visionRes.json();
-           if (visionData.output) {
-              promptEng += ` Exact Scene Constraints: ${visionData.output}.`;
-              console.log("Detected Scene:", visionData.output);
-           }
+      if (fluxStrength <= 0.05 && targetImageUrl) {
+          console.log("Skipping Flux Image-to-Image entirely, directly using targetImageUrl for FaceSwap...");
+          finalImageUrl = baseImageForFlux;
+      } else {
+        try {
+          console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
+          let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
+          
+          const bodyPayload: any = {
+             prompt: promptEng,
+             image_url: baseImageForFlux,
+             strength: fluxStrength,
+             num_inference_steps: 28,
+             guidance_scale: 3.5
+          };
+          
+          const fluxRes = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Authorization": `Key ${falKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(bodyPayload)
+          });
+
+          if (!fluxRes.ok) {
+             const errData = await fluxRes.text();
+             throw new Error(`FAL Flux Dev Error HTTP ${fluxRes.status}: ${errData}`);
+          }
+          
+          const fluxData = await fluxRes.json();
+          const generatedUrl = fluxData.images?.[0]?.url || fluxData.image?.url || fluxData.image_url || fluxData.url;
+          
+          if (generatedUrl) {
+              finalImageUrl = generatedUrl;
+          } else {
+              throw new Error(`No image generated by Flux. Payload: ${JSON.stringify(fluxData)}`);
+          }
+        } catch (e: any) {
+          throw e; 
         }
-      } catch (e) {
-        console.log("Vision clothing extraction failed, continuing...", e);
-      }
-      */
-
-      promptEng = promptEng.substring(0, 700).trim();
-
-      try {
-        console.log("Generating new haircut via FAL.AI (Flux I2I)...");
-        let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
-        const bodyPayload: any = {
-          image_url: selfieImageFull,
-          prompt: promptEng,
-          strength: fluxStrength,
-          num_inference_steps: 15
-        };
-        
-        const fluxRes = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Authorization": `Key ${falKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(bodyPayload)
-        });
-
-        if (!fluxRes.ok) {
-           const errData = await fluxRes.text();
-           throw new Error(`FAL Flux I2I Error HTTP ${fluxRes.status}: ${errData}`);
-        }
-        
-        const fluxData = await fluxRes.json();
-        const generatedUrl = fluxData.images?.[0]?.url || fluxData.image?.url || fluxData.image_url || fluxData.url;
-        
-        if (generatedUrl) {
-            finalImageUrl = generatedUrl;
-        } else {
-            throw new Error(`No image generated by Flux I2I. Payload: ${JSON.stringify(fluxData)}`);
-        }
-      } catch (e: any) {
-        throw e; // Pass error out
       }
 
+      // Always run FaceSwap to ensure 100% facial feature retention
       try {
          console.log("Starting Virtual Try-On FaceSwap via FAL.AI...");
          const faceSwapPayload = {
@@ -834,6 +956,33 @@ Return ONLY the raw JSON string matching this schema:
     }
   });
 
+  app.post("/api/chat-stylist", async (req, res) => {
+    try {
+      const { messages, features, styleName } = req.body;
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Missing or invalid messages array" });
+      }
+
+      let pureFeatures = { ...(features || {}) };
+      delete pureFeatures.recommendations;
+      
+      const systemInstruction = `Ты - креативный и опытный звездный стилист-парикмахер. Твоя задача — отвечать на вопросы клиента о его волосах и стиле.
+Физические данные клиента: ${JSON.stringify(pureFeatures)}.
+Выбранная стрижка для обсуждения: ${styleName ? styleName : 'не указана'}.
+Отвечай вежливо, профессионально, давай четкие, практичные советы.
+Используй форматирование HTML (<strong>, <em>, <ul>, <li>, <p>, <br>) для лучшей читаемости, так как твой ответ будет вставлен в HTML документ. НЕ используй markdown (например, ** или \`\`\`html). Старайся отвечать лаконично, без лишней воды.`;
+
+      const responseHtml = await callYandexGPTChat(systemInstruction, messages);
+      
+      let finalHtml = responseHtml.replace(/```html\s*/g, "").replace(/```\s*$/g, "").trim();
+
+      return res.json({ replyHtml: finalHtml });
+    } catch (err: any) {
+      console.error("Chat error:", err);
+      res.status(500).json({ error: err.message || "Ошибка чата со стилистом" });
+    }
+  });
+
   app.post("/api/load-more", async (req, res) => {
     try {
       const { existingNames, features, preferredStyle } = req.body;
@@ -844,36 +993,37 @@ Return ONLY the raw JSON string matching this schema:
       delete pureFeatures2.recommendations;
       const faceDescription = features ? JSON.stringify(pureFeatures2) : "Нет данных о лице (ошибка)";
 
-      const systemInstruction = `Ты строгий парикмахер-стилист. Выведи ТОЛЬКО валидный JSON (без markdown и других символов).
+      const systemInstruction = `Ты топовый и очень креативный парикмахер-стилист. Выведи ТОЛЬКО валидный JSON (без markdown и других символов).
 Внимательно изучи описание внешности клиента (ТЕКУЩАЯ ДЛИНА И ГУСТОТА):
 "${faceDescription}"
 
-Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. Если стиль указан и не равен "На твое усмотрение", КАТЕГОРИЧЕСКИ ВАЖНО подобрать 3 СОВЕРШЕННО РАЗНЫЕ, УНИКАЛЬНЫЕ стрижки, которые на 100% передают настроение и эстетику стиля "${preferredStyle}". НЕ предлагай стандартные повторяющиеся варианты, прояви креатив и предложи именно стрижки в стиле "${preferredStyle}", строго соблюдая правила длины и густоты.
+Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'На твое усмотрение'}. КАТЕГОРИЧЕСКИ ВАЖНО подобрать 3 СОВЕРШЕННО РАЗНЫЕ, УНИКАЛЬНЫЕ стрижки, которые на 100% передают настроение и эстетику этого стиля. СТРОГО опирайся на КОЛИЧЕСТВО И КАЧЕСТВО ВОЛОС (учитывай залысины и густоту из описания) — не предлагай невыполнимые стрижки! НЕ предлагай стандартные повторяющиеся варианты (например, обычный фейд или кроп), сделай их максимально разнообразными!
 
 ШАГ 1. Учитывая ПОЛ, текущую ДЛИНУ волос и ГУСТОТУ из описания.
-ШАГ 2. Предложи 3 НОВЫЕ СОВЕРШЕННО РАЗНЫЕ стрижки (не повторять: ${existingNames}).
+ШАГ 2. Предложи 3 НОВЫЕ СОВЕРШЕННО РАЗНЫЕ стрижки (категорически не повторять: ${existingNames}).
 
-ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛС ПРИ ПОДБОРЕ (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ИЛИ ДОРИСОВЫВАТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
-1. Если у клиента "Лысый": разрешается советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина". Любые другие стрижки запрещены!
-2. Если у клиента "Ежик/Очень короткие" (волосы до 1.5-2 см): разрешается предлагать ТОЛЬКО "Базз-кат (Buzz cut)", "Милитари фейд", "Ультракороткий кроп (Ultra-short crop)". Любые классические, модельные, объемные кудри, челки или прически со средними воласами КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ.
-3. Если у клиента "Короткие" (волосы от 2 до 7 см): разрешается предлагать ТОЛЬКО короткие стрижки: "Короткий кроп (Short crop)", "Текстурированный фейд (Textured fade)", "Бокс / Полубокс", "Цезарь". КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО советовать маллет, каре, каскад, помпадур, квифф, андеркат с длинными прядями или любые средние/длинные прически! Длина предлагаемого образа должна быть КРАЙНЕ короткой и аккуратной.
-4. Если у клиента "Средние" (волосы от 7 до 15 см): разрешается предлагать средние или короткие стрижки (каре, шегги, маллет, андеркат, короткий кроп). Запрещено советовать длинные волосы (ниже плеч).
-5. Если у клиента "Длинные" (волосы более 15 см): можно советовать любые стрижки (так как стрижка укорачивает волосы).
+ЖЕСТКАЯ ТАБЛИЦА ФИЗИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛИНЫ ВОЛОС (МЫ ПРИМЕРЯЕМ НА ФОТО, НЕЛЬЗЯ УДЛИНЯТЬ ВОЛОСЫ ПРИМЕРКОЙ! Стрижка ДОЛЖНА быть КОРОЧЕ или РАВНОЙ текущей длине волос оригинала):
+1. Если у клиента "Лысый": советовать ТОЛЬКО "Полное бритье головы" (Clean head shave) или "Гладкая лысина".
+2. Если у клиента "Ежик/Очень короткие" (волосы до 2 см): разрешается предлагать ТОЛЬКО ультракороткие варианты (Базз-кат, Милитари фейд, Френч кроп).
+3. Если у клиента "Короткие" (волосы от 2 до 7 см): предлагайте самые разнообразные варианты (Андеркат, Квифф, Цезарь, Помпадур-лайт - главное нестандартно!). Выбор должен СТРОГО соответствовать стилю.
+4. Если у клиента "Средние" (волосы от 7 до 15 см): разрешается предлагать средние или короткие стрижки.
+5. Если у клиента "Длинные" (волосы более 15 см): можно советовать любые стрижки.
+
+ОБЯЗАТЕЛЬНО УЧИТЫВАЙТЕ густоту волос клиента! Если волосы "Редкие/Тонкие" или есть залысины - предлагайте стрижки для тонких волос, скрывающие недостатки.
 
 АБСОЛЮТНОЕ ПРАВИЛО 1: Описание строго на русском языке.
-АБСОЛЮТНОЕ ПРАВИЛО 2: КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать длинные, средние или классические объемные стрижки, если у клиента короткие волосы, базз-кат, ежик или залысины. Стрижка должна быть выполнима путем обрезания текущих волос.
-АБСОЛЮТНОЕ ПРАВИЛО 3: КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать объемные густые стрижки, если у клиента тонкие/редкие волосы.
-АБСОЛЮТНОЕ ПРАВИЛО 4: Исключить следующие стрижки, они уже были предложены: ${existingNames}.
-АБСОЛЮТНОЕ ПРАВИЛО 5: В поле imageKeyword ОБЯЗАТЕЛЬНО укажи густоту волос и длину на английском языке (например: buzz cut, thin receding hair, very short hair).
+АБСОЛЮТНОЕ ПРАВИЛО 2: КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать длинные стрижки, если у клиента короткие волосы или залысины. 
+АБСОЛЮТНОЕ ПРАВИЛО 3: Исключить следующие стрижки, они уже были предложены: ${existingNames}.
+АБСОЛЮТНОЕ ПРАВИЛО 4: В поле imageKeyword ОБЯЗАТЕЛЬНО укажи уникальное название стрижки ТОЧНО НА АНГЛИЙСКОМ языке, густоту волос (ОБЯЗАТЕЛЬНО пиши 'thin hair' или 'receding hairline' если волосы редкие или есть залысины) и длину. Иначе генератор не поймет стрижку.
 
 Верни массив "recommendations":
 {
   "recommendations": [
     {
-      "name": "Название",
-      "description": "Описание",
+      "name": "Название (креативное и уникальное)",
+      "description": "Описание (почему идеально подходит)",
       "stylingTips": "Укладка",
-      "imageKeyword": "Haircut name, hair density (english)"
+      "imageKeyword": "Exact english haircut name, hair length, hair density/status"
     }
   ]
 }`;
@@ -940,7 +1090,7 @@ Return ONLY the raw JSON string matching this schema:
 
   app.post("/api/create-invoice", async (req, res) => {
     try {
-      const { userId, tgUserId } = req.body;
+      const { userId, tgUserId, packageId = 10 } = req.body;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       if (!botToken) {
         return res
@@ -948,7 +1098,17 @@ Return ONLY the raw JSON string matching this schema:
           .json({ error: "Telegram Bot Token is not configured" });
       }
 
-      const payloadString = JSON.stringify({ userId, tgUserId, package: 100 });
+      // Определяем пакеты: 5, 10 или 30 генераций
+      type PackageConfig = { stars: number; label: string };
+      const packages: Record<number, PackageConfig> = {
+        5: { stars: 50, label: "5 Генераций" },
+        10: { stars: 100, label: "10 Генераций" },
+        30: { stars: 250, label: "30 Генераций" },
+      };
+
+      const selectedPackage = packages[packageId] || packages[10];
+
+      const payloadString = JSON.stringify({ userId, tgUserId, package: packageId });
       
       const response = await fetch(
         `https://api.telegram.org/bot${botToken}/createInvoiceLink`,
@@ -956,12 +1116,12 @@ Return ONLY the raw JSON string matching this schema:
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            title: "Доступ к боту",
-            description: "Полный доступ ко всем функциям",
+            title: selectedPackage.label,
+            description: `Пакет на ${packageId} примерных генераций нейростилиста`,
             payload: payloadString,
             provider_token: "", // Empty for Telegram Stars
             currency: "XTR",
-            prices: [{ label: "Полный доступ", amount: 100 }], // 100 Stars
+            prices: [{ label: selectedPackage.label, amount: selectedPackage.stars }], 
           }),
         },
       );
@@ -979,12 +1139,12 @@ Return ONLY the raw JSON string matching this schema:
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: tgUserId || userId, // Admin or current user
-              title: "Доступ к боту (Принятие условий)",
+              title: `${selectedPackage.label} (Принятие условий)`,
               description: "Нажмите оплатить, чтобы принять условия Telegram Stars (если вы владелец бота)",
               payload: payloadString,
               provider_token: "",
               currency: "XTR",
-              prices: [{ label: "Полный доступ", amount: 100 }]
+              prices: [{ label: selectedPackage.label, amount: selectedPackage.stars }]
             }),
           }
         );
@@ -1062,44 +1222,51 @@ Return ONLY the raw JSON string matching this schema:
         const payloadStr = update.message.successful_payment.invoice_payload;
         
         let firebaseUserId = null;
+        let purchasedGenerations = 10;
         try {
           const payloadObj = JSON.parse(payloadStr);
           firebaseUserId = payloadObj.userId;
-        } catch(e) {}
+          if (payloadObj.package) {
+            purchasedGenerations = Number(payloadObj.package);
+          }
+          if (firebaseUserId === "local-user" || !firebaseUserId) {
+            firebaseUserId = tgUserId.toString();
+          }
+        } catch(e) {
+          firebaseUserId = tgUserId.toString();
+        }
         
-        logToTelegram(`✅ <b>Оплата успешна!</b> Пользователь: ${tgUserId}. payload: ${payloadStr}`).catch(console.error);
+        logToTelegram(`✅ <b>Оплата успешна!</b> Пользователь: ${tgUserId}. Куплено: ${purchasedGenerations}. payload: ${payloadStr}`).catch(console.error);
 
         try {
-          // Initialize Firebase if not already initialized
-          const { initializeApp, getApps } = await import("firebase/app");
-          const { getFirestore, doc, setDoc, increment } = await import("firebase/firestore");
+          const admin = await import("firebase-admin");
+          const fs = await import("fs");
           
-          let appInstance;
-          if (getApps().length === 0) {
-            const fs = await import("fs");
+          if (!admin.apps.length) {
             const configPath = "./firebase-applet-config.json";
             if (fs.existsSync(configPath)) {
               const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-              appInstance = initializeApp(config);
+              admin.initializeApp({
+                projectId: config.projectId,
+              });
             }
-          } else {
-            appInstance = getApps()[0];
           }
-
-          if (appInstance && firebaseUserId) {
+          
+          if (admin.apps.length > 0 && firebaseUserId) {
+            const db = admin.firestore();
             const configPath = "./firebase-applet-config.json";
-            const fs = await import("fs");
             const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-            const db = getFirestore(appInstance, config.firestoreDatabaseId);
-            const userRef = doc(db, "users", firebaseUserId.toString());
-            await setDoc(userRef, {
-              generationsLeft: increment(100),
+            db.settings({ databaseId: config.firestoreDatabaseId });
+            
+            const userRef = db.collection("users").doc(firebaseUserId.toString());
+            await userRef.set({
+              generationsLeft: admin.firestore.FieldValue.increment(purchasedGenerations),
               fullAccess: true,
             }, { merge: true });
-            console.log(`Updated Firestore for user ${firebaseUserId}`);
+            console.log(`Updated Firestore for user ${firebaseUserId} via Admin SDK`);
           }
         } catch (dbErr) {
-          console.error("Failed to update Firestore:", dbErr);
+          console.error("Failed to update Firestore via Admin SDK:", dbErr);
         }
 
         if (botToken && tgUserId) {

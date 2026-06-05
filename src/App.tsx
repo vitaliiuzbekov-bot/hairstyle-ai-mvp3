@@ -17,9 +17,17 @@ import {
   FileDown,
   Moon,
   Sun,
+  HelpCircle,
+  Star,
+  BookOpen,
 } from "lucide-react";
-import { auth, db } from "./firebase";
+import { CachedImage } from "./components/CachedImage";
+import { BeforeAfterSlider } from "./components/BeforeAfterSlider";
+import { StylistChat } from "./components/StylistChat";
+import { generateCollage } from "./utils/collage";
+import { auth, db, remoteConfig } from "./firebase";
 import { signInAnonymously } from "firebase/auth";
+import { fetchAndActivate, getString } from "firebase/remote-config";
 import {
   doc,
   getDoc,
@@ -233,6 +241,7 @@ interface AnalysisResult {
   ageRange?: string;
   facialFeatures?: string;
   facialHair?: string;
+  clothingContext?: string;
   recommendations: Array<{
     name: string;
     description: string;
@@ -333,7 +342,7 @@ export default function App() {
   const [vtonResultUrl, setVtonResultUrl] = useState<string | null>(null);
   const [vtonError, setVtonError] = useState<string | null>(null);
   const [customHairColor, setCustomHairColor] = useState<string | null>(null);
-  const [vtonStrength, setVtonStrength] = useState<number>(85);
+  const [vtonStrength, setVtonStrength] = useState<number>(50);
 
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -345,8 +354,54 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [faqData, setFaqData] = useState<any[]>([]);
   const [isLightMode, setIsLightMode] = useState(false);
   const [isTelegramEnv, setIsTelegramEnv] = useState(true);
+
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatStyleName, setChatStyleName] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!localStorage.getItem("welcomeShown")) {
+      setShowWelcome(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Fetch FAQ from Remote Config
+    if (remoteConfig) {
+      // Setup default config
+      remoteConfig.settings.minimumFetchIntervalMillis = 3600000;
+      remoteConfig.defaultConfig = {
+        faq_data: JSON.stringify([
+          { q: "🆓 Что бесплатно, а что платно?", a: "Мы разделили функционал, чтобы ты мог(ла) бесплатно изучить все рекомендации и принять взвешенное решение.\n\nБесплатно всегда:\n📊 Анализ формы лица — ИИ определит твой тип лица и даст текстовые рекомендации\n📖 Гайды по стрижкам — подробные описания, какие причёски подходят именно твоей форме лица\n🖼️ Галерея референсов — фото-примеры стрижек, которые тебе рекомендованы (готовые изображения моделей, не твоё фото)\n🎚️ Шкала вмешательства ИИ — настройка при генерации (см. раздел ниже)\n📋 История всех твоих генераций — всегда доступна в профиле\n\nОплачивается звёздами Telegram:\n⭐ Генерация примерки на твоём фото — когда нейросеть рисует выбранную стрижку именно на твоём лице\n\nПри старте ты получаешь 5 бесплатных генераций, чтобы попробовать и оценить результат." },
+          { q: "🎚️ Что такое «шкала вмешательства ИИ»?", a: "Это уникальная фишка НейроСтилиста, которая даёт тебе контроль над результатом. Перед каждой генерацией ты выбираешь, насколько сильно нейросеть может изменить твоё изображение.\n\n0–25% — Лёгкое вмешательство\nИИ меняет только причёску. Твоё лицо, тон кожи, освещение остаются максимально близкими к оригиналу. Идеально для реалистичного предпросмотра.\n\n25–50% — Умеренное вмешательство\nНейросеть немного адаптирует причёску под твой образ: может скорректировать тени на лице, слегка подправить переходы у шеи. Результат выглядит естественно, но чуть более «прилизанно».\n\n50–75% — Заметное вмешательство\nИИ активно перерабатывает изображение: причёска интегрируется глубже, меняется текстура волос, может слегка измениться тон кожи для гармонии. Подходит, если хочешь увидеть максимально целостный образ.\n\n75–100% — Полное преображение\nМаксимальная свобода для нейросети. Результат может выглядеть как полноценная студийная фотография в новом образе. Подходит для вдохновения и смелых экспериментов. Помни: чем выше процент, тем дальше результат от твоего исходного фото.\n\nРекомендация: для первого знакомства с ботом начни с 10–25% — так ты увидишь наиболее реалистичную примерку." },
+          { q: "🎨 Результат выглядит неестественно. Почему?", a: "НейроСтилист создаёт концепт-арт, а не студийную фотографию. Это значит:\n\n• Причёска может немного отличаться от реальной (длина, текстура волос)\n• Тон кожи или тени могут слегка измениться — это особенность технологии генерации\n• Мелкие детали (переход волос к одежде, отдельные прядки) могут иметь артефакты\n\nЦель бота — дать тебе общее представление о том, как стрижка будет смотреться именно на твоём лице. Это не замена консультации с мастером, а вдохновение перед походом в салон.\n\nКак улучшить результат:\n• Попробуй загрузить другое фото (более чёткое, при хорошем свете)\n• Сгенерируй тот же стиль ещё раз — нейросеть может выдать другой вариант\n• Поэкспериментируй со шкалой вмешательства ИИ — иногда снижение процента даёт более естественный результат\n\nПомни: реальная стрижка всегда будет смотреться лучше, потому что мастер учтёт структуру твоих волос и укладку" },
+          { q: "📸 Почему фото не принимается?", a: "Бот работает с нейросетями, которые анализируют геометрию лица. Если фото тёмное, размытое, снято под углом или с аксессуарами — алгоритм не сможет корректно определить форму лица и результат будет неточным.\n\nЧто делать:\n• Пересними селфи при дневном свете, глядя прямо в камеру\n• Сними очки, убери волосы от лица\n• Убедись, что фото чёткое — не используй скриншоты или сжатые изображения из мессенджеров" },
+          { q: "⏳ Почему генерация занимает до 20 секунд?", a: "Твоё фото проходит сложный процесс:\n\n• Анализ лица (3–8 сек.) — ИИ определяет форму лица, пропорции, особенности\n• Генерация причёски (10–20 сек.) — нейросеть перерисовывает волосы с учётом выбранного процента вмешательства ИИ\n\nЭто не просто «наложение фильтра», а полноценная работа нескольких нейросетей. Мы сделали всё, чтобы ожидание было комфортным — добавили анимацию и статус процесса. Скорость зависит от загруженности серверов, но обычно это не больше 20 секунд." },
+          { q: "💰 Как купить дополнительные генерации?", a: "Бот использует Telegram Stars — внутреннюю валюту Telegram.\n\n1. Нажми кнопку «Запустить примерку» (если генерации кончились) или «Пополнить» в профиле\n2. Выбери пакет (5, 10 или 30 генераций)\n3. Оплати через встроенную систему Telegram\n\nЕсли у тебя не хватает звёзд, пополни баланс в настройках Telegram:\nНастройки → Telegram Stars → Пополнить" },
+          { q: "👤 Кто видит мои фото?", a: "Твоя приватность — наш приоритет.\n\n• Фото загружаются на сервер только для обработки\n• Мы не храним оригиналы дольше, чем это необходимо для генерации\n• Никто из команды не просматривает пользовательские фото вручную\n• Сгенерированные результаты видны только тебе в истории генераций\n\nТы можешь удалить любое фото из истории в любой момент." },
+          { q: "💇‍♂️ Можно ли использовать бота с клиентами в салоне?", a: "Да! Многие мастера уже используют НейроСтилиста для консультаций:\n\n• Покажи клиенту 2–3 варианта до начала стрижки\n• Сравните «было / стало» прямо в кресле\n• Убеди сомневающегося клиента визуальным результатом\n\nДля мастеров мы готовим специальные условия — напиши в поддержку, чтобы узнать подробности." },
+          { q: "🆘 Что делать, если генерация не удалась или зависла?", a: "• Проверь интернет-соединение\n• Нажми «Попробовать снова» — повторная попытка не тратит генерацию, если результат не был показан\n• Если проблема повторяется — напиши в поддержку.\n\nТо же самое происходит, если нейросеть не смогла найти лицо, генерация не списана и ты можешь безопасно загрузить новое фото." }
+        ])
+      };
+      
+      fetchAndActivate(remoteConfig)
+        .then(() => {
+          const faqString = getString(remoteConfig, 'faq_data');
+          if (faqString) {
+            try {
+              setFaqData(JSON.parse(faqString));
+            } catch (e) {
+              console.error("Failed to parse remote config FAQ data", e);
+            }
+          }
+        })
+        .catch(console.error);
+    }
+  }, []);
   const [history, setHistory] = useState<
     { url: string; keyword: string; timestamp: number }[]
   >([]);
@@ -368,148 +423,124 @@ export default function App() {
         setUserAvatar(tgUser.photo_url);
       }
     } else {
-      setIsTelegramEnv(false);
+      // setIsTelegramEnv(false);
     }
 
     const initUser = async () => {
-      const unsubscribe = auth.onAuthStateChanged(async (user) => {
-        if (!user) {
+      let currentUid = null;
+      let tgUser = tg?.initDataUnsafe?.user;
+
+      try {
+        const userCred = await Promise.race([
+          signInAnonymously(auth),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 5000),
+          ),
+        ]) as any;
+        if (userCred && userCred.user) {
+          currentUid = userCred.user.uid;
+        }
+      } catch (e) {
+        console.warn("Auth warning (timeout expected in dev):", e);
+      }
+
+      if (!currentUid) {
+         currentUid = "local-user";
+      }
+
+      setUserId(currentUid);
+
+      if (currentUid === "local-user") {
+          const localGens = localStorage.getItem("localGenerationsLeft");
+          if (localGens === null) {
+            localStorage.setItem("localGenerationsLeft", "5");
+            setGenerationsLeft(5);
+          } else {
+            setGenerationsLeft(parseInt(localGens, 10));
+          }
+          try {
+            const localHistory = JSON.parse(
+              localStorage.getItem("localHistory") || "[]",
+            );
+            setHistory(localHistory);
+          } catch (e) {}
+          // Removed restriction for test
+      }
+
+      try {
+        const userRef = doc(db, "users", currentUid);
+        let userDoc;
+        try {
+          userDoc = (await Promise.race([
+            getDoc(userRef),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("timeout")), 5000),
+            ),
+          ])) as import("firebase/firestore").DocumentSnapshot;
+        } catch (e: any) {
+          console.warn(`getDoc failed: ${e.message || e}.`);
+          throw new Error("fallback_to_local");
+        }
+
+        if (!userDoc || !userDoc.exists()) {
           try {
             await Promise.race([
-              signInAnonymously(auth),
+              setDoc(userRef, {
+                generationsLeft: 5,
+                createdAt: serverTimestamp(),
+                history: [],
+                ...(tgUser?.id ? { tgId: tgUser.id } : {}),
+                ...(tgUser?.username ? { tgUsername: tgUser.username } : {}),
+              }),
               new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error("timeout")), 5000),
               ),
             ]);
-          } catch (e: any) {
-            console.error("Auth Error", e);
-            // Fallback to local storage if anon auth fails
-            const localGens = localStorage.getItem("localGenerationsLeft");
-            if (localGens === null) {
-              localStorage.setItem("localGenerationsLeft", "10");
-              setGenerationsLeft(10);
-            } else {
-              setGenerationsLeft(parseInt(localGens, 10));
-            }
-            try {
-              const localHistory = JSON.parse(
-                localStorage.getItem("localHistory") || "[]",
-              );
-              setHistory(localHistory);
-            } catch (e) {}
-            setInitError("App must be initialized in Telegram to work properly.");
-          }
-          return;
-        }
-
-        const currentUid = user.uid;
-        setUserId(currentUid);
-
-        try {
-          const userRef = doc(db, "users", currentUid);
-          let userDoc;
-          try {
-            userDoc = (await Promise.race([
-              getDoc(userRef),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("timeout")), 5000),
-              ),
-            ])) as import("firebase/firestore").DocumentSnapshot;
-          } catch (e: any) {
-            console.warn(`getDoc failed: ${e.message || e}.`);
-            // Always fallback to local storage if DB fails to initialize properly
-            console.warn(
-              "Permission denied or DB missing. Falling back to LocalStorage.",
-            );
-            throw new Error("fallback_to_local");
-          }
-
-          if (!userDoc || !userDoc.exists()) {
-            const tgUser = tg?.initDataUnsafe?.user;
-            try {
-              await Promise.race([
-                setDoc(userRef, {
-                  generationsLeft: 10,
-                  createdAt: serverTimestamp(),
-                  history: [],
-                  ...(tgUser?.id ? { tgId: tgUser.id } : {}),
-                  ...(tgUser?.username ? { tgUsername: tgUser.username } : {}),
-                }),
-                new Promise<never>((_, reject) =>
-                  setTimeout(() => reject(new Error("timeout")), 5000),
-                ),
-              ]);
-              setGenerationsLeft(10);
-              fetch("/api/log", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  level: "info",
-                  message: `👋 <b>Новый пользователь</b>\nUsername: ${tgUser?.username || "нет"}\nID: ${tgUser?.id || currentUid}`,
-                  userId: currentUid,
-                }),
-              }).catch(console.error);
-            } catch (createErr: any) {
-              console.warn(
-                "setDoc create failed:",
-                createErr?.message || createErr,
-              );
-              throw new Error("fallback_to_local");
-            }
-          } else {
-            const data = userDoc.data();
-            setGenerationsLeft(data?.generationsLeft ?? 0);
-            setHistory(data?.history ?? []);
-          }
-        } catch (err: any) {
-          if (
-            err.message === "fallback_to_local" ||
-            (err.message && err.message.includes("permissions"))
-          ) {
-            const localGens = localStorage.getItem("localGenerationsLeft");
-            if (localGens === null) {
-              localStorage.setItem("localGenerationsLeft", "10");
-              setGenerationsLeft(10);
-            } else {
-              setGenerationsLeft(parseInt(localGens, 10));
-            }
-            try {
-              const localHistory = JSON.parse(
-                localStorage.getItem("localHistory") || "[]",
-              );
-              setHistory(localHistory);
-            } catch (e) {}
-            setUserId("local-user");
-            setInitError(null);
-          } else {
-            console.error("Firebase Init Error", err);
+            setGenerationsLeft(5);
             fetch("/api/log", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                level: "warn",
-                message: `⚠️ <b>Ошибка инициализации Firebase</b>\nФолбэк на локальное хранилище.\n<code>${err.message || "Unknown Error"}</code>`,
+                level: "info",
+                message: `👋 <b>Новый пользователь</b>\nUsername: ${tgUser?.username || "нет"}\nID: ${currentUid}`,
                 userId: currentUid,
               }),
             }).catch(console.error);
-            // Fallback too to just prevent blocking UI completely if possible
-            const localGens = localStorage.getItem("localGenerationsLeft");
-            setGenerationsLeft(localGens ? parseInt(localGens, 10) : 3);
-            setUserId("local-user");
-            setInitError(null);
-            setError(
-              `Ошибка инициализации базы данных. Вы используете локальную сессию.`,
+          } catch (createErr: any) {
+            console.warn(
+              "setDoc create failed:",
+              createErr?.message || createErr,
             );
+            throw new Error("fallback_to_local");
           }
+        } else {
+          const data = userDoc.data();
+          setGenerationsLeft(data?.generationsLeft ?? 0);
+          setHistory(data?.history ?? []);
         }
-      });
-      return () => unsubscribe();
+      } catch (err: any) {
+        if (err.message !== "fallback_to_local") {
+          console.error("Firebase Init Error", err);
+        }
+        const localGens = localStorage.getItem("localGenerationsLeft");
+        if (localGens === null) {
+          localStorage.setItem("localGenerationsLeft", "5");
+          setGenerationsLeft(5);
+        } else {
+          setGenerationsLeft(parseInt(localGens, 10));
+        }
+        try {
+          const localHistory = JSON.parse(
+            localStorage.getItem("localHistory") || "[]",
+          );
+          setHistory(localHistory);
+        } catch (e) {}
+        setUserId("local-user");
+        setInitError(null);
+      }
     };
 
-    const cleanup = initUser();
-    return () => {
-      cleanup.then((fn) => fn && fn());
-    };
+    initUser();
   }, []);
 
   const consumeToken = async () => {
@@ -574,8 +605,13 @@ export default function App() {
   };
 
   const [isBuying, setIsBuying] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
 
-  const buyTokens = async () => {
+  const buyTokens = () => {
+    setShowBuyModal(true);
+  };
+
+  const processPayment = async (packageId: number, starsAmount: number) => {
     if (!userId) return;
 
     setIsBuying(true);
@@ -598,7 +634,7 @@ export default function App() {
         const response = await fetch("/api/create-invoice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, tgUserId }),
+          body: JSON.stringify({ userId, tgUserId, packageId }),
         });
         const data = await response.json();
         if (!response.ok || !data.invoiceUrl) {
@@ -609,11 +645,20 @@ export default function App() {
           tg.openInvoice(data.invoiceUrl, async (status: string) => {
             if (status === "paid") {
               if (userId === "local-user") {
-                const next = (generationsLeft || 10) + 100;
+                const next = (generationsLeft || 5) + packageId;
                 localStorage.setItem("localGenerationsLeft", next.toString());
                 setGenerationsLeft(next);
               } else {
-                setGenerationsLeft((prev) => (prev || 0) + 100);
+                setGenerationsLeft((prev) => (prev || 0) + packageId);
+                try {
+                  const userRef = doc(db, "users", userId as string);
+                  await updateDoc(userRef, {
+                    generationsLeft: increment(packageId),
+                    fullAccess: true
+                  });
+                } catch (e) {
+                  console.error("Failed to commit stars to db:", e);
+                }
               }
               
               fetch("/api/log", {
@@ -621,10 +666,13 @@ export default function App() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   level: "info",
-                  message: "💰 Оплата успешно завершена (Полный доступ, 100 Stars)",
+                  message: `💰 Оплата успешно завершена (Пакет: ${packageId}, ${starsAmount} Stars)`,
                   userId,
                 }),
               }).catch(console.error);
+
+              setShowBuyModal(false);
+              tg.showAlert(`Успешно! Добавлено ${packageId} генераций.`);
             } else {
               fetch("/api/log", {
                 method: "POST",
@@ -647,7 +695,11 @@ export default function App() {
       console.error("Error creating invoice: ", err);
       const tg = window.Telegram?.WebApp;
       if (tg && tg.showAlert) {
-        tg.showAlert(err.message || "Ошибка при оплате");
+        if (err.message && err.message.includes("bot owner")) {
+           tg.showAlert("Оплата временно недоступна. Владелец бота еще не принял условия.");
+        } else {
+           tg.showAlert(err.message || "Ошибка при оплате");
+        }
       } else {
         alert(
           "Ошибка создания счета: " + (err.message || "Неизвестная ошибка"),
@@ -909,13 +961,10 @@ export default function App() {
         customVideoRef.current.srcObject = stream;
       }
       setCameraFacingMode(mode);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera error:", err);
-      // Fallback if mediaDevices fails during access
       setIsCameraModalOpen(false);
-      alert(
-        "Не удалось получить доступ к камере. Пожалуйста, разрешите доступ в браузере или используйте загрузку из галереи.",
-      );
+      alert(`Ошибка камеры: ${err.message || "устройство не найдено"}. Пожалуйста, используйте загрузку из галереи.`);
     }
   };
 
@@ -1119,8 +1168,7 @@ export default function App() {
     } catch (err: any) {
       console.error("AI Analysis Error:", err);
       setError(
-        err?.message ||
-          "Произошла ошибка при анализе фото. Убедитесь, что лицо четко видно.",
+        "⚠️ Не удалось проанализировать фото\n\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\n\nПожалуйста, попробуй ещё раз:\n• Сделай фото при дневном свете, лицом к окну\n• Смотри прямо в камеру, не наклоняй голову\n• Убери волосы от лица и сними очки\n\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно."
       );
     } finally {
       setIsAnalyzing(false);
@@ -1195,7 +1243,9 @@ export default function App() {
   const generateVirtualTryOn = async (
     styleKeyword: string,
     styleName: string,
+    styleDescription: string,
     selectedColor: string | null = null,
+    targetImageUrl: string | null = null,
   ) => {
     if (!imageBase64) return;
 
@@ -1216,6 +1266,7 @@ export default function App() {
           userId,
           selfieImage: imageBase64,
           keyword: styleKeyword,
+          description: styleDescription,
           customHairColor: selectedColor,
           vtonStrength: vtonStrength,
           gender: results?.gender,
@@ -1230,6 +1281,8 @@ export default function App() {
           ageRange: results?.ageRange,
           facialFeatures: results?.facialFeatures,
           facialHair: results?.facialHair,
+          clothingContext: results?.clothingContext,
+          targetImageUrl: targetImageUrl
         }),
       });
 
@@ -1263,7 +1316,7 @@ export default function App() {
           timestamp: Date.now(),
         };
         setHistory((prev) => {
-          const newHistory = [newItem, ...prev].slice(0, 5);
+          const newHistory = [newItem, ...prev].slice(0, 50);
           // Save to local storage for local users
           localStorage.setItem("localHistory", JSON.stringify(newHistory));
 
@@ -1447,6 +1500,18 @@ export default function App() {
                     <div className="p-2">
                       <button
                         onClick={() => {
+                          setIsFaqOpen(true);
+                          setIsProfileOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/5 text-sm text-white/80 hover:text-white transition-colors mb-1"
+                      >
+                        <span className="flex items-center gap-2">
+                          <HelpCircle size={16} />
+                          Вопросы и ответы (FAQ)
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => {
                           setIsLightMode(!isLightMode);
                           setIsProfileOpen(false);
                         }}
@@ -1502,7 +1567,7 @@ export default function App() {
                   className="flex-none snap-center relative rounded-xl overflow-hidden border border-white/10 group cursor-pointer w-[120px] h-[160px] sm:w-[150px] sm:h-[200px]"
                   onClick={() => window.open(item.url, "_blank")}
                 >
-                  <img
+                  <CachedImage
                     src={item.url}
                     alt={item.keyword}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -1609,7 +1674,7 @@ export default function App() {
                           type="file"
                           accept="image/*"
                           ref={cameraInputRef}
-                          capture="environment"
+                          capture="user"
                           className="absolute w-px h-px opacity-0 overflow-hidden pointer-events-none -z-10"
                           onChange={handleFileUpload}
                         />
@@ -1672,13 +1737,42 @@ export default function App() {
 
                       {/* Error Message */}
                       {error && (
-                        <div className="bg-red-50 text-red-600 border border-red-100 p-4 rounded-xl text-sm flex items-start gap-3 mt-2">
-                          <AlertCircle
-                            size={18}
-                            className="shrink-0 mt-0.5 opacity-80"
-                          />
-                          <p className="leading-relaxed">{error}</p>
-                        </div>
+                        error.includes("Не удалось проанализировать") ? (
+                          <div className={isLightMode ? "bg-orange-50 border border-orange-200 p-5 rounded-2xl text-left mt-2 shadow-md" : "bg-[#111] border border-orange-500/20 p-5 rounded-2xl text-left mt-2 shadow-lg"}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <AlertCircle className="text-orange-500" size={20} />
+                              <h3 className="font-semibold text-orange-500 text-sm">Не удалось проанализировать фото</h3>
+                            </div>
+                            <div className={isLightMode ? "text-gray-700 space-y-3 text-sm leading-relaxed mb-5" : "text-white/80 space-y-3 text-sm leading-relaxed mb-5"}>
+                             <p>Нейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.</p>
+                             <p>Пожалуйста, попробуй ещё раз:</p>
+                             <ul className={isLightMode ? "space-y-1.5 pl-1.5 text-gray-600" : "space-y-1.5 pl-1.5 text-white/70"}>
+                               <li>• Сделай фото при дневном свете, лицом к окну</li>
+                               <li>• Смотри прямо в камеру, не наклоняй голову</li>
+                               <li>• Убери волосы от лица и сними очки</li>
+                             </ul>
+                             <p className={isLightMode ? "pt-2 text-xs font-medium text-gray-500" : "pt-2 text-xs font-medium text-white/60"}>📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.</p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                               <button onClick={resetApp} className={isLightMode ? "flex-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-900 shadow-sm py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2" : "flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-white py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"}>
+                                 <RefreshCw size={16} />
+                                 Загрузить новое фото
+                               </button>
+                               <button onClick={() => setIsFaqOpen(true)} className={isLightMode ? "flex-1 bg-transparent hover:bg-gray-100 border border-transparent text-gray-700 py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2" : "flex-1 bg-transparent hover:bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"}>
+                                 <BookOpen size={16} />
+                                 Гайд по съёмке
+                               </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`border p-4 rounded-xl text-sm flex items-start gap-3 mt-2 ${isLightMode ? 'bg-red-50 text-red-600 border-red-100' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                            <AlertCircle
+                              size={18}
+                              className="shrink-0 mt-0.5 opacity-80"
+                            />
+                            <p className="leading-relaxed whitespace-pre-line">{error}</p>
+                          </div>
+                        )
                       )}
 
                       {/* Style Selection */}
@@ -2155,54 +2249,79 @@ export default function App() {
                   {/* Virtual Try-On Section */}
                   <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-3">
                     {vtonResultUrl && (
-                      <div className="mb-4 bg-white/5 border border-white/10 rounded-2xl p-2 text-white/90">
-                        <div className="w-full grid grid-cols-2 gap-2 sm:gap-4 p-2 bg-black/20 rounded-xl border border-white/10">
-                          <div className="relative rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-black/40 group flex flex-col justify-center">
-                            <img
-                              src={
-                                imageUrl ||
-                                `data:${mimeType || "image/jpeg"};base64,${imageBase64}`
-                              }
-                              alt="Ваше фото"
-                              className="w-full h-auto max-h-[70vh] object-contain pointer-events-none"
-                            />
-                            <div className="absolute top-2 left-2 z-10 bg-black/50 backdrop-blur-md px-2 py-1 rounded-md text-[9px] sm:text-[10px] font-semibold tracking-wide text-white border border-white/10 pointer-events-none">
-                              ВАШЕ ФОТО
-                            </div>
-                          </div>
-
-                          <div className="relative rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-black/40 group flex flex-col justify-center">
-                            <img
-                              src={vtonResultUrl}
-                              alt="Результат"
-                              className="w-full h-auto max-h-[70vh] object-contain pointer-events-none"
-                            />
-                            <div className="absolute top-2 left-2 z-10 bg-emerald-500/30 backdrop-blur-md px-2 py-1 rounded-md text-[9px] sm:text-[10px] font-semibold tracking-wide text-emerald-100 border border-emerald-500/30 pointer-events-none">
-                              РЕЗУЛЬТАТ
-                            </div>
-                            <div className="absolute bottom-2 right-2 z-20 flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all opacity-100">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  shareResult(vtonResultUrl);
-                                }}
-                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center text-white cursor-pointer hover:bg-white/30 shadow-xl"
-                                title="Поделиться результатом"
-                              >
-                                <Send size={16} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  downloadImage(vtonResultUrl, "ai_result.jpg");
-                                }}
-                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center text-white cursor-pointer hover:bg-white/30 shadow-xl"
-                                title="Сохранить результат"
-                              >
-                                <Download size={16} />
-                              </button>
-                            </div>
-                          </div>
+                      <div className="mb-4 bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-4 text-white/90 relative group">
+                        <BeforeAfterSlider 
+                          beforeImage={imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`}
+                          afterImage={vtonResultUrl}
+                        />
+                        <div className="absolute bottom-6 right-6 z-20 flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all opacity-100">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              shareResult(vtonResultUrl);
+                            }}
+                            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white cursor-pointer hover:bg-black/70 shadow-xl"
+                            title="Поделиться результатом"
+                          >
+                            <Send size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadImage(vtonResultUrl, "ai_result.jpg");
+                            }}
+                            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white cursor-pointer hover:bg-black/70 shadow-xl"
+                            title="Сохранить результат"
+                          >
+                            <Download size={16} />
+                          </button>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                           <button 
+                             onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                   const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+                                   const collageDataUrl = await generateCollage(beforeSrc, vtonResultUrl);
+                                   
+                                   // Check if we can share file
+                                   if (navigator.share) {
+                                      try {
+                                         const res = await fetch(collageDataUrl);
+                                         const blob = await res.blob();
+                                         const file = new File([blob], "neurostylist_collage.jpg", { type: "image/jpeg" });
+                                         await navigator.share({
+                                            title: "Мой новый стиль от НейроСтилиста",
+                                            files: [file]
+                                         });
+                                      } catch (e) {
+                                         // Fallback to download
+                                         downloadImage(collageDataUrl, "ai_collage.jpg");
+                                      }
+                                   } else {
+                                      downloadImage(collageDataUrl, "ai_collage.jpg");
+                                   }
+                                } catch (err) {
+                                   console.error("Collage error", err);
+                                   alert("Не удалось создать коллаж");
+                                }
+                             }}
+                             className="flex-1 py-3 px-4 rounded-xl bg-orange-500/20 text-orange-300 font-medium border border-orange-500/30 hover:bg-orange-500/30 transition-colors flex items-center justify-center gap-2"
+                           >
+                              <Download size={16} />
+                              <span>Экспорт Коллажа</span>
+                           </button>
+                           <button 
+                             onClick={(e) => {
+                                e.stopPropagation();
+                                setChatStyleName(tryOnStyle?.name || tryOnStyle?.ru);
+                                setIsChatOpen(true);
+                             }}
+                             className="flex-1 py-3 px-4 rounded-xl bg-blue-500/20 text-blue-300 font-medium border border-blue-500/30 hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
+                           >
+                              <Sparkles size={16} />
+                              <span>Спросить Стилиста</span>
+                           </button>
                         </div>
                       </div>
                     )}
@@ -2245,7 +2364,7 @@ export default function App() {
                       </div>
                       <input
                         type="range"
-                        min="50"
+                        min="0"
                         max="100"
                         step="5"
                         value={vtonStrength}
@@ -2255,11 +2374,11 @@ export default function App() {
                         className="w-full accent-blue-500 bg-white/10 rounded-lg appearance-none h-1.5 cursor-pointer"
                       />
                       <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                        <span className="max-w-[70px] text-left leading-tight">
-                          Сохраняет ваш фон (Легкая нейро-укладка)
+                        <span className="max-w-[100px] text-left leading-tight">
+                          Только цвет / Легкая укладка
                         </span>
-                        <span className="max-w-[70px] text-right leading-tight">
-                          Студийный кадр (Идеальная прическа)
+                        <span className="max-w-[100px] text-right leading-tight">
+                          Замена лица на модель (Студия)
                         </span>
                       </div>
                     </div>
@@ -2269,7 +2388,9 @@ export default function App() {
                         generateVirtualTryOn(
                           tryOnStyle.imageKeyword,
                           tryOnStyle.name,
+                          tryOnStyle.description,
                           customHairColor,
+                          tryOnStyle.imageUrl,
                         )
                       }
                       disabled={loadingVTONStyles[tryOnStyle.imageKeyword]}
@@ -2335,6 +2456,194 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {showBuyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-[#111] border border-white/10 rounded-3xl p-6 shadow-2xl relative flex flex-col items-center">
+            <button
+              onClick={() => setShowBuyModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <X size={20} className="text-white/60" />
+            </button>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent mb-6 mt-2 flex items-center gap-2">
+               <Star size={24} className="text-amber-400 fill-current" />
+              Пополнить баланс
+            </h2>
+            <div className="flex flex-col gap-4 w-full">
+              {[
+                { count: 5, stars: 50 },
+                { count: 10, stars: 100 },
+                { count: 30, stars: 250 },
+              ].map(pkg => (
+                <button
+                  key={pkg.count}
+                  onClick={() => processPayment(pkg.count, pkg.stars)}
+                  disabled={isBuying}
+                  className="flex items-center justify-between w-full p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  <div className="flex flex-col items-start gap-1">
+                     <span className="font-bold text-white/90 text-lg">{pkg.count} генераций</span>
+                     <span className="text-xs text-white/50">{Math.round((pkg.stars / pkg.count) * 10) / 10} ⭐️ за генерацию</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-amber-500/20 px-3 py-1.5 rounded-full border border-amber-500/30">
+                    <span className="font-bold text-amber-500">{pkg.stars}</span>
+                    <Star size={16} className="text-amber-500 fill-amber-500" />
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            <p className="text-[10px] text-white/40 mt-6 text-center">
+              Оплата производится во внутренней валюте Telegram (Stars). Звёзды списываются с вашего баланса Telegram.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isFaqOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-[#111] border border-white/10 rounded-3xl p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsFaqOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <X size={20} className="text-white/60" />
+            </button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                <HelpCircle size={20} />
+              </div>
+              <h2 className="text-xl font-medium">Частые вопросы</h2>
+            </div>
+            
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+              {faqData.length > 0 ? faqData.map((item, index) => (
+                <div key={index} className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <h3 className="font-medium text-white/90 mb-2">{item.q}</h3>
+                  <p className="text-sm text-white/60 leading-relaxed whitespace-pre-line">{item.a}</p>
+                </div>
+              )) : (
+                <div className="text-center py-6 text-white/40">
+                  <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
+                  <p>Загрузка вопросов...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-[#111] border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 sm:p-6 pb-2 border-b border-white/5 sticky top-0 bg-[#111]/90 backdrop-blur-md z-10 flex justify-between items-center">
+               <h2 className="text-lg sm:text-xl font-medium text-white flex items-center gap-2">
+                <span className="text-2xl">👋</span> Привет!
+               </h2>
+               <button
+                onClick={() => {
+                  setShowWelcome(false);
+                  localStorage.setItem("welcomeShown", "true");
+                }}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <X size={20} className="text-white/60" />
+              </button>
+            </div>
+            <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar text-white/80 space-y-5 text-sm sm:text-base leading-relaxed">
+              <p className="font-medium text-white/90 text-[15px] sm:text-[16px]">Я — НейроСтилист, твой карманный эксперт по причёскам.</p>
+              
+              <div className="space-y-2 bg-white/5 p-4 rounded-2xl border border-white/5">
+                <p>Я помогу тебе:</p>
+                <ul className="space-y-1.5 ml-1">
+                  <li className="flex items-start gap-2"><span className="text-blue-400">✨</span> <span>Определить идеальную стрижку под форму лица</span></li>
+                  <li className="flex items-start gap-2"><span className="text-blue-400">✨</span> <span>Увидеть себя в новом образе за 15 секунд</span></li>
+                  <li className="flex items-start gap-2"><span className="text-blue-400">✨</span> <span>Перестать бояться экспериментов с волосами</span></li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-bold text-white/90 mb-2 px-1 flex items-center gap-2 uppercase text-xs tracking-wider border-b border-white/10 pb-2">
+                     <span className="text-base">🎁</span> Что бесплатно всегда:
+                  </h3>
+                  <ul className="space-y-1 px-1 text-white/70">
+                    <li>• Анализ формы лица и рекомендации стилиста</li>
+                    <li>• Гайды по подбору стрижки под твой тип лица</li>
+                    <li>• Галерея референсов (фото-примеры стрижек)</li>
+                    <li>• Шкала вмешательства ИИ при генерации</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-white/90 mb-2 px-1 flex items-center gap-2 uppercase text-xs tracking-wider border-b border-white/10 pb-2">
+                    <span className="text-base">⭐</span> Что оплачивается звёздами:
+                  </h3>
+                  <ul className="space-y-1 px-1 text-white/70">
+                    <li>• Только сама генерация примерки на твоём фото</li>
+                    <li>• <i>У тебя есть 5 бесплатных генераций для старта</i></li>
+                    <li>• Дополнительные пакеты: 5, 10 или 30 генераций</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-[#1a1a1f] p-4 rounded-2xl border border-[#2a2a35] mt-4">
+                <h3 className="font-bold text-white/90 mb-3 flex items-center gap-2 text-[15px]">
+                  <span className="text-xl">📸</span> Как сделать правильное фото:
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-green-400 font-medium mb-1.5 text-sm flex items-center gap-1"><span className="text-base">✅</span> Нужно:</h4>
+                    <ul className="text-[13px] text-white/60 space-y-1">
+                      <li>• Дневной свет или яркое освещение спереди</li>
+                      <li>• Лицо строго анфас, без наклона головы</li>
+                      <li>• Волосы убраны от лица (за уши/в хвост)</li>
+                      <li>• Нейтральное выражение лица, без улыбки</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="text-red-400 font-medium mb-1.5 text-sm flex items-center gap-1"><span className="text-base">❌</span> Нельзя:</h4>
+                    <ul className="text-[13px] text-white/60 space-y-1">
+                      <li>• Солнечные очки или маска на лице</li>
+                      <li>• Селфи в темноте или при тусклом свете</li>
+                      <li>• Сильный поворот головы (профиль, 3/4)</li>
+                      <li>• Размытое или зернистое фото</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                  <p className="text-[13px] text-blue-200/90 leading-tight">
+                    <span className="font-bold">📌 Совет:</span> попроси кого-то сфотографировать тебя на уровне глаз — это даст лучший результат, чем селфи с вытянутой руки.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-white/5 bg-[#0a0a0f]">
+               <button
+                className="w-full bg-[#2AABEE] hover:bg-[#2298d6] text-white font-medium py-3.5 rounded-2xl transition-colors text-[15px] sm:text-base outline-none flex justify-center items-center gap-2 shadow-lg shadow-blue-500/20"
+                onClick={() => {
+                  setShowWelcome(false);
+                  localStorage.setItem("welcomeShown", "true");
+                }}
+              >
+                <span>Готов(а)? Начать!</span>
+                <span className="text-lg">💇‍♀️💇‍♂️</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isChatOpen && results && (
+        <StylistChat 
+           onClose={() => setIsChatOpen(false)}
+           features={results}
+           styleName={chatStyleName}
+        />
       )}
 
       <style>{`
