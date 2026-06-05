@@ -2,7 +2,8 @@
   "name": "НейроСтилист AI",
   "description": "ИИ-Подбор Причесок",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

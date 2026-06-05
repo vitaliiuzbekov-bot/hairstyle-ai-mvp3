@@ -640,7 +640,7 @@ Return ONLY the raw JSON string matching this schema:
       let finalImageUrl = "";
       let lastError = "";
       let swappedImageUrl = "";
-      const selfieImageFull = selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
+      const selfieImageFull = selfieImage.startsWith('http') || selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
 
       const translateColor = (val: string) => {
         val = val.toLowerCase();
@@ -983,6 +983,37 @@ Return ONLY the raw JSON string matching this schema:
     }
   });
 
+  app.post("/api/transcribe", async (req, res) => {
+    try {
+      const { audioBase64, mimeType } = req.body;
+      if (!audioBase64 || !mimeType) {
+        return res.status(400).json({ error: "Missing audioBase64 or mimeType" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            text: "Транскрибируй это аудио на русском языке. Верни только текст и ничего больше."
+          },
+          {
+            inlineData: {
+              data: audioBase64,
+              mimeType: mimeType
+            }
+          }
+        ]
+      });
+
+      res.json({ text: response.text?.trim() || "" });
+    } catch (err: any) {
+      console.error("Transcription error:", err);
+      res.status(500).json({ error: err.message || "Ошибка распознавания речи" });
+    }
+  });
+
   app.post("/api/load-more", async (req, res) => {
     try {
       const { existingNames, features, preferredStyle } = req.body;
@@ -1090,7 +1121,7 @@ Return ONLY the raw JSON string matching this schema:
 
   app.post("/api/create-invoice", async (req, res) => {
     try {
-      const { userId, tgUserId, packageId = 10 } = req.body;
+      const { userId, tgUserId, packageId = "popular" } = req.body;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       if (!botToken) {
         return res
@@ -1098,17 +1129,19 @@ Return ONLY the raw JSON string matching this schema:
           .json({ error: "Telegram Bot Token is not configured" });
       }
 
-      // Определяем пакеты: 5, 10 или 30 генераций
-      type PackageConfig = { stars: number; label: string };
-      const packages: Record<number, PackageConfig> = {
-        5: { stars: 50, label: "5 Генераций" },
-        10: { stars: 100, label: "10 Генераций" },
-        30: { stars: 250, label: "30 Генераций" },
+      // Определяем пакеты
+      type PackageConfig = { stars: number; label: string; count: number; pdf: boolean };
+      const packages: Record<string, PackageConfig> = {
+        "basic": { stars: 99, label: "1 стрижка + базовый цвет", count: 1, pdf: false },
+        "popular": { stars: 199, label: "3 стрижки + 3 цвета", count: 3, pdf: false },
+        "premium": { stars: 349, label: "3 стрижки + цвета + PDF-гайд", count: 3, pdf: true },
+        "master": { stars: 500, label: "Пакет для мастера (10 генераций)", count: 10, pdf: false },
+        "teaser_unlock": { stars: 150, label: "Убрать блюр и примерить ещё", count: 2, pdf: false },
       };
 
-      const selectedPackage = packages[packageId] || packages[10];
+      const selectedPackage = packages[packageId] || packages["popular"];
 
-      const payloadString = JSON.stringify({ userId, tgUserId, package: packageId });
+      const payloadString = JSON.stringify({ userId, tgUserId, packageId });
       
       const response = await fetch(
         `https://api.telegram.org/bot${botToken}/createInvoiceLink`,
@@ -1222,12 +1255,21 @@ Return ONLY the raw JSON string matching this schema:
         const payloadStr = update.message.successful_payment.invoice_payload;
         
         let firebaseUserId = null;
-        let purchasedGenerations = 10;
+        let purchasedGenerations = 3;
+        let pId = "popular";
+
         try {
           const payloadObj = JSON.parse(payloadStr);
           firebaseUserId = payloadObj.userId;
-          if (payloadObj.package) {
-            purchasedGenerations = Number(payloadObj.package);
+          if (payloadObj.packageId) {
+            pId = payloadObj.packageId;
+            const packageCounts: Record<string, number> = {
+               "basic": 1,
+               "popular": 3,
+               "premium": 3,
+               "master": 10
+            };
+            purchasedGenerations = packageCounts[pId] || 3;
           }
           if (firebaseUserId === "local-user" || !firebaseUserId) {
             firebaseUserId = tgUserId.toString();
@@ -1259,10 +1301,14 @@ Return ONLY the raw JSON string matching this schema:
             db.settings({ databaseId: config.firestoreDatabaseId });
             
             const userRef = db.collection("users").doc(firebaseUserId.toString());
-            await userRef.set({
+            const updates: any = {
               generationsLeft: admin.firestore.FieldValue.increment(purchasedGenerations),
               fullAccess: true,
-            }, { merge: true });
+            };
+            if (pId === "premium") {
+               updates.hasPdfUnlocked = true;
+            }
+            await userRef.set(updates, { merge: true });
             console.log(`Updated Firestore for user ${firebaseUserId} via Admin SDK`);
           }
         } catch (dbErr) {

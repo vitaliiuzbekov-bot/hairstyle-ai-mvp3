@@ -1,0 +1,172 @@
+import React, { useState, useEffect, useCallback, memo } from "react";
+import { Skeleton } from "./Skeleton";
+import { Download, AlertCircle, Image as ImageIcon } from "lucide-react";
+import { downloadImage } from "../utils/downloadImage";
+import { AnalysisResult } from "../types";
+
+const globalImageCache: Record<string, string> = {};
+
+export const LazyImage = memo(({
+  keyword,
+  gender,
+  uniqueName,
+  description,
+  className,
+  autoLoad = false,
+  results,
+}: {
+  keyword: string;
+  gender: string;
+  uniqueName: string;
+  description?: string;
+  className?: string;
+  autoLoad?: boolean;
+  results?: AnalysisResult;
+}) => {
+  const cacheKey = `${gender}_${keyword}`;
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(
+    globalImageCache[cacheKey] || null,
+  );
+  const [isLoading, setIsLoading] = useState(
+    autoLoad && !globalImageCache[cacheKey],
+  );
+  const [errorString, setErrorString] = useState<string | null>(null);
+
+  const generateImage = useCallback(async () => {
+    if (globalImageCache[cacheKey]) {
+      setLoadedUrl(globalImageCache[cacheKey]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorString(null);
+
+    try {
+      const response = await fetch("/api/generate-reference", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          keyword,
+          gender,
+          faceShape: results?.faceShape,
+          hairLength: results?.hairLength,
+          hairDensity: results?.hairDensity,
+          hairType: results?.hairType,
+          skinTone: results?.skinTone,
+          skinDetails: results?.skinDetails,
+          hairColor: results?.hairColor,
+          eyeColor: results?.eyeColor,
+          ageRange: results?.ageRange,
+          facialFeatures: results?.facialFeatures,
+          facialHair: results?.facialHair,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate image");
+      }
+
+      if (data.imageUrl) {
+        globalImageCache[cacheKey] = data.imageUrl;
+        setLoadedUrl(data.imageUrl);
+      } else {
+        throw new Error("No image URL in response");
+      }
+    } catch (err: any) {
+      console.error("Failed to load reference image", err);
+      let errMsg = err.message || "Сбой загрузки";
+      if (
+        err.message &&
+        (err.message.toLocaleLowerCase().includes("лимит") ||
+          err.message.includes("429") ||
+          err.message.includes("quota"))
+      ) {
+        errMsg = "СЕРВЕР ПЕРЕГРУЖЕН";
+      } else if (errMsg.length > 50) {
+        errMsg = errMsg.substring(0, 47) + "...";
+      }
+      setErrorString(errMsg);
+    }
+
+    setIsLoading(false);
+  }, [cacheKey, keyword, gender, results]);
+
+  useEffect(() => {
+    if (autoLoad) {
+      const t = setTimeout(() => generateImage(), Math.random() * 500);
+      return () => clearTimeout(t);
+    }
+  }, [keyword, gender, uniqueName, autoLoad, generateImage]);
+
+  if (loadedUrl) {
+    return (
+      <div className="relative w-full h-full group/lazy flex">
+        <img
+          src={loadedUrl}
+          alt={uniqueName}
+          className={`w-full h-full ${className || "object-cover"}`}
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            downloadImage(loadedUrl, "reference_style.jpg");
+          }}
+          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white cursor-pointer hover:bg-black/80 transition-opacity z-10 opacity-100 sm:opacity-0 group-hover/lazy:opacity-100"
+          title="Сохранить референс"
+        >
+          <Download size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex flex-col items-center justify-center bg-transparent text-white/90 border-r border-white/10 ${className || ""}`}
+    >
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center w-full h-full p-4 gap-4">
+          <Skeleton className="w-12 h-12 rounded-full mb-2" />
+          <Skeleton className="w-2/3 h-2 rounded" />
+          <Skeleton className="w-1/2 h-2 rounded" />
+        </div>
+      ) : errorString ? (
+        <div className="flex flex-col items-center gap-2 px-2 text-center">
+          <AlertCircle size={20} className="text-red-500 opacity-80" />
+          <span className="text-red-500 text-[10px] uppercase font-medium leading-tight">
+            {errorString}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              generateImage();
+            }}
+            className="mt-1 text-[9px] bg-white/10 hover:bg-white/10 text-white/90 px-3 py-1.5 rounded uppercase tracking-wider transition-colors"
+          >
+            Повторить
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            generateImage();
+          }}
+          className="flex flex-col items-center gap-2 group p-4 hover:bg-white/5 rounded-xl transition-colors"
+        >
+          <ImageIcon className="w-8 h-8 text-white/40 group-hover:text-white/80 transition-colors" />
+          <span className="text-[10px] text-white/60 font-mono uppercase tracking-wider text-center leading-tight group-hover:text-white/90">
+            Показать
+            <br />
+            пример
+          </span>
+        </button>
+      )}
+    </div>
+  );
+});
