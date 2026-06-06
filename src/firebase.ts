@@ -1,13 +1,15 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getRemoteConfig } from 'firebase/remote-config';
 
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true
+}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const remoteConfig = getRemoteConfig(app);

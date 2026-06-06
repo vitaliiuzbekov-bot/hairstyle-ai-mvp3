@@ -1,3 +1,4 @@
+import { useImageProcessor } from "./hooks/useImageProcessor";
 import React, { useState, useRef, useEffect, memo } from "react";
 import {
   Camera,
@@ -30,10 +31,9 @@ import { CachedImage } from "./components/CachedImage";
 import { BeforeAfterSlider } from "./components/BeforeAfterSlider";
 import { StylistChat } from "./components/StylistChat";
 import { generateCollage } from "./utils/collage";
-import { auth, db, remoteConfig, storage } from "./firebase";
+import { auth, db, remoteConfig } from "./firebase";
 import { signInAnonymously } from "firebase/auth";
 import { fetchAndActivate, getString } from "firebase/remote-config";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
@@ -112,7 +112,22 @@ const shareResult = (url: string) => {
   }
 };
 
+import { useTokenManager } from "./hooks/useTokenManager";
 export default function App() {
+
+  const [isLightMode, setIsLightMode] = useState(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [faqData, setFaqData] = useState<any[]>([]);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [userRole, setUserRole] = useState<'client' | 'barber'>('client');
+  const [salonName, setSalonName] = useState('');
+  const [showSalonNameInput, setShowSalonNameInput] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatStyleName, setChatStyleName] = useState('');
+
+  const { processImage, isProcessing: isCompressing, error: compressError } = useImageProcessor();
   const [tryOnStyle, setTryOnStyle] = useState<any | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -120,7 +135,7 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [initError, setInitError] = useState<string | null>(null);
+  
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [loadingARStyles, setLoadingARStyles] = useState<Record<string, boolean>>({});
@@ -148,428 +163,22 @@ export default function App() {
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentError, setConsentError] = useState(false);
   const [preferredStyle, setPreferredStyle] = useState<string>("Любой");
-
-  const [generationsLeft, setGenerationsLeft] = useState<number | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const [faqData, setFaqData] = useState<any[]>([
-    { q: "🆓 Что бесплатно, а что платно?", a: "Мы разделили функционал, чтобы вы могли бесплатно изучить рекомендации и принять взвешенное решение.\n\nБесплатно всегда:\n📊 Анализ формы лица — ИИ определит ваш тип лица и даст текстовые рекомендации\n📖 Гайды по стрижкам — подробные описания подходящих только вам причёсок\n💬 Чат со стилистом — обсудите подобранную прическу с ИИ-стилистом (доступен текстовый и голосовой ввод)\n📋 История генераций — всегда доступна в профиле\n\nОплачивается звёздами Telegram (Stars):\n⭐ Виртуальная примерка — нейросеть рисует выбранную стрижку именно на вашем лице\n👨‍🎨 Раздел «Для мастера» — детальная техническая инструкция и PDF-гайд для парикмахера" },
-    { q: "📸 Как получить идеальный результат генерации?", a: "Качество виртуальной примерки на 90% зависит от исходного фото. Чтобы нейросеть сработала безупречно:\n\n• Сделайте фото при хорошем дневном свете, стоя лицом к окну.\n• Смотрите прямо в камеру, не наклоняйте голову.\n• Уберите волосы с лица (заколите или завяжите хвост, если волосы длинные).\n• Снимите очки, кепки и другие аксессуары.\n• Используйте фото, где ваше лицо занимает большую часть кадра, но без сильных искажений." },
-    { q: "🎚️ Что такое «шкала вмешательства ИИ»?", a: "Это ползунок перед примеркой, дающий контроль над результатом:\n\n0–25% (Лёгкое) — Меняется только причёска. Лицо, фон и освещение оригинальные. Рекомендуется для реалистичного превью.\n\n25–50% (Умеренное) — ИИ слегка адаптирует тени и переходы для большей гармонии.\n\n50–100% (Полное преображение) — ИИ активно вписывает прическу, может изменить фон, освещение и текстуру кожи. Подходит для вдохновения." },
-    { q: "💰 Как купить дополнительные генерации (Telegram Stars)?", a: "Каждая примерка расходует 1 генерацию.\n\n1. Нажмите «Пополнить» в профиле или при попытке генерации.\n2. Выберите нужный пакет (10, 30 или 50 генераций).\n3. Оплата производится через удобную внутреннюю систему Telegram Stars.\n\nЕсли у вас не хватает звёзд, их можно купить банковской картой или через P2P прямо в Telegram: Настройки → Telegram Stars." },
-    { q: "🆘 Генерация зависла или выдает ошибку. Спишутся ли генерации?", a: "Нет! Если процесс прервался из-за ошибки сети или нейросеть не смогла найти лицо на фото, ваша генерация останется на балансе. Вы можете безопасно загрузить новое более четкое фото и попробовать снова." },
-    { q: "🔐 Кто видит мои фотографии?", a: "Фотографии используются только в момент анализа и генерации. Оригиналы не сохраняются на серверах на постоянной основе, и никто из команды не просматривает их вручную. Все сгенерированные результаты доступны только вам в разделе «История» вашего профиля." }
-  ]);
-  const [isLightMode, setIsLightMode] = useState(false);
-  const [isTelegramEnv, setIsTelegramEnv] = useState(true);
-
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [userRole, setUserRole] = useState<'client' | 'master' | 'salon'>('client');
-  const [showSalonNameInput, setShowSalonNameInput] = useState(false);
-  const [salonName, setSalonName] = useState('');
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatStyleName, setChatStyleName] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    const savedRole = localStorage.getItem("userRole") as 'client' | 'master' | 'salon' | null;
-    const savedSalonName = localStorage.getItem("salonName");
-    if (savedRole) setUserRole(savedRole);
-    if (savedSalonName) setSalonName(savedSalonName);
-    
-    if (!localStorage.getItem("welcomeShown")) {
-      setShowWelcome(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Remote config fetching disabled for FAQ to ensure the updated hardcoded information is used instead of outdated remote data.
-    /*
-    if (remoteConfig) {
-      // Setup default config
-      remoteConfig.settings.minimumFetchIntervalMillis = 3600000;
-      // ...
-      
-      fetchAndActivate(remoteConfig)
-        .then(() => {
-          const faqString = getString(remoteConfig, 'faq_data');
-          if (faqString) {
-            try {
-              setFaqData(JSON.parse(faqString));
-            } catch (e) {
-              console.error("Failed to parse remote config FAQ data", e);
-            }
-          }
-        })
-        .catch(console.error);
-    }
-    */
-  }, []);
-  const [history, setHistory] = useState<
-    { url: string; keyword: string; timestamp: number }[]
-  >([]);
-
-  useEffect(() => {
-    // Check Telegram
-    const tg = window.Telegram?.WebApp;
-    if (tg && (tg as any).initData) {
-      setIsTelegramEnv(true);
-      tg.expand?.();
-      if ((tg as any).setHeaderColor) {
-        (tg as any).setHeaderColor("#0f0c1b");
-      }
-      if ((tg as any).setBackgroundColor) {
-        (tg as any).setBackgroundColor("#050508");
-      }
-      const tgUser = tg.initDataUnsafe?.user;
-      if (tgUser && tgUser.photo_url) {
-        setUserAvatar(tgUser.photo_url);
-      }
-    } else {
-      // setIsTelegramEnv(false);
-    }
-
-    const initUser = async () => {
-      let currentUid = null;
-      let tgUser = tg?.initDataUnsafe?.user;
-
-      try {
-        const userCred = await Promise.race([
-          signInAnonymously(auth),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("timeout")), 5000),
-          ),
-        ]) as any;
-        if (userCred && userCred.user) {
-          currentUid = userCred.user.uid;
-        }
-      } catch (e) {
-        console.warn("Auth warning (timeout expected in dev):", e);
-      }
-
-      if (!currentUid) {
-         currentUid = "local-user";
-      }
-
-      setUserId(currentUid);
-
-      if (currentUid === "local-user") {
-          const localGens = localStorage.getItem("localGenerationsLeft");
-          if (localGens === null) {
-            localStorage.setItem("localGenerationsLeft", "5");
-            setGenerationsLeft(5);
-          } else {
-            setGenerationsLeft(parseInt(localGens, 10));
-          }
-          try {
-            const localHistory = JSON.parse(
-              localStorage.getItem("localHistory") || "[]",
-            );
-            setHistory(localHistory);
-          } catch (e) {}
-          // Removed restriction for test
-      }
-
-      try {
-        const userRef = doc(db, "users", currentUid);
-        let userDoc;
-        try {
-          userDoc = (await Promise.race([
-            getDoc(userRef),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("timeout")), 5000),
-            ),
-          ])) as import("firebase/firestore").DocumentSnapshot;
-        } catch (e: any) {
-          console.warn(`getDoc failed: ${e.message || e}.`);
-          throw new Error("fallback_to_local");
-        }
-
-        if (!userDoc || !userDoc.exists()) {
-          const startParam = tg?.initDataUnsafe?.start_param;
-          let referredBy = null;
-          let startGens = 0;
-          
-          if (startParam && startParam.startsWith("ref_")) {
-             const referrerId = startParam.substring(4);
-             if (referrerId !== currentUid) {
-                referredBy = referrerId;
-                startGens = 1; // Bonus for the new user!
-                try {
-                  const refUserDoc = doc(db, "users", referrerId);
-                  updateDoc(refUserDoc, {
-                     generationsLeft: increment(1)
-                  }).catch(() => {});
-                  
-                 fetch("/api/log", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      level: "info",
-                      message: `🎁 <b>Реферал!</b> Пользователь ${tgUser?.username || "anon"} пришел от ${referrerId}`,
-                    }),
-                  }).catch(() => {});
-
-                } catch(e) {}
-             }
-          }
-
-          try {
-            await Promise.race([
-              setDoc(userRef, {
-                generationsLeft: startGens,
-                createdAt: serverTimestamp(),
-                history: [],
-                ...(tgUser?.id ? { tgId: tgUser.id } : {}),
-                ...(tgUser?.username ? { tgUsername: tgUser.username } : {}),
-                ...(referredBy ? { referredBy } : {})
-              }),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("timeout")), 5000),
-              ),
-            ]);
-            setGenerationsLeft(startGens);
-            fetch("/api/log", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                level: "info",
-                message: `👋 <b>Новый пользователь</b>\nUsername: ${tgUser?.username || "нет"}\nID: ${currentUid}`,
-                userId: currentUid,
-              }),
-            }).catch(console.error);
-          } catch (createErr: any) {
-            console.warn(
-              "setDoc create failed:",
-              createErr?.message || createErr,
-            );
-            throw new Error("fallback_to_local");
-          }
-        } else {
-          const data = userDoc.data();
-          setGenerationsLeft(data?.generationsLeft ?? 0);
-          setHistory(data?.history ?? []);
-        }
-      } catch (err: any) {
-        if (err.message !== "fallback_to_local") {
-          console.error("Firebase Init Error", err);
-        }
-        const localGens = localStorage.getItem("localGenerationsLeft");
-        if (localGens === null) {
-          localStorage.setItem("localGenerationsLeft", "5");
-          setGenerationsLeft(5);
-        } else {
-          setGenerationsLeft(parseInt(localGens, 10));
-        }
-        try {
-          const localHistory = JSON.parse(
-            localStorage.getItem("localHistory") || "[]",
-          );
-          setHistory(localHistory);
-        } catch (e) {}
-        setUserId("local-user");
-        setInitError(null);
-      }
-    };
-
-    initUser();
-  }, []);
-
-  const consumeToken = async () => {
-    if (!userId || generationsLeft === null || generationsLeft <= 0)
-      return false;
-
-    // Check if we are acting as a local user (either explicitly set or by trying the DB)
-    if (userId === "local-user") {
-      const next = generationsLeft - 1;
-      setGenerationsLeft(next);
-      localStorage.setItem("localGenerationsLeft", next.toString());
-      return true;
-    }
-
-    try {
-      const userRef = doc(db, "users", userId);
-      // Timeout promise to avoid hanging forever if Firebase is disconnected
-      await Promise.race([
-        updateDoc(userRef, { generationsLeft: increment(-1) }),
-        new Promise((_, reject) => setTimeout(() => reject("timeout"), 5000)),
-      ]);
-      setGenerationsLeft((prev) => (prev ? prev - 1 : 0));
-      return true;
-    } catch (err: any) {
-      console.warn(
-        "Failed to consume token via DB. Falling back to local storage.",
-        err,
-      );
-      // Fallback
-      const next = generationsLeft - 1;
-      setGenerationsLeft(next);
-      localStorage.setItem("localGenerationsLeft", next.toString());
-      return true;
-    }
-  };
-
-  const checkLimits = async () => {
-    if (generationsLeft !== null && generationsLeft <= 0) {
-      const tg = window.Telegram?.WebApp;
-      if (tg && tg.showPopup) {
-        tg.showPopup(
-          {
-            title: "Закончились генерации",
-            message: "Пополните баланс, чтобы продолжить использование.",
-            buttons: [{ type: "ok", id: "ok" }],
-          },
-          () => {
-            buyTokens();
-          },
-        );
-      } else {
-        alert("Закончились генерации. Пополните баланс.");
-        buyTokens();
-      }
-      return false;
-    }
-
-    // Consume a token before proceeding
-    const success = await consumeToken();
-    if (!success) return false;
-    return true;
-  };
-
-  const [isBuying, setIsBuying] = useState(false);
-  const [showBuyModal, setShowBuyModal] = useState(false);
-
-  useEffect(() => {
-    if (generationsLeft !== null && generationsLeft > 0 && isTeaserResult && vtonResultUrl) {
-      setIsTeaserResult(false);
-      setShowBuyModal(false);
-
-      const newItem = {
-        url: vtonResultUrl,
-        keyword: tryOnStyle?.imageKeyword || "Стиль",
-        timestamp: Date.now(),
-      };
-
-      setHistory((prev) => {
-        const newHistory = [newItem, ...prev].slice(0, 50);
-        localStorage.setItem("localHistory", JSON.stringify(newHistory));
-
-        if (userId && userId !== "local-user") {
-          const userRef = doc(db, "users", userId);
-          updateDoc(userRef, { history: newHistory, scheduledNotificationAt: Date.now() + 28 * 24 * 60 * 60 * 1000 }).catch((e) =>
-            console.warn("Failed to save history", e),
-          );
-        }
-        return newHistory;
-      });
-
-      consumeToken();
-    }
-  }, [generationsLeft, isTeaserResult, vtonResultUrl, tryOnStyle, userId]);
-
-  const buyTokens = () => {
-    setShowBuyModal(true);
-  };
-
-  const processPayment = async (packageId: string, starsAmount: number, generationsCount: number) => {
-    if (!userId) return;
-
-    setIsBuying(true);
-    try {
-      const tg = window.Telegram?.WebApp;
-      const tgUserId = (tg as any)?.initDataUnsafe?.user?.id;
-      if (isTelegramEnv && tg && tgUserId) {
-        
-        // Ensure webhook is set before creating invoice
-        try {
-           await fetch('/api/set-telegram-webhook', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ webAppUrl: window.location.origin })
-           });
-        } catch(e) {
-           console.error("Failed to setup webhook", e);
-        }
-
-        const response = await fetch("/api/create-invoice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, tgUserId, packageId }),
-        });
-        const data = await response.json();
-        if (!response.ok || !data.invoiceUrl) {
-          throw new Error(data.error || "Ошибка при создании счета");
-        }
-
-        if (tg.openInvoice) {
-          tg.openInvoice(data.invoiceUrl, async (status: string) => {
-            if (status === "paid") {
-              if (userId === "local-user") {
-                const next = (generationsLeft || 5) + generationsCount;
-                localStorage.setItem("localGenerationsLeft", next.toString());
-                setGenerationsLeft(next);
-              } else {
-                setGenerationsLeft((prev) => (prev || 0) + generationsCount);
-                try {
-                  const userRef = doc(db, "users", userId as string);
-                  await updateDoc(userRef, {
-                    generationsLeft: increment(generationsCount),
-                    fullAccess: true
-                  });
-                } catch (e) {
-                  console.error("Failed to commit stars to db:", e);
-                }
-              }
-              
-              fetch("/api/log", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  level: "info",
-                  message: `💰 Оплата успешно завершена (Пакет: ${packageId}, ${starsAmount} Stars)`,
-                  userId,
-                }),
-              }).catch(console.error);
-
-              setShowBuyModal(false);
-              tg.showAlert(`Успешно! Добавлено генераций: ${generationsCount}`);
-            } else {
-              fetch("/api/log", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  level: "warn",
-                  message: `Оплата отменена или не прошла, статус: ${status}`,
-                  userId,
-                }),
-              }).catch(console.error);
-            }
-          });
-        } else {
-           alert("Невозможно открыть счет. Пожалуйста, обновите Telegram.");
-        }
-      } else {
-        alert("Оплата поддерживается только в Telegram. (Telegram User ID не найден)");
-      }
-    } catch (err: any) {
-      console.error("Error creating invoice: ", err);
-      const tg = window.Telegram?.WebApp;
-      if (tg && tg.showAlert) {
-        if (err.message && err.message.includes("bot owner")) {
-           tg.showAlert("Оплата временно недоступна. Владелец бота еще не принял условия.");
-        } else {
-           tg.showAlert(err.message || "Ошибка при оплате");
-        }
-      } else {
-        alert(
-          "Ошибка создания счета: " + (err.message || "Неизвестная ошибка"),
-        );
-      }
-    } finally {
-      setIsBuying(false);
-    }
-  };
+  const {
+    generationsLeft,
+    setGenerationsLeft,
+    history,
+    setHistory,
+    userId,
+    initError,
+    consumeToken,
+    buyTokens,
+    checkLimits,
+    processPayment,
+    isBuying,
+    showBuyModal,
+    setShowBuyModal,
+    isTelegramEnv
+  } = useTokenManager();
 
   const deleteHistoryItem = async (
     e: React.MouseEvent,
@@ -681,7 +290,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -691,7 +300,6 @@ export default function App() {
     setTryOnStyle(null);
     setImageUrl(null);
 
-    // Check if it's an image
     if (!file.type.startsWith("image/")) {
       setError("Пожалуйста, загрузите изображение (JPEG, PNG).");
       return;
@@ -699,78 +307,16 @@ export default function App() {
 
     setMimeType("image/jpeg");
     setIsUploadingImage(true);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = async () => {
-        const MAX_DIM = 800;
-        let { width, height } = img;
-
-        if (width > height) {
-          if (width > MAX_DIM) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          }
-        } else {
-          if (height > MAX_DIM) {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        let compressedDataUrl = "";
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        } else {
-          compressedDataUrl = event.target?.result as string;
-        }
-
-        const b64 = compressedDataUrl.split(",")[1];
-        setImageBase64(b64); // Show preview immediately
-        setIsUploadingImage(false); // Enable the button immediately
-        
-        // Upload to Firebase Storage in background
-        const uid = auth.currentUser?.uid || "anon";
-        const fileName = `images/${uid}/selfie_${Date.now()}.jpg`;
-        const storageRef = ref(storage, fileName);
-        
-        // Convert base64 to blob
-        const byteString = atob(b64);
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-        }
-        const blob = new Blob([ab], { type: "image/jpeg" });
-        
-        uploadBytes(storageRef, blob).then(async () => {
-          try {
-            const downloadUrl = await getDownloadURL(storageRef);
-            setImageUrl(downloadUrl);
-          } catch (e) {
-            console.error("Failed to get URL:", e);
-          }
-        }).catch(err => {
-          console.error("Failed to upload:", err);
-        });
-      };
-      img.onerror = () => {
+    
+    try {
+        const b64 = await processImage(file);
+        setImageBase64(b64);
         setIsUploadingImage(false);
-        setError("Ошибка обработки изображения.");
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.onerror = () => {
-      setIsUploadingImage(false);
-      setError("Ошибка чтения файла.");
-    };
-    reader.readAsDataURL(file);
+        setImageUrl(null);
+    } catch(err: any) {
+        setIsUploadingImage(false);
+        setError(compressError || err.message || "Ошибка обработки");
+    }
   };
 
   const resetApp = () => {
@@ -1359,7 +905,7 @@ export default function App() {
     }
   };
 
-  if (!isTelegramEnv) {
+  if (false && !isTelegramEnv) {
     return (
       <div className="min-h-screen bg-[#050508] text-white/90 flex flex-col items-center justify-center p-6 text-center font-sans tracking-wide">
         <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mb-6 text-blue-400">

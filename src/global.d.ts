@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export {};
 
+declare module '*?worker' {
+  const workerConstructor: new () => Worker;
+  export default workerConstructor;
+}
+
 declare global {
   interface Window {
     Telegram?: {
