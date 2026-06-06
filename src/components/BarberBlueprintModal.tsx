@@ -6,6 +6,7 @@ import { downloadImage } from "../utils/downloadImage";
 import { shareResult } from "../utils/shareResult";
 import { generateCollage } from "../utils/collage";
 import { AnalysisResult } from "../types";
+import { RotatingFactsLoader } from "./RotatingFactsLoader";
 
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
@@ -168,7 +169,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               {/* Original Input */}
               <div className={`relative glass-panel rounded-2xl overflow-hidden border group aspect-[4/5] sm:aspect-auto sm:h-[400px] lg:h-[500px] flex items-center justify-center shadow-sm ${isLightMode ? 'bg-gray-100 border-gray-200' : 'bg-black/40 border-white/10'}`}>
                 <img
-                  src={imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`}
+                  src={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
                   alt="Ваша база"
                   className="absolute inset-0 w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
                 />
@@ -264,7 +265,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                 {vtonResultUrl && !isTeaserResult && (
                   <div className={`mb-4 border rounded-2xl p-3 sm:p-4 relative group ${isLightMode ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
                     <BeforeAfterSlider 
-                      beforeImage={imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`}
+                      beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
                       afterImage={vtonResultUrl}
                     />
                     <div className="absolute bottom-6 right-6 z-20 flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all opacity-100">
@@ -294,7 +295,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                          onClick={async (e) => {
                             e.stopPropagation();
                             try {
-                               const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+                               const beforeSrc = imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
                                const collageDataUrl = await generateCollage(beforeSrc, vtonResultUrl, userRole === 'salon' ? salonName : undefined);
                                
                                const messageText = "Привет! Смотри, какой стиль я подобрал(а) в нейросети. Хочу такую стрижку и цвет!\nСоздано в @neirostilist_bot";
@@ -376,11 +377,11 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                            <button 
                              onClick={(e) => {
                                 e.stopPropagation();
-                                processPayment("teaser_unlock", 150, 2);
+                                processPayment("popular", 199, 3);
                              }}
                              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold py-4 px-6 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all flex flex-col items-center gap-1 active:scale-95 border border-white/20"
                            >
-                              <span className="text-[16px] drop-shadow-md">Убрать блюр и примерить ещё — 150 ⭐</span>
+                              <span className="text-[16px] drop-shadow-md text-center">Убрать блюр и примерить ещё 2 варианта — 199 ⭐</span>
                            </button>
                         </div>
                      </div>
@@ -461,25 +462,26 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() =>
-                    generateVirtualTryOn(
-                      tryOnStyle.imageKeyword,
-                      tryOnStyle.name,
-                      tryOnStyle.description,
-                      customHairColor,
-                      tryOnStyle.imageUrl,
-                    )
-                  }
-                  disabled={loadingVTONStyles[tryOnStyle.imageKeyword]}
-                  style={{ color: "#ffffff" }}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-medium py-4 px-6 rounded-full transition-all shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 text-sm sm:text-base vton-generate-btn"
-                >
-                  <Sparkles size={18} fill="currentColor" />
-                  {loadingVTONStyles[tryOnStyle.imageKeyword]
-                    ? "Генерация виртуальной примерки..."
-                    : "📸 Виртуальная примерка (Beta)"}
-                </button>
+                {loadingVTONStyles[tryOnStyle.imageKeyword] ? (
+                  <RotatingFactsLoader isLightMode={isLightMode} title="Примерка стиля (около 15-30 сек)..." />
+                ) : (
+                  <button
+                    onClick={() =>
+                      generateVirtualTryOn(
+                        tryOnStyle.imageKeyword,
+                        tryOnStyle.name,
+                        tryOnStyle.description,
+                        customHairColor,
+                        tryOnStyle.imageUrl,
+                      )
+                    }
+                    style={{ color: "#ffffff" }}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-medium py-4 px-6 rounded-full transition-all shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-[0.98] flex justify-center items-center gap-2 border border-white/10 text-sm sm:text-base vton-generate-btn"
+                  >
+                    <Sparkles size={18} fill="currentColor" />
+                    📸 Виртуальная примерка (Beta)
+                  </button>
+                )}
                 {vtonError && (
                   <p className="text-xs text-orange-200/90 bg-orange-500/20 border border-orange-500/30 p-2.5 rounded-lg text-center leading-relaxed">
                     {vtonError}

@@ -42,8 +42,8 @@ export const useTokenManager = () => {
       if (currentUid === "local-user") {
         const localGens = localStorage.getItem("localGenerationsLeft");
         if (localGens === null) {
-          localStorage.setItem("localGenerationsLeft", "5");
-          setGenerationsLeft(5);
+          localStorage.setItem("localGenerationsLeft", "0");
+          setGenerationsLeft(0);
         } else {
           setGenerationsLeft(parseInt(localGens, 10));
         }
@@ -138,8 +138,8 @@ export const useTokenManager = () => {
         }
         const localGens = localStorage.getItem("localGenerationsLeft");
         if (localGens === null) {
-          localStorage.setItem("localGenerationsLeft", "5");
-          setGenerationsLeft(5);
+          localStorage.setItem("localGenerationsLeft", "0");
+          setGenerationsLeft(0);
         } else {
           setGenerationsLeft(parseInt(localGens, 10));
         }
@@ -155,6 +155,15 @@ export const useTokenManager = () => {
     };
 
     initUser();
+
+    const handleDailyReward = () => {
+      setGenerationsLeft((prev) => (prev !== null ? prev + 1 : 1));
+    };
+
+    window.addEventListener("daily_reward_claimed", handleDailyReward);
+    return () => {
+      window.removeEventListener("daily_reward_claimed", handleDailyReward);
+    };
   }, []);
 
   const consumeToken = async () => {
@@ -242,20 +251,12 @@ export const useTokenManager = () => {
           tg.openInvoice(data.invoiceUrl, async (status: string) => {
             if (status === "paid") {
               if (userId === "local-user") {
-                const next = (generationsLeft || 5) + generationsCount;
+                const next = (generationsLeft || 0) + generationsCount;
                 localStorage.setItem("localGenerationsLeft", next.toString());
                 setGenerationsLeft(next);
               } else {
+                // Generates left updated by bot webhook, but we manually increase here for UI sync
                 setGenerationsLeft((prev) => (prev || 0) + generationsCount);
-                try {
-                  const userRef = doc(db, "users", userId as string);
-                  await updateDoc(userRef, {
-                    generationsLeft: increment(generationsCount),
-                    fullAccess: true
-                  });
-                } catch (e) {
-                  console.error("Failed to commit stars to db:", e);
-                }
               }
               
               fetch("/api/log", {
@@ -263,7 +264,7 @@ export const useTokenManager = () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   level: "info",
-                  message: `💰 Оплата успешно завершена (Пакет: ${packageId}, ${starsAmount} Stars)`,
+                  message: `💰 Оплата успешно завершена (Пакет: ${packageId}, ${starsAmount} Stars) [Ждем Webhook]`,
                   userId,
                 }),
               }).catch(console.error);

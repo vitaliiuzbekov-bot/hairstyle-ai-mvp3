@@ -255,7 +255,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                 {/* Preview */}
                 <div className={`relative rounded-xl overflow-hidden aspect-[3/4] flex items-center justify-center max-h-[500px] ring-1 ${isLightMode ? 'bg-gray-100 ring-gray-200' : 'glass-panel ring-white/10'}`}>
                   <img
-                    src={imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`}
+                    src={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
                     alt="Ваше фото"
                     className={`max-w-full max-h-full object-contain w-full h-full transition-all duration-1000 ${isAnalyzing ? "scale-105 blur-sm opacity-50 grayscale hover:grayscale-0" : "scale-100"}`}
                   />

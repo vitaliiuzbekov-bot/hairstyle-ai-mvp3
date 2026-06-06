@@ -2,6 +2,9 @@
 import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
 import { callYandexGPT, callYandexGPTChat, getYandexIamToken, extractFolderId } from "../services/yandex";
+import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
+import { adminApp, adminStorage } from "../firebase";
+import crypto from "crypto";
 
 export const generateRouter = Router();
 
@@ -14,6 +17,18 @@ generateRouter.post("/generate-reference", async (req, res) => {
       
       if (!keyword) {
         return res.status(400).json({ error: "Missing parameters" });
+      }
+
+      // Check cache first (Cache for 30 days)
+      const cacheKey = getCacheKey({ 
+        route: "generate-reference", 
+        keyword, gender, faceShape, hairLength, hairDensity, hairType, skinTone, 
+        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair
+      });
+      const cachedImage = await getCachedValue<string>(cacheKey);
+      if (cachedImage) {
+        console.log("Returned reference from cache!");
+        return res.json({ imageUrl: cachedImage });
       }
 
       let descriptorRu = 'человек';
@@ -214,6 +229,9 @@ generateRouter.post("/generate-reference", async (req, res) => {
       if (!finalImageUrl) {
           console.error(`Не удалось сгенерировать изображение: ${lastError}. Используем fallback-изображение.`);
           finalImageUrl = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80';
+      } else {
+          // Save to cache for 30 days (30 * 24 * 60 * 60 seconds)
+          await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
       }
 
       res.json({ imageUrl: finalImageUrl, debugError: lastError });
@@ -227,7 +245,7 @@ generateRouter.post("/generate-reference", async (req, res) => {
 generateRouter.post("/generate-full", async (req, res) => {
     try {
       const { 
-        gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
+        userId, gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
         skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
         selfieImage, // Required for Step 2
         vtonStrength, // Number from 50 to 100
@@ -236,6 +254,20 @@ generateRouter.post("/generate-full", async (req, res) => {
       
       if (!keyword || !selfieImage) {
         return res.status(400).json({ error: "Missing parameters: keyword and selfieImage are required." });
+      }
+
+      // Check cache first (Cache for 30 days)
+      const cacheKey = getCacheKey({ 
+        route: "generate-full", 
+        userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl,
+        // using string truncation or full string to hash the selfie.
+        // String hashing is deterministic.
+        selfieHash: getCacheKey(selfieImage) 
+      });
+      const cachedImage = await getCachedValue<string>(cacheKey);
+      if (cachedImage) {
+        console.log("Returned VTON from cache!");
+        return res.json({ imageUrl: cachedImage });
       }
 
       const falKey = process.env.FAL_KEY;
@@ -480,8 +512,40 @@ generateRouter.post("/generate-full", async (req, res) => {
           });
         }
 
+      // Upload to Firebase Storage to persist
+      if (adminStorage && swappedImageUrl) {
+         try {
+             const bucket = adminStorage.bucket();
+             if (bucket.name) {
+                 const imageRes = await fetch(swappedImageUrl);
+                 if (imageRes.ok) {
+                     const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+                     const fileName = `generations/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                     const file = bucket.file(fileName);
+                     const uuid = crypto.randomUUID();
+                     await file.save(imageBuffer, {
+                         metadata: { 
+                           contentType: "image/jpeg",
+                           metadata: {
+                             firebaseStorageDownloadTokens: uuid
+                           }
+                         }
+                     });
+                     swappedImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
+                 }
+             }
+         } catch (storageErr: any) {
+             console.warn("Storage upload skipped. To enable cloud persistence, ensure Firebase Storage is enabled in the Firebase Console (Build -> Storage). Falling back to temporary image URL.");
+             // Fallback to original URL
+         }
+      }
+
       // Final success
       logToTelegram(`🎨 <b>Генерация (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
+      
+      // Save to cache for 30 days
+      await setCachedValue(cacheKey, swappedImageUrl, 30 * 24 * 60 * 60);
+
       res.json({ 
         imageUrl: swappedImageUrl,            // Final processed image (face swapped)
         referenceImage: finalImageUrl,        // Original generation

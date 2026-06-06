@@ -77,6 +77,7 @@ import { Skeleton } from "./components/Skeleton";
 import { Header } from "./components/Header";
 import { FaqModal } from "./components/FaqModal";
 import { WelcomeModal } from "./components/WelcomeModal";
+import { DailyRewardModal } from "./components/DailyRewardModal";
 import { BuyModal } from "./components/BuyModal";
 import { HistoryCarousel } from "./components/HistoryCarousel";
 import { UploadZone } from "./components/UploadZone";
@@ -121,11 +122,27 @@ export default function App() {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
   const [faqData, setFaqData] = useState<any[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [userRole, setUserRole] = useState<'client' | 'barber'>('client');
+  const [userRole, setUserRole] = useState<'client' | 'master' | 'salon'>('client');
   const [salonName, setSalonName] = useState('');
   const [showSalonNameInput, setShowSalonNameInput] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatStyleName, setChatStyleName] = useState('');
+
+  useEffect(() => {
+    const welcomeShown = localStorage.getItem("welcomeShown");
+    if (!welcomeShown) {
+      setShowWelcome(true);
+    } else {
+      const storedRole = localStorage.getItem("userRole") as 'client' | 'master' | 'salon';
+      if (storedRole) {
+        setUserRole(storedRole);
+      }
+      const storedSalonName = localStorage.getItem("salonName");
+      if (storedSalonName) {
+        setSalonName(storedSalonName);
+      }
+    }
+  }, []);
 
   const { processImage, isProcessing: isCompressing, error: compressError } = useImageProcessor();
   const [tryOnStyle, setTryOnStyle] = useState<any | null>(null);
@@ -746,14 +763,15 @@ export default function App() {
   ) => {
     if (!imageBase64) return;
 
-    const isTeaser = generationsLeft !== null && generationsLeft <= 0;
-
-    if (!isTeaser) {
-      const proceed = await checkLimits();
-      if (!proceed) return;
+    if (generationsLeft !== null && generationsLeft <= 0) {
+       setShowBuyModal(true);
+       return;
     }
 
-    setIsTeaserResult(isTeaser);
+    const proceed = await checkLimits();
+    if (!proceed) return;
+
+    setIsTeaserResult(false);
     setLoadingVTONStyles((prev) => ({ ...prev, [styleKeyword]: true }));
     setVtonError(null);
     setVtonResultUrl(null);
@@ -813,27 +831,25 @@ export default function App() {
       if (data.imageUrl) {
         setVtonResultUrl(data.imageUrl);
         
-        if (!isTeaser) {
-          const newItem = {
-            url: data.imageUrl,
-            keyword: styleKeyword || "Стиль",
-            timestamp: Date.now(),
-          };
-          setHistory((prev) => {
-            const newHistory = [newItem, ...prev].slice(0, 50);
-            // Save to local storage for local users
-            localStorage.setItem("localHistory", JSON.stringify(newHistory));
+        const newItem = {
+          url: data.imageUrl,
+          keyword: styleKeyword || "Стиль",
+          timestamp: Date.now(),
+        };
+        setHistory((prev) => {
+          const newHistory = [newItem, ...prev].slice(0, 50);
+          // Save to local storage for local users
+          localStorage.setItem("localHistory", JSON.stringify(newHistory));
 
-            // Save to firestore if logged in
-            if (userId && userId !== "local-user") {
-              const userRef = doc(db, "users", userId);
-              updateDoc(userRef, { history: newHistory, scheduledNotificationAt: Date.now() + 28 * 24 * 60 * 60 * 1000 }).catch((e) =>
-                console.warn("Failed to save history", e),
-              );
-            }
-            return newHistory;
-          });
-        }
+          // Save to firestore if logged in
+          if (userId && userId !== "local-user") {
+            const userRef = doc(db, "users", userId);
+            updateDoc(userRef, { history: newHistory, scheduledNotificationAt: Date.now() + 28 * 24 * 60 * 60 * 1000 }).catch((e) =>
+              console.warn("Failed to save history", e),
+            );
+          }
+          return newHistory;
+        });
       } else {
         throw new Error("Не удалось загрузить данные из ответа сервера.");
       }
@@ -1043,6 +1059,7 @@ export default function App() {
         loadingVTONStyles={loadingVTONStyles}
         generateVirtualTryOn={generateVirtualTryOn}
         vtonError={vtonError}
+        isLightMode={isLightMode}
       />
 
       <CameraModal
@@ -1076,6 +1093,8 @@ export default function App() {
         setShowSalonNameInput={setShowSalonNameInput}
         isLightMode={isLightMode}
       />
+
+      <DailyRewardModal isLightMode={isLightMode} />
 
       {isChatOpen && results && (
         <StylistChat 

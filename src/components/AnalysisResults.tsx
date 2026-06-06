@@ -4,7 +4,10 @@ import { AlertCircle, Lock, RefreshCw, Sparkles, Maximize2 } from "lucide-react"
 import { LazyImage } from "./LazyImage";
 import { AnalysisResult } from "../types";
 
+import { RotatingFactsLoader } from "./RotatingFactsLoader";
+
 interface AnalysisResultsProps {
+
   isAnalyzing: boolean;
   results: AnalysisResult | null;
   generationsLeft: number | null;
@@ -32,60 +35,8 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   return (
     <>
       {isAnalyzing && !results && (
-        <div className="col-span-1 lg:col-span-7 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both">
-          {/* Vitals Skeleton */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={`rounded-2xl p-5 md:p-6 shadow-sm overflow-hidden border ${isLightMode ? 'bg-white border-gray-200' : 'glass-panel border-white/10'}`}
-              >
-                <Skeleton className="w-16 h-3 rounded mb-4" />
-                <Skeleton className="w-5/6 h-6 rounded" />
-              </div>
-            ))}
-          </div>
-
-          {/* Recommendations Skeleton */}
-          <div className="mt-4">
-            <div className="flex items-center gap-4 mb-6">
-              <div className={`h-px flex-1 ${isLightMode ? 'bg-gray-200' : 'bg-white/10'}`}></div>
-              <Skeleton className="w-48 h-6 rounded" />
-              <div className={`h-px flex-1 ${isLightMode ? 'bg-gray-200' : 'bg-white/10'}`}></div>
-            </div>
-
-            <div className="flex flex-col gap-5 lg:gap-6">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className={`rounded-2xl overflow-hidden flex flex-col sm:flex-row items-stretch border ${isLightMode ? 'bg-white border-gray-200 shadow-sm' : 'glass-panel border-white/10'}`}
-                >
-                  <div className={`w-full sm:w-[180px] shrink-0 border-b sm:border-b-0 sm:border-r flex items-center justify-center p-6 ${isLightMode ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
-                    <div className="flex flex-col items-center justify-center w-full h-full gap-4">
-                      <Skeleton className="w-12 h-12 rounded-full mb-2" />
-                      <Skeleton className="w-2/3 h-2 rounded" />
-                      <Skeleton className="w-1/2 h-2 rounded" />
-                    </div>
-                  </div>
-                  <div className="p-5 md:p-6 flex-1 flex flex-col justify-center space-y-4">
-                    <div className="space-y-2">
-                      <Skeleton className="w-3/4 h-6 rounded" />
-                      <Skeleton className="w-full h-4 rounded" />
-                      <Skeleton className="w-5/6 h-4 rounded" />
-                    </div>
-                    <div className="space-y-2 pt-2">
-                      <Skeleton className="w-1/4 h-3 rounded" />
-                      <Skeleton className="w-2/3 h-4 rounded" />
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                      <Skeleton className="w-32 h-10 rounded-full" />
-                      <Skeleton className="w-32 h-10 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="col-span-1 lg:col-span-7 flex flex-col justify-center min-h-[400px] animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both">
+          <RotatingFactsLoader isLightMode={isLightMode} title="Анализ и подбор стиля (около 15-30 сек)..." />
         </div>
       )}
 
@@ -212,12 +163,12 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                               <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mb-3 border border-amber-500/30">
                                 <Lock size={20} className="text-amber-500" />
                               </div>
-                              <span className="text-white/90 font-medium text-sm mb-3 leading-snug drop-shadow-md">Ваш идеальный образ<br/>уже сгенерирован!</span>
+                              <span className="text-white/90 font-medium text-sm mb-3 leading-snug drop-shadow-md text-balance px-2">Это вы с {rec.ru || rec.name}.</span>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setShowBuyModal(true); }}
-                                className="bg-gradient-to-r from-amber-500 to-orange-400 text-white text-xs font-bold uppercase tracking-wider py-2.5 px-5 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:scale-105 active:scale-95 transition-all"
+                                className="bg-gradient-to-r from-amber-500 to-orange-400 text-white text-xs font-bold uppercase tracking-wider py-2.5 px-5 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:scale-105 active:scale-95 transition-all w-[90%] break-words"
                               >
-                                Посмотреть результат
+                                Убрать блюр и примерить ещё 2 варианта — 199 ⭐
                               </button>
                             </div>
                           )}
