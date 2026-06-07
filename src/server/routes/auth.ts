@@ -16,15 +16,17 @@ const PACKAGES: Record<string, { title: string; description: string; amount: num
 authRouter.post('/create-invoice', async (req: Request, res: Response) => {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not configured" });
+    if (!botToken || botToken === "MY_TELEGRAM_BOT_TOKEN" || botToken === "") {
+      return res.status(500).json({ 
+        error: "Токен TELEGRAM_BOT_TOKEN не настроен. Пожалуйста, добавьте рабочий токен бота в меню Settings -> Environment Variables в AI Studio." 
+      });
     }
 
     const { userId, tgUserId, packageId } = req.body;
     const pkg = PACKAGES[packageId];
     
     if (!pkg) {
-      return res.status(400).json({ error: "Invalid packageId" });
+      return res.status(400).json({ error: "Неверный ID пакета" });
     }
 
     // Include packageId, userId, tgUserId
@@ -48,7 +50,9 @@ authRouter.post('/create-invoice', async (req: Request, res: Response) => {
       res.json({ invoiceUrl: data.result });
     } else {
       console.error("Telegram invoice error:", data);
-      res.status(500).json({ error: data.description || "Failed to create invoice" });
+      res.status(500).json({ 
+        error: `Ошибка Telegram API: ${data.description || "Не удалось создать счет"}. Убедитесь, что бот подключен к платежам Stars (через @BotFather -> Bot Settings -> Payments).` 
+      });
     }
   } catch (error: any) {
     console.error("Create invoice error:", error);

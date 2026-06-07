@@ -14,6 +14,7 @@ export const LazyImage = memo(({
   className,
   autoLoad = false,
   results,
+  onImageLoaded,
 }: {
   keyword: string;
   gender: string;
@@ -22,11 +23,18 @@ export const LazyImage = memo(({
   className?: string;
   autoLoad?: boolean;
   results?: AnalysisResult;
+  onImageLoaded?: (url: string) => void;
 }) => {
-  const cacheKey = `${gender}_${keyword}`;
+  const cacheKey = `${gender}_${keyword}_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairQuality || ""}`;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
     globalImageCache[cacheKey] || null,
   );
+
+  useEffect(() => {
+    if (loadedUrl && onImageLoaded) {
+      onImageLoaded(loadedUrl);
+    }
+  }, [loadedUrl, onImageLoaded]);
   const [isLoading, setIsLoading] = useState(
     autoLoad && !globalImageCache[cacheKey],
   );
@@ -51,6 +59,7 @@ export const LazyImage = memo(({
         body: JSON.stringify({
           keyword,
           gender,
+          haircutName: uniqueName,
           faceShape: results?.faceShape,
           hairLength: results?.hairLength,
           hairDensity: results?.hairDensity,
@@ -62,6 +71,8 @@ export const LazyImage = memo(({
           ageRange: results?.ageRange,
           facialFeatures: results?.facialFeatures,
           facialHair: results?.facialHair,
+          hairlineStatus: results?.hairlineStatus,
+          hairQuality: results?.hairQuality,
         }),
       });
 

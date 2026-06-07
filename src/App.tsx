@@ -87,6 +87,7 @@ import { CameraModal } from "./components/CameraModal";
 import { LazyImage } from "./components/LazyImage";
 import { downloadImage } from "./utils/downloadImage";
 import { AnalysisResult } from "./types";
+import { defaultFaqData } from "./data/faq";
 
 const FallbackImage =
   "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80";
@@ -120,7 +121,7 @@ export default function App() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const [faqData, setFaqData] = useState<any[]>([]);
+  const [faqData, setFaqData] = useState<any[]>(defaultFaqData);
   const [showWelcome, setShowWelcome] = useState(false);
   const [userRole, setUserRole] = useState<'client' | 'master' | 'salon'>('client');
   const [salonName, setSalonName] = useState('');
@@ -176,6 +177,12 @@ export default function App() {
   const [customHairColor, setCustomHairColor] = useState<string | null>(null);
   const [vtonStrength, setVtonStrength] = useState<number>(50);
 
+  useEffect(() => {
+    setVtonResultUrl(null);
+    setVtonError(null);
+    setCustomHairColor(null);
+  }, [tryOnStyle]);
+
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentError, setConsentError] = useState(false);
@@ -194,7 +201,9 @@ export default function App() {
     isBuying,
     showBuyModal,
     setShowBuyModal,
-    isTelegramEnv
+    isTelegramEnv,
+    isDeveloper,
+    setIsDeveloper
   } = useTokenManager();
 
   const deleteHistoryItem = async (
@@ -612,6 +621,8 @@ export default function App() {
           facialFeatures: resultData.facialFeatures,
           facialHair: resultData.facialHair,
           clothingContext: resultData.clothingContext,
+          hairlineStatus: resultData.hairlineStatus,
+          hairQuality: resultData.hairQuality,
         }),
       });
       const data = await response.json();
@@ -763,7 +774,7 @@ export default function App() {
   ) => {
     if (!imageBase64) return;
 
-    if (generationsLeft !== null && generationsLeft <= 0) {
+    if (!isDeveloper && generationsLeft !== null && generationsLeft <= 0) {
        setShowBuyModal(true);
        return;
     }
@@ -802,7 +813,9 @@ export default function App() {
           facialFeatures: results?.facialFeatures,
           facialHair: results?.facialHair,
           clothingContext: results?.clothingContext,
-          targetImageUrl: targetImageUrl
+          targetImageUrl: targetImageUrl,
+          hairlineStatus: results?.hairlineStatus,
+          hairQuality: results?.hairQuality,
         }),
       });
 
@@ -963,6 +976,8 @@ export default function App() {
         setIsFaqOpen={setIsFaqOpen}
         isLightMode={isLightMode}
         setIsLightMode={setIsLightMode}
+        isDeveloper={isDeveloper}
+        setIsDeveloper={setIsDeveloper}
       />
 
       {/* Main Content */}

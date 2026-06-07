@@ -122,6 +122,58 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
             </div>
           </div>
 
+          {/* Trichology Analysis Card */}
+          <div className={`p-6 rounded-2xl border transition-all duration-300 shadow-sm ${
+            isLightMode 
+              ? 'bg-gradient-to-r from-teal-50/50 to-emerald-50/50 border-teal-100' 
+              : 'bg-gradient-to-r from-emerald-950/10 to-teal-950/10 border-emerald-500/10'
+          }`}>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="text-emerald-500 shrink-0" size={18} />
+              <h4 className={`text-base font-serif font-medium tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+                Трихологический анализ и качество волос
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Hairline status */}
+              <div className={`p-4 rounded-xl border text-sm flex flex-col justify-between ${
+                isLightMode ? 'bg-white/80 border-gray-100' : 'bg-black/20 border-white/5'
+              }`}>
+                <div>
+                  <span className={`text-[10px] uppercase tracking-widest font-semibold block mb-1 ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                    Линия роста волос и зоны
+                  </span>
+                  <p className={`font-medium mb-1.5 ${isLightMode ? 'text-gray-800' : 'text-white/80'}`}>
+                    {results.hairlineStatus || "Классическая ровная линия лба"}
+                  </p>
+                </div>
+                <p className={`text-xs leading-relaxed mt-2 ${isLightMode ? 'text-gray-500' : 'text-white/50'}`}>
+                  {results.hairDensity?.toLowerCase().includes("редк") || results.hairlineStatus?.toLowerCase().includes("залыс")
+                    ? "⚠️ Особенности: ИИ автоматически скорректировал форму стрижек, чтобы замаскировать зоны поредения или залысин."
+                    : "✨ Особенности: Однородная густота по всей краевой линии роста. Подходят любые типы открытого и закрытого лба."}
+                </p>
+              </div>
+
+              {/* Hair quality */}
+              <div className={`p-4 rounded-xl border text-sm flex flex-col justify-between ${
+                isLightMode ? 'bg-white/80 border-gray-100' : 'bg-black/20 border-white/5'
+              }`}>
+                <div>
+                  <span className={`text-[10px] uppercase tracking-widest font-semibold block mb-1 ${isLightMode ? 'text-emerald-600' : 'text-emerald-400'}`}>
+                    Структура и качество полотна
+                  </span>
+                  <p className={`font-medium mb-1.5 ${isLightMode ? 'text-gray-800' : 'text-white/80'}`}>
+                    {results.hairQuality || "Волосы средней плотности, эластичные"}
+                  </p>
+                </div>
+                <p className={`text-xs leading-relaxed mt-2 ${isLightMode ? 'text-gray-500' : 'text-white/50'}`}>
+                  Рекомендации по стайлингу и уходу в карточках ниже полностью адаптированы под силу натяжения и удерживающую способность ваших волос.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Recommendations */}
           <div className="mt-4">
             <div className="flex items-center gap-4 mb-6">

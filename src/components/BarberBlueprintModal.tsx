@@ -76,6 +76,12 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   vtonError,
   isLightMode,
 }) => {
+  const [loadedReferenceUrl, setLoadedReferenceUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLoadedReferenceUrl(null);
+  }, [tryOnStyle]);
+
   if (!tryOnStyle) return null;
   return (
     <div className={`fixed inset-0 z-[100] flex sm:items-center sm:justify-center animate-in fade-in duration-300 ${isLightMode ? 'bg-black/20 sm:bg-white/40' : 'bg-black/60 sm:bg-white/10'} sm:backdrop-blur-md`}>
@@ -193,6 +199,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                   autoLoad={true}
                   results={results || undefined}
                   className={`absolute inset-0 w-full h-full object-contain transition-transform duration-700 group-hover:scale-105`}
+                  onImageLoaded={setLoadedReferenceUrl}
                 />
 
                 <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 bg-gradient-to-t from-black/60 to-transparent">
@@ -472,7 +479,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                         tryOnStyle.name,
                         tryOnStyle.description,
                         customHairColor,
-                        tryOnStyle.imageUrl,
+                        loadedReferenceUrl || tryOnStyle.imageUrl,
                       )
                     }
                     style={{ color: "#ffffff" }}

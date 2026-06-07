@@ -10,6 +10,14 @@ export const useTokenManager = () => {
   const [initError, setInitError] = useState<string | null>(null);
   const [isBuying, setIsBuying] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [isDeveloper, setIsDeveloper] = useState(() => {
+    const isDevUrl = typeof window !== "undefined" && (
+      window.location.hostname.includes("localhost") ||
+      window.location.hostname.includes("run.app") ||
+      window.location.hostname.includes("google.com")
+    );
+    return isDevUrl || localStorage.getItem("isDeveloperMode") === "true";
+  });
 
   const tg = window.Telegram?.WebApp;
   const isTelegramEnv = !!tg?.initDataUnsafe?.user;
@@ -39,13 +47,33 @@ export const useTokenManager = () => {
 
       setUserId(currentUid);
 
+      const isDevUrl = typeof window !== "undefined" && (
+        window.location.hostname.includes("localhost") ||
+        window.location.hostname.includes("run.app") ||
+        window.location.hostname.includes("google.com")
+      );
+
+      // Identify developer by hardcoded Telegram UID or any known Dev signature
+      const isDevUser = 
+        currentUid === "8585130589" || 
+        tgUser?.id?.toString() === "8585130589" ||
+        tgUser?.username?.toLowerCase() === "vitalii_uzbekov" ||
+        isDevUrl ||
+        localStorage.getItem("isDeveloperMode") === "true";
+
+      if (isDevUser) {
+        setIsDeveloper(true);
+        localStorage.setItem("isDeveloperMode", "true");
+      }
+
       if (currentUid === "local-user") {
         const localGens = localStorage.getItem("localGenerationsLeft");
         if (localGens === null) {
-          localStorage.setItem("localGenerationsLeft", "0");
-          setGenerationsLeft(0);
+          const startingVal = isDevUser ? "999" : "0";
+          localStorage.setItem("localGenerationsLeft", startingVal);
+          setGenerationsLeft(parseInt(startingVal, 10));
         } else {
-          setGenerationsLeft(parseInt(localGens, 10));
+          setGenerationsLeft(isDevUser ? 999 : parseInt(localGens, 10));
         }
         try {
           const localHistory = JSON.parse(
@@ -73,7 +101,7 @@ export const useTokenManager = () => {
         if (!userDoc || !userDoc.exists()) {
           const startParam = tg?.initDataUnsafe?.start_param;
           let referredBy = null;
-          let startGens = 0;
+          let startGens = isDevUser ? 999 : 0;
           
           if (startParam && startParam.startsWith("ref_")) {
              const referrerId = startParam.substring(4);
@@ -129,7 +157,7 @@ export const useTokenManager = () => {
           }
         } else {
           const data = userDoc.data();
-          setGenerationsLeft(data?.generationsLeft ?? 0);
+          setGenerationsLeft(isDevUser ? 999 : (data?.generationsLeft ?? 0));
           setHistory(data?.history ?? []);
         }
       } catch (err: any) {
@@ -138,10 +166,11 @@ export const useTokenManager = () => {
         }
         const localGens = localStorage.getItem("localGenerationsLeft");
         if (localGens === null) {
-          localStorage.setItem("localGenerationsLeft", "0");
-          setGenerationsLeft(0);
+          const startingVal = isDevUser ? "999" : "0";
+          localStorage.setItem("localGenerationsLeft", startingVal);
+          setGenerationsLeft(parseInt(startingVal, 10));
         } else {
-          setGenerationsLeft(parseInt(localGens, 10));
+          setGenerationsLeft(isDevUser ? 999 : parseInt(localGens, 10));
         }
         try {
           const localHistory = JSON.parse(
@@ -149,7 +178,7 @@ export const useTokenManager = () => {
           );
           setHistory(localHistory);
         } catch (e) {}
-        setUserId("local-user");
+        setUserId(isDevUser ? "8585130589" : "local-user");
         setInitError(null);
       }
     };
@@ -164,9 +193,13 @@ export const useTokenManager = () => {
     return () => {
       window.removeEventListener("daily_reward_claimed", handleDailyReward);
     };
-  }, []);
+  }, [isDeveloper]);
 
   const consumeToken = async () => {
+    if (isDeveloper) {
+      // Developers do not consume generations/tokens during testing!
+      return true;
+    }
     if (!userId || generationsLeft === null || generationsLeft <= 0) return false;
 
     if (userId === "local-user") {
@@ -196,6 +229,9 @@ export const useTokenManager = () => {
   const buyTokens = () => setShowBuyModal(true);
 
   const checkLimits = async () => {
+    if (isDeveloper) {
+      return true;
+    }
     if (generationsLeft !== null && generationsLeft <= 0) {
       if (tg && tg.showPopup) {
         tg.showPopup(
@@ -287,7 +323,30 @@ export const useTokenManager = () => {
            alert("Невозможно открыть счет. Пожалуйста, обновите Telegram.");
         }
       } else {
-        alert("Оплата поддерживается только в Telegram. (Telegram User ID не найден)");
+        // Режим симуляции оплаты (Вне Telegram)
+        const confirmPay = window.confirm(
+          `💳 Режим разработки / тестирования (Вне Telegram)\n\nХотите симулировать успешную оплату пакета "${packageId}" в размере ${starsAmount} ⭐?\n\nВам будет начислено +${generationsCount} генераций.`
+        );
+        if (confirmPay) {
+          if (userId === "local-user") {
+            const next = (generationsLeft || 0) + generationsCount;
+            localStorage.setItem("localGenerationsLeft", next.toString());
+            setGenerationsLeft(next);
+          } else {
+            try {
+              const userRef = doc(db, "users", userId);
+              await updateDoc(userRef, {
+                generationsLeft: increment(generationsCount),
+                fullAccess: true
+              });
+            } catch (e) {
+              console.warn("Could not write mock purchase to Firestore", e);
+            }
+            setGenerationsLeft((prev) => (prev || 0) + generationsCount);
+          }
+          alert(`Успешно начислено +${generationsCount} генераций!`);
+          setShowBuyModal(false);
+        }
       }
     } catch (err: any) {
       console.error("Error creating invoice: ", err);
@@ -319,6 +378,8 @@ export const useTokenManager = () => {
     isBuying,
     showBuyModal,
     setShowBuyModal,
-    isTelegramEnv
+    isTelegramEnv,
+    isDeveloper,
+    setIsDeveloper
   };
 };

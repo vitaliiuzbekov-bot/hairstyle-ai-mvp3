@@ -12,6 +12,8 @@ interface HeaderProps {
   setIsFaqOpen: (open: boolean) => void;
   isLightMode: boolean;
   setIsLightMode: (light: boolean) => void;
+  isDeveloper?: boolean;
+  setIsDeveloper?: (dev: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,17 +27,53 @@ export const Header: React.FC<HeaderProps> = ({
   setIsFaqOpen,
   isLightMode,
   setIsLightMode,
+  isDeveloper = false,
+  setIsDeveloper,
 }) => {
+  const [logoClicks, setLogoClicks] = React.useState(0);
+  
+  const handleLogoClick = () => {
+    const nextClicks = logoClicks + 1;
+    setLogoClicks(nextClicks);
+    if (nextClicks >= 5) {
+      if (setIsDeveloper) {
+        const nextDev = !isDeveloper;
+        setIsDeveloper(nextDev);
+        localStorage.setItem("isDeveloperMode", nextDev ? "true" : "false");
+        
+        if (window.Telegram?.WebApp?.showPopup) {
+          window.Telegram.WebApp.showPopup({
+            title: nextDev ? "🔧 Режим Разработчика" : "🔒 Режим Разработчика",
+            message: nextDev 
+              ? "Тестовый режим разработчика успешно активирован! Генерации заблокированы на 999. Токены не списываются."
+              : "Режим разработчика отключен.",
+            buttons: [{ id: "ok", type: "ok" }]
+          }, () => {});
+        } else {
+          alert(nextDev 
+            ? "🔧 Тестовый режим разработчика активирован! Вся функциональность разблокирована. Баланс установлен на 999 и не списывается." 
+            : "Режим разработчика деактивирован."
+          );
+        }
+      }
+      setLogoClicks(0);
+    }
+  };
+
   return (
     <header className={`border-b sticky top-0 z-50 backdrop-blur-xl ${isLightMode ? 'bg-white/80 border-gray-200' : 'glass-header border-white/10'}`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center border shadow-sm ${isLightMode ? 'bg-white text-gray-800 border-gray-200' : 'glass-button text-white/90 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)]'}`}>
+          <div 
+            onClick={handleLogoClick}
+            className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full cursor-pointer select-none active:scale-95 flex items-center justify-center border shadow-sm transition-all ${isDeveloper ? 'bg-gradient-to-tr from-red-500 to-amber-500 text-white border-transparent animate-pulse' : isLightMode ? 'bg-white text-gray-800 border-gray-200' : 'glass-button text-white/90 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)]'}`}
+          >
             <Scissors size={16} className="opacity-90 sm:w-5 sm:h-5 w-4 h-4" />
           </div>
           <h1 className={`font-serif font-semibold text-lg sm:text-2xl tracking-tight truncate max-w-[140px] sm:max-w-none ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
             НейроСтилист{" "}
             <span className={`italic opacity-80 hidden sm:inline ${isLightMode ? 'text-gray-400' : 'text-white/60'}`}>AI</span>
+            {isDeveloper && <span className="ml-1.5 text-[9px] bg-red-500 text-white font-mono px-1 rounded uppercase tracking-widest">DEV</span>}
           </h1>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -124,6 +162,51 @@ export const Header: React.FC<HeaderProps> = ({
                         ></div>
                       </div>
                     </button>
+
+                    {isDeveloper && (
+                      <div className={`mt-2 p-2 rounded-xl text-xs flex flex-col gap-1.5 border leading-tight ${isLightMode ? 'bg-red-50/80 border-red-200 text-red-900' : 'bg-red-500/10 border-red-500/20 text-red-200 font-mono'}`}>
+                        <div className="font-bold flex items-center justify-between mb-0.5 border-b pb-1 border-current/10">
+                          <span>🛠️ Developer Panel</span>
+                          <span className="px-1 py-0.2 text-[8px] bg-red-500 text-white rounded">ON</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            localStorage.removeItem("localHistory");
+                            localStorage.removeItem("localGenerationsLeft");
+                            window.location.reload();
+                          }}
+                          className={`w-full text-left py-1 px-1.5 rounded transition-colors text-[11px] ${isLightMode ? 'hover:bg-gray-200' : 'hover:bg-white/5'}`}
+                        >
+                          🧹 Сбросить баланс и историю
+                        </button>
+                        <button
+                          onClick={() => {
+                            const keys = Object.keys(localStorage);
+                            keys.forEach(k => {
+                              if (k.startsWith("cached_") || k.includes("base64")) {
+                                localStorage.removeItem(k);
+                              }
+                            });
+                            alert("Кэш изображений очищен.");
+                          }}
+                          className={`w-full text-left py-1 px-1.5 rounded transition-colors text-[11px] ${isLightMode ? 'hover:bg-gray-200' : 'hover:bg-white/5'}`}
+                        >
+                          🖼️ Очистить кэш картинок
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (setIsDeveloper) {
+                              setIsDeveloper(false);
+                              localStorage.setItem("isDeveloperMode", "false");
+                              window.location.reload();
+                            }
+                          }}
+                          className="w-full text-left py-1 px-1.5 rounded text-red-500 font-bold text-[11px]"
+                        >
+                          🚫 Выйти из Dev-режима
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

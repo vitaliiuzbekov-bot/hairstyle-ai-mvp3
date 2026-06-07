@@ -20,6 +20,7 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -77,6 +78,11 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
   };
 
   const startRecording = async () => {
+    setMicError(null);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setMicError("Запись аудио не поддерживается этим браузером или заблокирована настройками конфиденциальности.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       let mimeType = '';
@@ -118,10 +124,12 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
                 setInputVal(prev => prev + (prev ? " " : "") + data.text);
               }
            } else {
-              throw new Error("Failed to transcribe");
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || "Ошибка расшифровки аудио");
            }
-        } catch(e) {
+        } catch(e: any) {
            console.error("Transcription error", e);
+           setMicError(e.message || "Ошибка распознавания голоса.");
         } finally {
            setIsLoading(false);
         }
@@ -129,9 +137,9 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
 
       mediaRecorder.start();
       setIsRecording(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Microphone access denied or error:", e);
-      alert("Не удалось получить доступ к микрофону");
+      setMicError("Доступ к микрофону отклонен. Одобрите доступ в настройках браузера или откройте приложение в отдельной вкладке.");
     }
   };
 
@@ -192,6 +200,12 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
 
           {/* Input Area */}
           <div className={`p-4 border-t sm:rounded-b-2xl ${isLightMode ? 'bg-gray-50 border-gray-200' : 'bg-black/40 border-white/10'}`}>
+             {micError && (
+               <div className="mb-2 text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-2 px-3 flex justify-between items-center animate-in fade-in slide-in-from-bottom-2 duration-200">
+                 <span>{micError}</span>
+                 <button type="button" onClick={() => setMicError(null)} className="text-red-500 hover:text-red-700 font-bold ml-2 text-sm">×</button>
+               </div>
+             )}
              <form 
                onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                className="flex items-center gap-2"

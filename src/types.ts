@@ -5,6 +5,8 @@ export interface AnalysisResult {
   hairLength?: string;
   hairDensity: string;
   hairType: string;
+  hairlineStatus?: string;
+  hairQuality?: string;
   skinTone?: string;
   skinDetails?: string;
   hairColor?: string;
