@@ -36,7 +36,22 @@
   }
 }
 
+@layer base {
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 @layer utilities {
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: var(--tg-viewport-stable-height, 100vh);
+  }
+  .h-screen {
+    height: 100vh;
+    height: var(--tg-viewport-height, 100vh);
+  }
   .animate-marquee {
     animation: marquee 40s linear infinite;
   }

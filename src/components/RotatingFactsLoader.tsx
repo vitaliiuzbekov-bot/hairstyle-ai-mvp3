@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Sparkles, Scissors, Info } from 'lucide-react';
+import { useLoadingState } from '../hooks/useLoadingState';
 
 const TIPS = [
   "💡 Асимметричная челка поможет визуально сузить лицо 💇‍♀️",
@@ -18,25 +19,7 @@ interface Props {
 }
 
 export const RotatingFactsLoader: React.FC<Props> = ({ isLightMode, title = "ИИ анализирует образ...", className = "" }) => {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    // Simulated progress bar (0 to 99% over ~20 seconds)
-    const totalTimeMs = 20000;
-    const intervalMs = 200;
-    const increment = 100 / (totalTimeMs / intervalMs);
-    
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 98) return prev;
-        return prev + increment;
-      });
-    }, intervalMs);
-
-    return () => {
-      clearInterval(progressInterval);
-    };
-  }, []);
+  const { progress } = useLoadingState(20000, 200);
 
   return (
     <div className={`flex flex-col items-center justify-center p-6 gap-6 text-center ${className} w-full overflow-hidden`}>

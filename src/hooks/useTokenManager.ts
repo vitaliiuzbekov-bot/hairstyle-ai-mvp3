@@ -12,9 +12,7 @@ export const useTokenManager = () => {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [isDeveloper, setIsDeveloper] = useState(() => {
     const isDevUrl = typeof window !== "undefined" && (
-      window.location.hostname.includes("localhost") ||
-      window.location.hostname.includes("run.app") ||
-      window.location.hostname.includes("google.com")
+      window.location.hostname.includes("localhost")
     );
     return isDevUrl || localStorage.getItem("isDeveloperMode") === "true";
   });
@@ -48,9 +46,7 @@ export const useTokenManager = () => {
       setUserId(currentUid);
 
       const isDevUrl = typeof window !== "undefined" && (
-        window.location.hostname.includes("localhost") ||
-        window.location.hostname.includes("run.app") ||
-        window.location.hostname.includes("google.com")
+        window.location.hostname.includes("localhost")
       );
 
       // Identify developer by hardcoded Telegram UID or any known Dev signature

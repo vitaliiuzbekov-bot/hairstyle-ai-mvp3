@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, memo } from "react";
+import localforage from "localforage";
 import { Skeleton } from "./Skeleton";
 import { Download, AlertCircle, Image as ImageIcon } from "lucide-react";
 import { downloadImage } from "../utils/downloadImage";
 import { AnalysisResult } from "../types";
+import { CachedImage } from "./CachedImage";
 
 const globalImageCache: Record<string, string> = {};
 
@@ -31,10 +33,23 @@ export const LazyImage = memo(({
   );
 
   useEffect(() => {
+    // Attempt to load from localforage if not in memory cache
+    if (!loadedUrl) {
+      localforage.getItem<string>(`genRef_${cacheKey}`).then((cachedUrl) => {
+        if (cachedUrl) {
+          globalImageCache[cacheKey] = cachedUrl;
+          setLoadedUrl(cachedUrl);
+        }
+      });
+    }
+  }, [cacheKey, loadedUrl]);
+
+  useEffect(() => {
     if (loadedUrl && onImageLoaded) {
       onImageLoaded(loadedUrl);
     }
   }, [loadedUrl, onImageLoaded]);
+
   const [isLoading, setIsLoading] = useState(
     autoLoad && !globalImageCache[cacheKey],
   );
@@ -45,6 +60,18 @@ export const LazyImage = memo(({
       setLoadedUrl(globalImageCache[cacheKey]);
       setIsLoading(false);
       return;
+    }
+
+    try {
+      const cachedUrl = await localforage.getItem<string>(`genRef_${cacheKey}`);
+      if (cachedUrl) {
+        globalImageCache[cacheKey] = cachedUrl;
+        setLoadedUrl(cachedUrl);
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.warn('Failed to check localforage:', e);
     }
 
     setIsLoading(true);
@@ -85,6 +112,7 @@ export const LazyImage = memo(({
       if (data.imageUrl) {
         globalImageCache[cacheKey] = data.imageUrl;
         setLoadedUrl(data.imageUrl);
+        localforage.setItem(`genRef_${cacheKey}`, data.imageUrl).catch(e => console.warn('Cache save failed', e));
       } else {
         throw new Error("No image URL in response");
       }
@@ -105,7 +133,7 @@ export const LazyImage = memo(({
     }
 
     setIsLoading(false);
-  }, [cacheKey, keyword, gender, results]);
+  }, [cacheKey, keyword, gender, results, uniqueName]);
 
   useEffect(() => {
     if (autoLoad) {
@@ -117,10 +145,11 @@ export const LazyImage = memo(({
   if (loadedUrl) {
     return (
       <div className="relative w-full h-full group/lazy flex">
-        <img
+        <CachedImage
           src={loadedUrl}
           alt={uniqueName}
           className={`w-full h-full ${className || "object-cover"}`}
+          style={{ display: "block", width: "100%", height: "100%" }}
         />
         <button
           onClick={(e) => {

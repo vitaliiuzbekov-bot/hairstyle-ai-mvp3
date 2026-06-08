@@ -35,7 +35,14 @@ export const HistoryCarousel: React.FC<HistoryCarouselProps> = ({
           <div
             key={index}
             className={`flex-none snap-center relative rounded-xl overflow-hidden border group cursor-pointer w-[120px] h-[160px] sm:w-[150px] sm:h-[200px] ${isLightMode ? 'border-gray-200 shadow-sm' : 'border-white/10'}`}
-            onClick={() => window.open(item.url, "_blank")}
+            onClick={() => {
+              const tg = window.Telegram?.WebApp;
+              if (tg?.openLink) {
+                tg.openLink(item.url);
+              } else {
+                window.open(item.url, "_blank");
+              }
+            }}
           >
             <CachedImage
               src={item.url}

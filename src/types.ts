@@ -20,5 +20,6 @@ export interface AnalysisResult {
     description: string;
     stylingTips: string;
     imageKeyword: string;
+    ru?: string;
   }>;
 }

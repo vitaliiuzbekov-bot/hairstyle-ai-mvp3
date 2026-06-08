@@ -30,7 +30,6 @@ import {
 import { CachedImage } from "./components/CachedImage";
 import { BeforeAfterSlider } from "./components/BeforeAfterSlider";
 import { hapticNotification, hapticImpact } from "./utils/haptics";
-import { StylistChat } from "./components/StylistChat";
 import { generateCollage } from "./utils/collage";
 import { auth, db, remoteConfig } from "./firebase";
 import { signInAnonymously } from "firebase/auth";
@@ -54,18 +53,24 @@ import {
   increment,
 } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "./firebase";
+import { scheduleBatchUpdate } from "./services/firestoreQueue";
 
 declare global {
   interface Window {
     Telegram?: {
       WebApp?: {
+        ready?: () => void;
         expand?: () => void;
         initData?: string;
         initDataUnsafe?: any;
+        colorScheme?: 'light' | 'dark';
+        onEvent?: (eventType: string, eventHandler: () => void) => void;
+        offEvent?: (eventType: string, eventHandler: () => void) => void;
         openInvoice?: (url: string, callback: (status: string) => void) => void;
         showPopup?: (params: any, callback: (buttonId: string) => void) => void;
         showAlert?: (message: string) => void;
         openTelegramLink?: (url: string) => void;
+        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;
         HapticFeedback?: {
           impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
           notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
@@ -82,19 +87,23 @@ declare global {
 
 import { Skeleton } from "./components/Skeleton";
 import { Header } from "./components/Header";
-import { FaqModal } from "./components/FaqModal";
-import { WelcomeModal } from "./components/WelcomeModal";
-import { DailyRewardModal } from "./components/DailyRewardModal";
-import { BuyModal } from "./components/BuyModal";
 import { HistoryCarousel } from "./components/HistoryCarousel";
 import { UploadZone } from "./components/UploadZone";
 import { AnalysisResults } from "./components/AnalysisResults";
-import { BarberBlueprintModal } from "./components/BarberBlueprintModal";
-import { CameraModal } from "./components/CameraModal";
 import { LazyImage } from "./components/LazyImage";
 import { downloadImage } from "./utils/downloadImage";
 import { AnalysisResult } from "./types";
 import { defaultFaqData } from "./data/faq";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
+const FaqModal = React.lazy(() => import("./components/FaqModal").then(m => ({ default: m.FaqModal })));
+const WelcomeModal = React.lazy(() => import("./components/WelcomeModal").then(m => ({ default: m.WelcomeModal })));
+const DailyRewardModal = React.lazy(() => import("./components/DailyRewardModal").then(m => ({ default: m.DailyRewardModal })));
+const BuyModal = React.lazy(() => import("./components/BuyModal").then(m => ({ default: m.BuyModal })));
+const BarberBlueprintModal = React.lazy(() => import("./components/BarberBlueprintModal").then(m => ({ default: m.BarberBlueprintModal })));
+const CameraModal = React.lazy(() => import("./components/CameraModal").then(m => ({ default: m.CameraModal })));
+const StylistChat = React.lazy(() => import("./components/StylistChat").then(m => ({ default: m.StylistChat })));
+
 
 const FallbackImage =
   "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80";
@@ -122,8 +131,11 @@ const shareResult = (url: string) => {
 };
 
 import { useTokenManager } from "./hooks/useTokenManager";
-export default function App() {
+import { useOfflineStatus } from "./hooks/useOfflineStatus";
 
+function App() {
+
+  const isOffline = useOfflineStatus();
   const [isLightMode, setIsLightMode] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -149,6 +161,27 @@ export default function App() {
       if (storedSalonName) {
         setSalonName(storedSalonName);
       }
+    }
+
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      // Use Telegram theme parameters if available
+      const updateTheme = () => {
+        if (tg.colorScheme === 'light') {
+          setIsLightMode(true);
+        } else if (tg.colorScheme === 'dark') {
+          setIsLightMode(false);
+        }
+      };
+      
+      updateTheme();
+      tg.onEvent('themeChanged', updateTheme);
+      
+      return () => {
+        tg.offEvent('themeChanged', updateTheme);
+      };
     }
   }, []);
 
@@ -231,10 +264,9 @@ export default function App() {
     // Save to firestore if logged in
     if (userId && userId !== "local-user") {
       try {
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, { history: newHistory });
+        scheduleBatchUpdate(userId, { history: newHistory });
       } catch (err) {
-        console.warn("Failed to save history on deletion", err);
+        console.warn("Failed to schedule history update on deletion", err);
       }
     }
   };
@@ -977,10 +1009,11 @@ export default function App() {
 
           // Save to firestore if logged in
           if (userId && userId !== "local-user") {
-            const userRef = doc(db, "users", userId);
-            updateDoc(userRef, { history: newHistory, scheduledNotificationAt: Date.now() + 28 * 24 * 60 * 60 * 1000 }).catch((e) =>
-              console.warn("Failed to save history", e),
-            );
+            try {
+              scheduleBatchUpdate(userId, { history: newHistory, scheduledNotificationAt: Date.now() + 28 * 24 * 60 * 60 * 1000 });
+            } catch (e) {
+              console.warn("Failed to schedule history update", e);
+            }
           }
           return newHistory;
         });
@@ -1056,7 +1089,7 @@ export default function App() {
     }
   };
 
-  if (!isTelegramEnv) {
+  if (!isTelegramEnv && !isDeveloper) {
     return (
       <div className="min-h-screen bg-[#050508] text-white/90 flex flex-col items-center justify-center p-6 text-center font-sans tracking-wide">
         <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mb-6 text-blue-400">
@@ -1101,6 +1134,12 @@ export default function App() {
         isDeveloper={isDeveloper}
         setIsDeveloper={setIsDeveloper}
       />
+
+      {isOffline && (
+        <div className="bg-orange-500/10 border-b border-orange-500/20 text-orange-400 text-sm font-medium py-2 px-4 text-center fixed top-16 left-0 right-0 z-40 backdrop-blur-md">
+          Отсутствует подключение к сети. Приложение работает в автономном режиме.
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-16">
@@ -1171,78 +1210,84 @@ export default function App() {
         </div>
       </main>
 
-            <BarberBlueprintModal
-        tryOnStyle={tryOnStyle}
-        setTryOnStyle={setTryOnStyle}
-        results={results}
-        imageUrl={imageUrl}
-        mimeType={mimeType}
-        imageBase64={imageBase64}
-        styleConsultations={styleConsultations}
-        loadingARStyles={loadingARStyles}
-        arError={arError}
-        vtonResultUrl={vtonResultUrl}
-        isTeaserResult={isTeaserResult}
-        processPayment={processPayment}
-        customHairColor={customHairColor}
-        setCustomHairColor={setCustomHairColor}
-        vtonStrength={vtonStrength}
-        setVtonStrength={setVtonStrength}
-        generateARPreview={generateARPreview}
-        exportToPDF={exportToPDF}
-        isExportingPDF={isExportingPDF}
-        userRole={userRole}
-        salonName={salonName}
-        setChatStyleName={setChatStyleName}
-        setIsChatOpen={setIsChatOpen}
-        loadingVTONStyles={loadingVTONStyles}
-        generateVirtualTryOn={generateVirtualTryOn}
-        vtonError={vtonError}
-        isLightMode={isLightMode}
-      />
+        <React.Suspense fallback={null}>
+          <BarberBlueprintModal
+            tryOnStyle={tryOnStyle}
+            setTryOnStyle={setTryOnStyle}
+            results={results}
+            imageUrl={imageUrl}
+            mimeType={mimeType}
+            imageBase64={imageBase64}
+            styleConsultations={styleConsultations}
+            loadingARStyles={loadingARStyles}
+            arError={arError}
+            vtonResultUrl={vtonResultUrl}
+            isTeaserResult={isTeaserResult}
+            processPayment={processPayment}
+            customHairColor={customHairColor}
+            setCustomHairColor={setCustomHairColor}
+            vtonStrength={vtonStrength}
+            setVtonStrength={setVtonStrength}
+            generateARPreview={generateARPreview}
+            exportToPDF={exportToPDF}
+            isExportingPDF={isExportingPDF}
+            userRole={userRole}
+            salonName={salonName}
+            setChatStyleName={setChatStyleName}
+            setIsChatOpen={setIsChatOpen}
+            loadingVTONStyles={loadingVTONStyles}
+            generateVirtualTryOn={generateVirtualTryOn}
+            vtonError={vtonError}
+            isLightMode={isLightMode}
+          />
 
-      <CameraModal
-        isCameraModalOpen={isCameraModalOpen}
-        customVideoRef={customVideoRef}
-        facingMode={facingMode}
-        stopCamera={stopCamera}
-        capturePhoto={capturePhoto}
-        startCameraLocal={startCameraLocal}
-      />
+          <CameraModal
+            isCameraModalOpen={isCameraModalOpen}
+            customVideoRef={customVideoRef}
+            facingMode={facingMode}
+            stopCamera={stopCamera}
+            capturePhoto={capturePhoto}
+            startCameraLocal={startCameraLocal}
+          />
 
-      <BuyModal
-        showBuyModal={showBuyModal}
-        setShowBuyModal={setShowBuyModal}
-        isBuying={isBuying}
-        userRole={userRole}
-        userId={userId}
-        processPayment={processPayment}
-        isLightMode={isLightMode}
-      />
+          <BuyModal
+            showBuyModal={showBuyModal}
+            setShowBuyModal={setShowBuyModal}
+            isBuying={isBuying}
+            userRole={userRole}
+            userId={userId}
+            processPayment={processPayment}
+            isLightMode={isLightMode}
+          />
 
-      <FaqModal isFaqOpen={isFaqOpen} setIsFaqOpen={setIsFaqOpen} faqData={faqData} isLightMode={isLightMode} />
+          <FaqModal isFaqOpen={isFaqOpen} setIsFaqOpen={setIsFaqOpen} faqData={faqData} isLightMode={isLightMode} />
 
-      <WelcomeModal
-        showWelcome={showWelcome}
-        setShowWelcome={setShowWelcome}
-        setUserRole={setUserRole}
-        salonName={salonName}
-        setSalonName={setSalonName}
-        showSalonNameInput={showSalonNameInput}
-        setShowSalonNameInput={setShowSalonNameInput}
-        isLightMode={isLightMode}
-      />
+          <WelcomeModal
+            showWelcome={showWelcome}
+            setShowWelcome={setShowWelcome}
+            setUserRole={setUserRole}
+            salonName={salonName}
+            setSalonName={setSalonName}
+            showSalonNameInput={showSalonNameInput}
+            setShowSalonNameInput={setShowSalonNameInput}
+            isLightMode={isLightMode}
+          />
 
-      <DailyRewardModal isLightMode={isLightMode} />
+          <DailyRewardModal isLightMode={isLightMode} />
+        </React.Suspense>
 
       {isChatOpen && results && (
-        <StylistChat 
-           onClose={() => setIsChatOpen(false)}
-           features={results}
-           styleName={chatStyleName}
-           isLightMode={isLightMode}
-        />
+        <React.Suspense fallback={null}>
+          <StylistChat 
+             onClose={() => setIsChatOpen(false)}
+             features={results}
+             styleName={chatStyleName}
+             isLightMode={isLightMode}
+          />
+        </React.Suspense>
       )}
+
+
 
       <style>{`
         @keyframes scan {
@@ -1253,5 +1298,13 @@ export default function App() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AppWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   );
 }

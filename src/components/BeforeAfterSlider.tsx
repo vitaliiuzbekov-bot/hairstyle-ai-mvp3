@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { CachedImage } from './CachedImage';
 
 interface BeforeAfterSliderProps {
   beforeImage: string;
@@ -66,7 +67,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
       }}
     >
       {/* After Image (Background) */}
-      <img
+      <CachedImage
         src={afterImage}
         alt="После"
         className="absolute inset-0 w-full h-full object-contain pointer-events-none"
@@ -77,7 +78,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
         className="absolute inset-0 pointer-events-none overflow-hidden"
         style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
       >
-        <img
+        <CachedImage
           src={beforeImage}
           alt="До"
           className="absolute inset-0 w-full h-full object-contain pointer-events-none"

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { Scissors, X, Zap, Sparkles, FileDown, Send, Download, ShoppingBag, Share2 } from "lucide-react";
 import { LazyImage } from "./LazyImage";
+import { CachedImage } from "./CachedImage";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { downloadImage } from "../utils/downloadImage";
 import { shareResult } from "../utils/shareResult";
@@ -383,7 +384,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                 {vtonResultUrl && isTeaserResult && (
                   <div className={`mb-4 relative rounded-2xl overflow-hidden border ${isLightMode ? 'bg-gray-100 border-gray-200' : 'bg-black/40 border-white/10'}`}>
                      <div className="relative aspect-[3/4] w-full flex items-center justify-center">
-                        <img src={vtonResultUrl} alt="Blurred Result" className="absolute inset-0 w-full h-full object-cover blur-xl opacity-70 scale-110 pointer-events-none" />
+                        <CachedImage src={vtonResultUrl} alt="Blurred Result" className="absolute inset-0 object-cover blur-xl opacity-70 scale-110 pointer-events-none" style={{ width: '100%', height: '100%' }} />
                         
                         {/* Watermark overlay */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">

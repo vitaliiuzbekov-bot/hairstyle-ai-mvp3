@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { Skeleton } from "./Skeleton";
-import { AlertCircle, Lock, RefreshCw, Sparkles, Maximize2, Share2 } from "lucide-react";
+import { AlertCircle, Lock, RefreshCw, Sparkles, Maximize2, Share2, Wand2 } from "lucide-react";
 import { LazyImage } from "./LazyImage";
+import { CachedImage } from "./CachedImage";
 import { AnalysisResult } from "../types";
 
 import { RotatingFactsLoader } from "./RotatingFactsLoader";
@@ -21,7 +22,7 @@ interface AnalysisResultsProps {
   isExportingPDF?: boolean;
 }
 
-export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
+const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
   isAnalyzing,
   results,
   generationsLeft,
@@ -212,9 +213,10 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                       {idx === 0 && (generationsLeft === null || generationsLeft <= 0 || teaserUrl) ? (
                         <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden bg-[#0A0510]">
                           {teaserUrl ? (
-                            <img 
+                            <CachedImage 
                               src={teaserUrl} 
-                              className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ${generationsLeft && generationsLeft > 0 ? "blur-none scale-100 opacity-100" : "blur-xl scale-[1.15] opacity-60 pointer-events-none"}`} 
+                              className={`absolute inset-0 object-cover transition-all duration-1000 ${generationsLeft && generationsLeft > 0 ? "blur-none scale-100 opacity-100" : "blur-xl scale-[1.15] opacity-60 pointer-events-none"}`} 
+                              style={{ width: '100%', height: '100%' }}
                               alt="Превью" 
                             />
                           ) : isGeneratingTeaser ? (
@@ -284,22 +286,42 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => setTryOnStyle(rec)}
-                      className={`mt-4 px-6 py-3.5 sm:py-4 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 w-full lg:w-auto self-start border ${isLightMode ? 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm' : 'text-white/90 bg-white/5 hover:bg-white/10 border-white/10'}`}
-                    >
-                      <Maximize2 size={16} /> Показать парикмахеру (гайд)
-                    </button>
+                    <div className="mt-4 flex flex-col xl:flex-row gap-3">
+                      <button
+                        onClick={() => setTryOnStyle(rec)}
+                        className={`px-6 py-3.5 sm:py-4 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 w-full flex-1 border ${isLightMode ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm' : 'bg-blue-600/80 text-white hover:bg-blue-600 border-blue-500/50'}`}
+                      >
+                        <Sparkles size={16} className="shrink-0" /> Примерить этот стиль
+                      </button>
+                      <button
+                        onClick={() => setTryOnStyle(rec)}
+                        className={`px-6 py-3.5 sm:py-4 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 w-full flex-1 border ${isLightMode ? 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm' : 'text-white/90 bg-white/5 hover:bg-white/10 border-white/10'}`}
+                      >
+                        <Maximize2 size={16} className="shrink-0" /> Показать парикмахеру (гайд)
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="mt-8 flex justify-center">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={() => {
+                   if (results && results.recommendations.length > 0) {
+                     const randomRec = results.recommendations[Math.floor(Math.random() * results.recommendations.length)];
+                     setTryOnStyle(randomRec);
+                   }
+                }}
+                className={`flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 shadow-sm' : 'text-indigo-100 bg-indigo-500/20 hover:bg-indigo-500/30 border-indigo-500/30 shadow-[0_8px_32px_rgba(99,102,241,0.15)]'}`}
+              >
+                <Wand2 size={16} />
+                Случайный стиль
+              </button>
               <button
                 onClick={loadMoreRecommendations}
                 disabled={isLoadingMore}
-                className={`flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base disabled:opacity-50 border ${isLightMode ? 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm' : 'text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]'}`}
+                className={`flex items-center justify-center w-full sm:w-auto gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base disabled:opacity-50 border ${isLightMode ? 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm' : 'text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]'}`}
               >
                 <RefreshCw
                   size={16}
@@ -316,3 +338,5 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     </>
   );
 };
+
+export const AnalysisResults = React.memo(AnalysisResultsComponent);
