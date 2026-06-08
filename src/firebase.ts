@@ -1,15 +1,15 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { initializeFirestore, setLogLevel, doc, getDocFromServer, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getRemoteConfig } from 'firebase/remote-config';
+
+setLogLevel('silent'); // Suppress warnings about network offline in testing environments
 
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
-}, firebaseConfig.firestoreDatabaseId);
+export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const remoteConfig = getRemoteConfig(app);

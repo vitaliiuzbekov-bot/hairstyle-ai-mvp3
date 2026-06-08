@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { CachedImage } from "./components/CachedImage";
 import { BeforeAfterSlider } from "./components/BeforeAfterSlider";
+import { hapticNotification, hapticImpact } from "./utils/haptics";
 import { StylistChat } from "./components/StylistChat";
 import { generateCollage } from "./utils/collage";
 import { auth, db, remoteConfig } from "./firebase";
@@ -38,6 +39,7 @@ import { fetchAndActivate, getString } from "firebase/remote-config";
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
   "Русый": [{name: "Matrix Socolor", shade: "7A"}, {name: "Redken Shades EQ", shade: "07N"}],
+  "Светло-каштановый": [{name: "L'Oreal Professionnel", shade: "Majirel 6.0"}, {name: "Wella Koleston", shade: "6/0"}],
   "Каштановый": [{name: "L'Oreal Professionnel", shade: "Majirel 5.0"}, {name: "Wella Koleston", shade: "5/0"}],
   "Черный": [{name: "Wella Koleston", shade: "2/0"}, {name: "Matrix Socolor", shade: "1A"}],
   "Рыжий": [{name: "Matrix Socolor", shade: "7C"}, {name: "L'Oreal Professionnel", shade: "Majirel 7.4"}],
@@ -64,6 +66,11 @@ declare global {
         showPopup?: (params: any, callback: (buttonId: string) => void) => void;
         showAlert?: (message: string) => void;
         openTelegramLink?: (url: string) => void;
+        HapticFeedback?: {
+          impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+          notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
+          selectionChanged: () => void;
+        };
         switchInlineQuery?: (
           query: string,
           choose_chat_types?: string[],
@@ -244,8 +251,13 @@ export default function App() {
 
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
-  const exportToPDF = async () => {
-    const guideElement = document.getElementById("hairdresser-guide-content");
+  const exportToPDF = async (elementIdOrEvent?: string | React.MouseEvent, filename: string = "neurostylist-guide.pdf") => {
+    let elementId = "hairdresser-guide-content";
+    if (typeof elementIdOrEvent === "string") {
+      elementId = elementIdOrEvent;
+    }
+
+    const guideElement = document.getElementById(elementId);
     if (!guideElement) return;
 
     setIsExportingPDF(true);
@@ -298,13 +310,35 @@ export default function App() {
 
       const opt = {
         margin: 15,
-        filename: "neurostylist-guide.pdf",
+        filename: filename,
         image: { type: "jpeg" as const, quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       };
 
-      await html2pdf().set(opt as any).from(htmlContent).save();
+      const worker = html2pdf().set(opt as any).from(htmlContent);
+      
+      let shared = false;
+      if (typeof navigator !== "undefined" && navigator.share && navigator.canShare) {
+        try {
+          const pdfBlob = await worker.output('blob');
+          const file = new File([pdfBlob], filename, { type: "application/pdf" });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: "Анализ от НейроСтилиста",
+              text: "Мой персональный подбор стрижек и рекомендации",
+              files: [file]
+            });
+            shared = true;
+          }
+        } catch (e) {
+          console.warn("Share failed, falling back to download", e);
+        }
+      }
+
+      if (!shared) {
+        await worker.save();
+      }
     } catch (error) {
       console.error("PDF export failed:", error);
       alert("Ошибка при экспорте в PDF.");
@@ -318,7 +352,13 @@ export default function App() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+
+    const targetInput = e.target;
+
+    if (!file) {
+      if (targetInput) targetInput.value = '';
+      return;
+    }
 
     setError(null);
     setResults(null);
@@ -342,6 +382,8 @@ export default function App() {
     } catch(err: any) {
         setIsUploadingImage(false);
         setError(compressError || err.message || "Ошибка обработки");
+    } finally {
+        if (targetInput) targetInput.value = '';
     }
   };
 
@@ -543,51 +585,125 @@ export default function App() {
         hairDensity: "Средние",
         hairType: "Прямые",
         ageRange: `${Math.round(detections.age - 5)}-${Math.round(detections.age + 5)}`,
-        recommendations: detections.gender === "male" ? [
-          {
-            name: "Андеркат (Undercut)",
-            description: "Короткие виски и затылок, удлиненная челка.",
-            stylingTips: "Используйте помаду для волос или воск для фиксации челки.",
-            imageKeyword: "Classic Undercut Men",
-          },
-          {
-            name: "Кроп (Textured Crop)",
-            description: "Текстурированная короткая стрижка с плавным переходом.",
-            stylingTips: "Матовая глина поможет подчеркнуть текстуру.",
-            imageKeyword: "Textured Crop Fade Men",
-          },
-          {
-            name: "Классическая канадка (Pompadour)",
-            description: "Объемная теменная зона с плавным переходом к вискам.",
-            stylingTips: "Используйте мусс для объема у корней при сушке феном.",
-            imageKeyword: "Classic Pompadour Men",
-          },
-        ] : [
-          {
-            name: "Стрижка Боб (Bob Cut)",
-            description:
-              "Классическая длина, которая идет почти всем типам лица.",
-            stylingTips:
-              "Слегка подкручивайте концы круглой щеткой для объема.",
-            imageKeyword: "Classic Bob Haircut",
-          },
-          {
-            name: "Пикси (Pixie Cut)",
-            description:
-              "Смелая короткая стрижка, прекрасно открывает черты лица.",
-            stylingTips:
-              "Используйте текстурирующую пасту для создания небрежного вида.",
-            imageKeyword: "Textured Pixie Cut",
-          },
-          {
-            name: "Длинные слои (Long Layers)",
-            description:
-              "Универсальный способ добавить объем и движение, сохраняя длину.",
-            stylingTips:
-              "Легкий спрей с морской солью поможет создать пляжные волны.",
-            imageKeyword: "Long Layered Waves",
-          },
-        ],
+        recommendations: detections.gender === "male" ? (
+          preferredStyle === "Деловой" || preferredStyle === "Элегантный" ? [
+            {
+              name: "Классический пробор (Executive Side Part)",
+              description: "Элегантная классика с аккуратным боковым пробором и плавным переходом. Подчеркивает статус и идеален для деловых встреч.",
+              stylingTips: "Нанесите помаду сильной фиксации с умеренным блеском и уложите расческой.",
+              imageKeyword: "Classic Executive Side Part Men",
+            },
+            {
+              name: "Лига Плюща (Ivy League)",
+              description: "Интеллигентный укороченный вариант классической канадки, который выглядит аккуратно без сложных укладок.",
+              stylingTips: "Слегка уложите челку набок с помощью воска или матовой глины.",
+              imageKeyword: "Classic Ivy League Haircut Men",
+            },
+            {
+              name: "Аккуратная Канадка (Low Taper Pompadour)",
+              description: "Объемная теменная зона с аккуратным, благородным и плавным переходом к вискам. Солидно и солидно.",
+              stylingTips: "Используйте мусс для объема и высушите феном по направлению назад-набок.",
+              imageKeyword: "Low Taper Pompadour Men",
+            }
+          ] : preferredStyle === "Спортивный" ? [
+            {
+              name: "Крю-кат (Dynamic Crew Cut)",
+              description: "Максимально практичная, мужественная спортивная стрижка, которая прекрасно держит форму в любых условиях.",
+              stylingTips: "Не требует укладки. Достаточно просушить полотенцем.",
+              imageKeyword: "Sporty Crew Cut Fade Men",
+            },
+            {
+              name: "Спортивный Базз-кат (Sporty Buzz Cut Fade)",
+              description: "Ультракороткая стрижка с плавным градиентом от кожи на висках до короткого верха. Подчеркивает волевые черты лица.",
+              stylingTips: "Не требует стайлинга. Идеально для активного образа жизни.",
+              imageKeyword: "Sporty Buzz Cut Fade Men",
+            },
+            {
+              name: "Атлетический Кроп (Textured Athletic Crop)",
+              description: "Короткая текстурированная спортивная стрижка с уплотненным верхом и короткими висками.",
+              stylingTips: "Нанесите каплю матовой пудры для подчеркивания текстуры волосков.",
+              imageKeyword: "Short Textured Athletic Crop Men",
+            }
+          ] : [
+            {
+              name: "Андеркат (Undercut)",
+              description: "Короткие виски и затылок с удлиненным стильным верхом и челкой.",
+              stylingTips: "Используйте помаду для волос или воск для фиксации челки.",
+              imageKeyword: "Classic Undercut Men",
+            },
+            {
+              name: "Кроп (Textured Crop)",
+              description: "Текстурированная современная короткая стрижка с плавным переходом.",
+              stylingTips: "Матовая глина поможет подчеркнуть современную текстуру.",
+              imageKeyword: "Textured Crop Fade Men",
+            },
+            {
+              name: "Современный Квифф (Modern Quiff)",
+              description: "Динамичная стрижка с объемом у лба, создающая стильный и свободный городской образ.",
+              stylingTips: "Уложите челку наверх и назад с помощью текстурирующей глины или пудры.",
+              imageKeyword: "Textured Modern Quiff Men",
+            }
+          ]
+        ) : (
+          preferredStyle === "Деловой" || preferredStyle === "Элегантный" ? [
+            {
+              name: "Гладкий Боб (Sleek Classic Bob)",
+              description: "Идеально ровная классическая стрижка средней длины, излучающая благородство и женственность.",
+              stylingTips: "Используйте термозащитный спрей и разгладьте утюжком для зеркального блеска.",
+              imageKeyword: "Sleek Classic Bob Haircut",
+            },
+            {
+              name: "Элегантный Пикси-Боб (Elegant Pixie-Bob)",
+              description: "Интеллигентный гибрид пикси и боба с красивым прикорневым объемом.",
+              stylingTips: "Высушите феном с круглой щеткой, направляя пряди назад-набок.",
+              imageKeyword: "Elegant Pixie Bob Haircut",
+            },
+            {
+              name: "Длинные Каскадные Слои (Classic Long Layers)",
+              description: "Роскошный классический способ придать объем длинным волосам, сохраняя общую форму.",
+              stylingTips: "Уложите феном на большую круглую щетку (брашинг) для эффекта салонной укладки.",
+              imageKeyword: "Classic Long Layered Waves",
+            }
+          ] : preferredStyle === "Спортивный" ? [
+            {
+              name: "Короткий Пикси (Active Pixie Cut)",
+              description: "Динамичная, легкая и максимально практичная стрижка, идеально открывающая шею и линию подбородка.",
+              stylingTips: "Разотрите немного матовой пасты в ладонях и взёрошьте кончики волос.",
+              imageKeyword: "Short Textured Pixie Cut Active",
+            },
+            {
+              name: "Рваное Каре (Textured Bob Cut)",
+              description: "Свободная, легкая в уходе стрижка средней длины с градуированными концами.",
+              stylingTips: "Быстро высушите феном по направлению вниз, взбивая пальцами для естественности.",
+              imageKeyword: "Messy Styled Bob Cut",
+            },
+            {
+              name: "Удобный Боб (Blunt Cut Bob)",
+              description: "Ровный и плотный срез, который всегда аккуратно лежит даже во время активных тренировок.",
+              stylingTips: "Слегка сбрызните легким увлажняющим спреем против пушения.",
+              imageKeyword: "Blunt Cut Short Bob Haircut",
+            }
+          ] : [
+            {
+              name: "Стрижка Боб (Bob Cut)",
+              description: "Классическая длина, которая великолепно идет почти всем типам лица.",
+              stylingTips: "Слегка подкручивайте концы круглой щеткой для дополнительного объема.",
+              imageKeyword: "Classic Bob Haircut",
+            },
+            {
+              name: "Пикси (Pixie Cut)",
+              description: "Смелая стильная короткая стрижка, прекрасно подчеркивающая изящные черты лица.",
+              stylingTips: "Используйте текстурирующую пасту для создания непринужденного вида.",
+              imageKeyword: "Textured Pixie Cut",
+            },
+            {
+              name: "Длинные слои (Long Layers)",
+              description: "Универсальный способ добавить объем и движение, сохраняя при этом всю роскошную длину.",
+              stylingTips: "Легкий спрей с морской солью поможет создать непринужденные пляжные волны.",
+              imageKeyword: "Long Layered Waves",
+            }
+          ]
+        ),
       } as AnalysisResult;
     } catch (e) {
       console.error("Local face-api fallback failed", e);
@@ -683,6 +799,7 @@ export default function App() {
 
       const parsedResults = (await response.json()) as AnalysisResult;
       setResults(parsedResults);
+      hapticNotification('success');
       
       // Auto-generate teaser if applicable
       if (parsedResults.recommendations && parsedResults.recommendations.length > 0) {
@@ -692,6 +809,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("AI Analysis Error:", err);
+      hapticNotification('error');
       setError(
         "⚠️ Не удалось проанализировать фото\n\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\n\nПожалуйста, попробуй ещё раз:\n• Сделай фото при дневном свете, лицом к окну\n• Смотри прямо в камеру, не наклоняй голову\n• Убери волосы от лица и сними очки\n\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно."
       );
@@ -749,8 +867,10 @@ export default function App() {
       if (!data.consultationHtml) {
         throw new Error("Не удалось загрузить данные из ответа сервера.");
       }
+      hapticNotification('success');
     } catch (err: any) {
       console.error("AR Generation Error:", err);
+      hapticNotification('error');
       // We still map what we can locally if network fails entirely
       setStyleConsultations((prev) => ({
         ...prev,
@@ -843,6 +963,7 @@ export default function App() {
 
       if (data.imageUrl) {
         setVtonResultUrl(data.imageUrl);
+        hapticNotification('success');
         
         const newItem = {
           url: data.imageUrl,
@@ -868,6 +989,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("VTON Error:", err);
+      hapticNotification('error');
       setVtonError(
         err?.message ||
           "Ошибка виртуальной примерки. Попробуйте снова чуть позже.",
@@ -934,7 +1056,7 @@ export default function App() {
     }
   };
 
-  if (false && !isTelegramEnv) {
+  if (!isTelegramEnv) {
     return (
       <div className="min-h-screen bg-[#050508] text-white/90 flex flex-col items-center justify-center p-6 text-center font-sans tracking-wide">
         <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mb-6 text-blue-400">
@@ -1043,6 +1165,8 @@ export default function App() {
             loadMoreRecommendations={loadMoreRecommendations}
             isLoadingMore={isLoadingMore}
             isLightMode={isLightMode}
+            exportToPDF={exportToPDF}
+            isExportingPDF={isExportingPDF}
           />
         </div>
       </main>

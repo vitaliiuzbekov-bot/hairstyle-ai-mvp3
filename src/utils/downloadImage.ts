@@ -36,7 +36,7 @@ export const downloadImage = async (url: string, filename: string) => {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.error("Download failed:", error);
+    console.warn("Direct download failed, attempting fallback...", error);
     // Fallback
     const link = document.createElement("a");
     link.href = url;

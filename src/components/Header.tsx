@@ -133,6 +133,25 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="p-2">
                     <button
                       onClick={() => {
+                        const botLink = "https://t.me/neirostilist_bot/app?startapp=ref_" + userId;
+                        const text = "Подбери себе идеальную стрижку с помощью ИИ!";
+                        const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent(botLink) + "&text=" + encodeURIComponent(text);
+                        if (window.Telegram?.WebApp?.openTelegramLink) {
+                          window.Telegram.WebApp.openTelegramLink(shareUrl);
+                        } else {
+                          window.open(shareUrl, "_blank");
+                        }
+                        setIsProfileOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-colors mb-1 ${isLightMode ? 'hover:bg-gray-100 text-gray-700 hover:text-gray-900' : 'hover:bg-white/5 text-white/80 hover:text-white'}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="flex items-center justify-center w-4 h-4 text-emerald-500">🎁</span>
+                        Пригласить друга (+1 ген.)
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => {
                         setIsFaqOpen(true);
                         setIsProfileOpen(false);
                       }}

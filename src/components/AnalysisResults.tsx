@@ -1,13 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Skeleton } from "./Skeleton";
-import { AlertCircle, Lock, RefreshCw, Sparkles, Maximize2 } from "lucide-react";
+import { AlertCircle, Lock, RefreshCw, Sparkles, Maximize2, Share2 } from "lucide-react";
 import { LazyImage } from "./LazyImage";
 import { AnalysisResult } from "../types";
 
 import { RotatingFactsLoader } from "./RotatingFactsLoader";
 
 interface AnalysisResultsProps {
-
   isAnalyzing: boolean;
   results: AnalysisResult | null;
   generationsLeft: number | null;
@@ -18,6 +17,8 @@ interface AnalysisResultsProps {
   loadMoreRecommendations: () => void;
   isLoadingMore: boolean;
   isLightMode: boolean;
+  exportToPDF?: (elementId: string, filename: string) => void;
+  isExportingPDF?: boolean;
 }
 
 export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
@@ -31,7 +32,19 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   loadMoreRecommendations,
   isLoadingMore,
   isLightMode,
+  exportToPDF,
+  isExportingPDF,
 }) => {
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (results && resultsRef.current) {
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [results]);
+
   return (
     <>
       {isAnalyzing && !results && (
@@ -41,7 +54,27 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       )}
 
       {results && (
-        <div className="col-span-1 lg:col-span-7 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both">
+        <div ref={resultsRef} className="col-span-1 lg:col-span-7 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both" id="analysis-results-content">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+            <h3 className={`font-serif text-2xl sm:text-3xl ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+              Результаты анализа
+            </h3>
+            {exportToPDF && (
+              <button
+                onClick={() => exportToPDF("analysis-results-content", "neurostylist-analysis.pdf")}
+                disabled={isExportingPDF}
+                className={`flex items-center justify-center gap-2 text-sm font-semibold border px-4 py-2.5 rounded-full transition-all active:scale-[0.98] w-full sm:w-auto shadow-sm ${
+                  isLightMode
+                    ? 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
+                    : 'bg-white/10 hover:bg-white/20 border-white/10 text-white/90'
+                }`}
+                title="Сгенерировать PDF / Поделиться результатом"
+              >
+                <Share2 size={16} />
+                {isExportingPDF ? "Подготовка PDF..." : "Поделиться (PDF)"}
+              </button>
+            )}
+          </div>
           {results.warning && (
             <div className={`px-5 py-4 rounded-2xl flex items-start gap-4 border ${isLightMode ? 'bg-red-50 border-red-200 text-red-700' : 'bg-red-500/10 border-red-500/20 text-red-200'}`}>
               <AlertCircle className="shrink-0 mt-0.5" size={20} />
@@ -50,73 +83,49 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           )}
 
           {/* Vitals */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-            <div className={`rounded-2xl p-5 md:p-6 shadow-sm relative overflow-hidden group transition-colors border ${isLightMode ? 'bg-white border-gray-200 hover:border-gray-300' : 'glass-panel border-white/10 hover:border-white/20'}`}>
-              <div className={`absolute top-0 right-0 p-4 transition-opacity ${isLightMode ? 'text-gray-300 opacity-50 group-hover:opacity-100' : 'opacity-[0.03] group-hover:opacity-[0.06]'}`}>
-                <svg
-                  width="40"
-                  height="40"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:gap-6 relative">
+            {/* Background ambient glow */}
+            <div className={`absolute -inset-4 bg-gradient-to-r blur-3xl opacity-20 -z-10 ${isLightMode ? 'from-blue-100 to-amber-100' : 'from-blue-900/40 to-amber-900/40'}`}></div>
+            
+            <div className={`rounded-2xl p-5 md:p-6 shadow-sm relative overflow-hidden group transition-all hover:-translate-y-1 border ${isLightMode ? 'bg-white/90 border-blue-100 hover:border-blue-300 hover:shadow-md' : 'bg-black/40 backdrop-blur-md border-white/10 hover:border-white/20'}`}>
+              <div className={`absolute top-0 right-0 p-4 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-6 ${isLightMode ? 'text-blue-500/20' : 'text-white/5'}`}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
                 </svg>
               </div>
-              <p className={`text-[10px] md:text-xs uppercase tracking-[0.15em] mb-3 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
+              <p className={`text-[10px] md:text-xs uppercase tracking-[0.15em] mb-3 relative z-10 ${isLightMode ? 'text-gray-500 font-semibold' : 'text-white/60'}`}>
                 Форма лица
               </p>
-              <p className={`font-serif text-xl sm:text-2xl font-medium tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+              <p className={`font-serif text-xl sm:text-2xl font-medium tracking-tight relative z-10 ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
                 {results.faceShape}
               </p>
             </div>
 
-            <div className={`rounded-2xl p-5 md:p-6 shadow-sm relative overflow-hidden group transition-colors delay-100 border ${isLightMode ? 'bg-white border-gray-200 hover:border-gray-300' : 'glass-panel border-white/10 hover:border-white/20'}`}>
-              <div className={`absolute top-0 right-0 p-4 transition-opacity ${isLightMode ? 'text-gray-300 opacity-50 group-hover:opacity-100' : 'opacity-[0.03] group-hover:opacity-[0.06]'}`}>
-                <svg
-                  width="40"
-                  height="40"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+            <div className={`rounded-2xl p-5 md:p-6 shadow-sm relative overflow-hidden group transition-all delay-75 hover:-translate-y-1 border ${isLightMode ? 'bg-white/90 border-blue-100 hover:border-blue-300 hover:shadow-md' : 'bg-black/40 backdrop-blur-md border-white/10 hover:border-white/20'}`}>
+              <div className={`absolute top-0 right-0 p-4 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6 ${isLightMode ? 'text-amber-500/20' : 'text-white/5'}`}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                   <path d="M14 3v5h5M16 13H8M16 17H8M10 9H8" />
                 </svg>
               </div>
-              <p className={`text-[10px] md:text-xs uppercase tracking-[0.15em] mb-3 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
+              <p className={`text-[10px] md:text-xs uppercase tracking-[0.15em] mb-3 relative z-10 ${isLightMode ? 'text-gray-500 font-semibold' : 'text-white/60'}`}>
                 Густота
               </p>
-              <p className={`font-serif text-xl sm:text-2xl font-medium tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+              <p className={`font-serif text-xl sm:text-2xl font-medium tracking-tight relative z-10 ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
                 {results.hairDensity}
               </p>
             </div>
 
-            <div className={`rounded-2xl p-5 md:p-6 shadow-sm relative overflow-hidden group transition-colors delay-200 border ${isLightMode ? 'bg-white border-gray-200 hover:border-gray-300' : 'glass-panel border-white/10 hover:border-white/20'}`}>
-              <div className={`absolute top-0 right-0 p-4 transition-opacity ${isLightMode ? 'text-gray-300 opacity-50 group-hover:opacity-100' : 'opacity-[0.03] group-hover:opacity-[0.06]'}`}>
-                <svg
-                  width="40"
-                  height="40"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+            <div className={`rounded-2xl p-5 md:p-6 shadow-sm relative overflow-hidden group transition-all delay-150 hover:-translate-y-1 border ${isLightMode ? 'bg-white/90 border-blue-100 hover:border-blue-300 hover:shadow-md' : 'bg-black/40 backdrop-blur-md border-white/10 hover:border-white/20'}`}>
+              <div className={`absolute top-0 right-0 p-4 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3 ${isLightMode ? 'text-emerald-500/20' : 'text-white/5'}`}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
               </div>
-              <p className={`text-[10px] md:text-xs uppercase tracking-[0.15em] mb-3 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
+              <p className={`text-[10px] md:text-xs uppercase tracking-[0.15em] mb-3 relative z-10 ${isLightMode ? 'text-gray-500 font-semibold' : 'text-white/60'}`}>
                 Текстура
               </p>
-              <p className={`font-serif text-xl sm:text-2xl font-medium tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+              <p className={`font-serif text-xl sm:text-2xl font-medium tracking-tight relative z-10 ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
                 {results.hairType}
               </p>
             </div>
@@ -193,8 +202,15 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                 >
                   <div className={`w-full sm:w-[300px] shrink-0 relative overflow-hidden border-b sm:border-b-0 sm:border-r ${isLightMode ? 'bg-gray-50 border-gray-200' : 'bg-transparent text-white/90 border-white/10'}`}>
                     <div className="w-full aspect-[4/5] relative">
+                      {idx === 0 && (generationsLeft === null || generationsLeft <= 0 || teaserUrl || isGeneratingTeaser) && (
+                        <div className="absolute top-3 right-3 z-30">
+                          <span className="bg-amber-600 border border-amber-500/30 shadow-[0_0_15px_rgba(217,119,6,0.5)] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 px-2.5 rounded-full flex items-center gap-1.5 animate-pulse">
+                            <Sparkles size={12} className="text-amber-200" /> ИИ-Примерка
+                          </span>
+                        </div>
+                      )}
                       {idx === 0 && (generationsLeft === null || generationsLeft <= 0 || teaserUrl) ? (
-                        <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden bg-black/80">
+                        <div className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden bg-[#0A0510]">
                           {teaserUrl ? (
                             <img 
                               src={teaserUrl} 
@@ -202,25 +218,31 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
                               alt="Превью" 
                             />
                           ) : isGeneratingTeaser ? (
-                            <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 bg-[#0a0812]">
-                              <RefreshCw size={24} className="text-amber-500 animate-spin mb-3" />
-                              <span className="text-[10px] text-amber-500 uppercase tracking-widest text-center mt-2 leading-tight">Примеряем образ<br/>на ваше фото...</span>
+                            <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-[#0a0812] to-[#1a1224] relative overflow-hidden">
+                              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
+                              <RefreshCw size={28} className="text-amber-500 animate-spin mb-4 relative z-10" />
+                              <span className="text-[11px] font-medium text-amber-500 uppercase tracking-widest text-center mt-2 leading-relaxed relative z-10">Идет примерка<br/>этого стиля на Ваше фото...</span>
                             </div>
                           ) : (
                             <div className="absolute inset-0 w-full h-full bg-[#0a0812]"></div>
                           )}
                           
                           {(!generationsLeft || generationsLeft <= 0) && (
-                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 text-center">
-                              <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mb-3 border border-amber-500/30">
-                                <Lock size={20} className="text-amber-500" />
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-5 text-center">
+                              <div className="w-14 h-14 bg-gradient-to-br from-amber-500/30 to-amber-600/10 rounded-full flex items-center justify-center mb-4 border border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                                <Lock size={22} className="text-amber-400" />
                               </div>
-                              <span className="text-white/90 font-medium text-sm mb-3 leading-snug drop-shadow-md text-balance px-2">Это вы с {rec.ru || rec.name}.</span>
+                              <h5 className="text-white font-serif font-medium text-lg leading-snug drop-shadow-md text-balance px-2 mb-2">
+                                Примерка формы {rec.ru || rec.name}
+                              </h5>
+                              <p className="text-white/70 text-sm mb-5 leading-relaxed">
+                                Разблокируйте этот и ещё 2 стиля, чтобы увидеть, как они смотрятся на вас.
+                              </p>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setShowBuyModal(true); }}
-                                className="bg-gradient-to-r from-amber-500 to-orange-400 text-white text-xs font-bold uppercase tracking-wider py-2.5 px-5 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:scale-105 active:scale-95 transition-all w-[90%] break-words"
+                                className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs sm:text-sm font-bold uppercase tracking-wider py-3 px-5 sm:px-6 rounded-full shadow-[0_4px_20px_rgba(245,158,11,0.4)] hover:scale-105 active:scale-95 transition-all w-[95%] border border-amber-400/50"
                               >
-                                Убрать блюр и примерить ещё 2 варианта — 199 ⭐
+                                Убрать блюр (199 ⭐)
                               </button>
                             </div>
                           )}

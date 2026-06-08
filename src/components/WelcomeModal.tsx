@@ -32,10 +32,13 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
             <Scissors size={28} className={isLightMode ? 'text-gray-700' : 'text-white/80'} />
           </div>
           <h2 className={`text-2xl font-bold tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white'}`}>Добро пожаловать в НейроСтилист</h2>
-          <p className={`text-sm mt-2 ${isLightMode ? 'text-gray-500' : 'text-white/50'}`}>Кто вы?</p>
+          <p className={`text-sm mt-3 leading-relaxed max-w-sm mx-auto ${isLightMode ? 'text-gray-600' : 'text-white/60'}`}>
+            Уникальная ИИ-платформа для подбора идеальной прически. Мы анализируем вашу форму лица, 
+            густоту волос и структуру, чтобы создать безупречный реалистичный образ до похода в салон.
+          </p>
         </div>
         
-        <div className={`p-6 space-y-3 ${isLightMode ? 'bg-white' : ''}`}>
+        <div className={`p-6 space-y-4 ${isLightMode ? 'bg-white' : ''}`}>
           {showSalonNameInput ? (
             <div className="flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
               <h3 className={`text-lg font-medium text-center ${isLightMode ? 'text-gray-800' : 'text-white/90'}`}>Укажите название вашего салона</h3>
@@ -65,6 +68,9 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
             </div>
           ) : (
             <>
+              <h3 className={`text-sm font-semibold mb-2 text-center uppercase tracking-wider ${isLightMode ? 'text-gray-500' : 'text-white/40'}`}>
+                Кто вы?
+              </h3>
               <button 
                 onClick={() => {
                   setUserRole('client');

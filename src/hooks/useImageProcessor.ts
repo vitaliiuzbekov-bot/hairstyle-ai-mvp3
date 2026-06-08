@@ -13,34 +13,8 @@ export const useImageProcessor = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
-        
-        try {
-          const worker = new ImageWorker();
-          worker.onmessage = (msg) => {
-            setIsProcessing(false);
-            if (msg.data.error) {
-              setError(msg.data.error);
-              reject(new Error(msg.data.error));
-            } else {
-              resolve(msg.data.base64);
-            }
-            worker.terminate();
-          };
-          worker.onerror = (err) => {
-            setIsProcessing(false);
-            setError("Ошибка веб-воркера");
-            reject(err);
-            worker.terminate();
-          };
 
-          worker.postMessage({
-            dataUrl,
-            maxDim: 800,
-            quality: 0.82,
-            mimeType: "image/jpeg"
-          });
-        } catch (err) {
-          // Fallback if worker fails to initialize
+        const doFallback = () => {
           const img = new Image();
           img.onload = () => {
              const MAX_DIM = 800;
@@ -74,9 +48,41 @@ export const useImageProcessor = () => {
           };
           img.onerror = () => {
             setIsProcessing(false);
-            reject(new Error("Ошибка обработки изображения"));
+            const errStr = "Ошибка обработки изображения";
+            setError(errStr);
+            reject(new Error(errStr));
           };
           img.src = dataUrl;
+        };
+        
+        try {
+          const worker = new ImageWorker();
+          worker.onmessage = (msg) => {
+            if (msg.data.error) {
+              console.warn("Worker error, running fallback. Reason:", msg.data.error);
+              doFallback();
+            } else {
+              setIsProcessing(false);
+              resolve(msg.data.base64);
+            }
+            worker.terminate();
+          };
+          worker.onerror = (err) => {
+            console.warn("Worker onerror, running fallback. Error:", err);
+            worker.terminate();
+            doFallback();
+          };
+
+          worker.postMessage({
+            dataUrl,
+            maxDim: 800,
+            quality: 0.82,
+            mimeType: "image/jpeg"
+          });
+        } catch (err) {
+          // Fallback if worker fails to initialize
+          console.warn("Worker Init failed, running fallback. Error:", err);
+          doFallback();
         }
       };
       reader.onerror = () => {

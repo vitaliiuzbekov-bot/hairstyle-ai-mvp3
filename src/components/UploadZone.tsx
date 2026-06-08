@@ -196,39 +196,49 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                     type="file"
                     accept="image/*"
                     ref={fileInputRef}
-                    className="absolute w-px h-px opacity-0 overflow-hidden pointer-events-none -z-10"
+                    className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
                     onChange={handleFileUpload}
+                    tabIndex={-1}
                   />
                   <input
                     type="file"
                     accept="image/*"
                     ref={cameraInputRef}
                     capture="user"
-                    className="absolute w-px h-px opacity-0 overflow-hidden pointer-events-none -z-10"
+                    className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
                     onChange={handleFileUpload}
+                    tabIndex={-1}
                   />
                 </div>
                 <div
-                  className="mt-5 flex items-start gap-3 px-2 w-full max-w-[340px] cursor-pointer"
+                  className={`mt-6 p-3 rounded-xl border flex items-start gap-3 w-full max-w-[340px] cursor-pointer transition-all ${
+                    consentError 
+                      ? (isLightMode ? "bg-red-50 border-red-300" : "bg-red-500/10 border-red-500/30")
+                      : (isLightMode ? "bg-gray-50/50 border-gray-200 hover:bg-gray-100" : "bg-white/5 border-white/10 hover:bg-white/10")
+                  }`}
                   onClick={() => {
                     setConsentGiven(!consentGiven);
                     if (!consentGiven) setConsentError(false);
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    id="consent152"
-                    checked={consentGiven}
-                    readOnly
-                    className={`mt-0.5 w-[18px] h-[18px] rounded border bg-transparent cursor-pointer flex-shrink-0 pointer-events-none accent-[#2AABEE] ${isLightMode ? 'border-gray-300' : 'border-white/20 text-white/90'}`}
-                  />
+                  <div className={`mt-0.5 w-[18px] h-[18px] rounded border flex items-center justify-center transition-colors shrink-0 ${
+                    consentGiven 
+                      ? 'bg-blue-500 border-blue-500' 
+                      : (consentError 
+                          ? 'border-red-400 bg-red-50/50' 
+                          : isLightMode ? 'border-gray-300 bg-white' : 'border-white/30 bg-transparent')
+                  }`}>
+                    {consentGiven && <svg viewBox="0 0 14 14" fill="none" className="w-3.5 h-3.5 text-white"><path d="M3 7.5L5.5 10L11 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </div>
                   <label
-                    htmlFor="consent152"
-                    className={`text-[11px] sm:text-xs leading-relaxed cursor-pointer select-none transition-colors pointer-events-none ${isLightMode ? 'text-gray-500 hover:text-gray-700' : 'text-white/40 hover:text-white/60'}`}
+                    className={`text-[11px] sm:text-xs leading-relaxed cursor-pointer select-none pointer-events-none transition-colors ${
+                      consentError 
+                        ? (isLightMode ? "text-red-700 font-medium" : "text-red-400 font-medium")
+                        : (isLightMode ? 'text-gray-600' : 'text-white/60')
+                    }`}
                   >
                     Я даю согласие на обработку моих персональных
-                    (биометрических) данных в соответствии с ФЗ-152 для
-                    обработки селфи нейросетью. Фото не хранится на
+                    (биометрических) данных в соответствии с ФЗ-152. Фото не хранится на
                     сервере.
                   </label>
                 </div>
@@ -325,8 +335,8 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                   !isAnalyzing &&
                   !isUploadingImage && (
                     <div className="mb-4">
-                      <label className={`block text-xs font-medium uppercase tracking-widest mb-3 opacity-80 text-center sm:text-left ${isLightMode ? 'text-gray-600' : 'text-white/80'}`}>
-                        Выберите стиль:
+                      <label className={`block text-[11px] font-semibold uppercase tracking-widest mb-3 text-center sm:text-left ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
+                        Выберите стиль или настроение:
                       </label>
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 max-h-[140px] overflow-y-auto hide-scrollbar sm:max-h-none sm:overflow-visible pr-1 sm:pr-0">
                         {[
@@ -342,10 +352,10 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                           <button
                             key={styleOpt}
                             onClick={() => setPreferredStyle(styleOpt)}
-                            className={`px-3 py-1.5 rounded-full text-xs transition-all border ${
+                            className={`px-4 py-2.5 rounded-2xl text-[13px] transition-all font-medium border ${
                               preferredStyle === styleOpt
-                                ? (isLightMode ? "bg-blue-600 border-blue-600 text-white shadow-md" : "bg-white/20 border-white/40 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]")
-                                : (isLightMode ? "bg-white hover:bg-gray-50 text-gray-600 border-gray-200" : "glass-button hover:bg-white/10 text-white/70 border-white/10")
+                                ? (isLightMode ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20" : "bg-white text-gray-900 border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]")
+                                : (isLightMode ? "bg-white hover:bg-gray-50 text-gray-700 border-gray-200" : "glass-button hover:bg-white/10 text-white/80 border-white/10")
                             }`}
                           >
                             {styleOpt}
@@ -359,18 +369,23 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                 {!results && !error && (
                   <button
                     onClick={analyzeImage}
-                    disabled={isAnalyzing || isUploadingImage}
-                    className={`w-full font-medium py-4 sm:py-4 px-6 flex items-center justify-center gap-3 transition-all duration-500 uppercase tracking-widest text-[11px] sm:text-xs rounded-full ${
-                      isAnalyzing || isUploadingImage
-                        ? (isLightMode ? "bg-gray-100 text-gray-400 border border-transparent cursor-not-allowed" : "bg-white/10 text-white/40 border-transparent cursor-not-allowed")
-                        : (isLightMode ? "bg-blue-600 text-white hover:bg-blue-700 shadow-lg border border-transparent active:scale-[0.98]" : "glass-button text-white/90 hover:bg-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)] border border-white/20 active:scale-[0.98]")
+                    disabled={isAnalyzing || isUploadingImage || !imageBase64}
+                    className={`relative w-full font-bold py-4 sm:py-5 px-6 flex items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group ${
+                      isAnalyzing || isUploadingImage || !imageBase64
+                        ? (isLightMode ? "bg-gray-100 text-gray-400 border border-transparent cursor-not-allowed" : "bg-white/5 text-white/40 border-transparent cursor-not-allowed")
+                        : (isLightMode ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl hover:shadow-blue-500/30 border border-transparent active:scale-[0.98]" : "bg-white text-black hover:bg-gray-100 shadow-[0_0_40px_rgba(255,255,255,0.3)] active:scale-[0.98]")
                     } focus:ring-4 focus:ring-blue-500/50`}
                   >
-                    {isUploadingImage
-                      ? "Обработка фото..."
-                      : isAnalyzing
-                        ? "Нейросеть в работе..."
-                        : "✨ Найти лучшую стрижку"}
+                    {!isAnalyzing && !isUploadingImage && imageBase64 && (
+                       <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
+                    )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      {isUploadingImage
+                        ? "Обработка фото..."
+                        : isAnalyzing
+                          ? "Нейросеть в работе..."
+                          : "Запустить ИИ-Анализ 🚀"}
+                    </span>
                   </button>
                 )}
               </div>

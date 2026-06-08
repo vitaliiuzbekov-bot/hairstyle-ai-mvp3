@@ -720,7 +720,7 @@ generateRouter.post("/generate-full", async (req, res) => {
 
       // Check cache first (Cache for 30 days)
       const cacheKey = getCacheKey({ 
-        route: "generate-full-v2", 
+        route: "generate-full-v4-perfect-color", 
         userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl,
         // using string truncation or full string to hash the selfie.
         // String hashing is deterministic.
@@ -744,19 +744,36 @@ generateRouter.post("/generate-full", async (req, res) => {
       const selfieImageFull = selfieImage.startsWith('http') || selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
 
       const translateColor = (val: string) => {
-        val = val.toLowerCase();
-        if (val.includes("тёмно-каштан") || val.includes("темно-каштан")) return "rich deep dark chestnut brown";
-        if (val.includes("блонд") || val.includes("светл")) return "BRIGHT PLATINUM BLONDE";
-        if (val.includes("рус")) return "natural medium ash brown";
-        if (val.includes("каштан") || val.includes("шатен")) return "solid warm chestnut brown";
-        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн")) return "pure deep jet black";
-        if (val.includes("рыж") || val.includes("медн")) return "vivid intense copper red / ginger";
-        if (val.includes("сед") || val.includes("пепел") || val.includes("бел") || val.includes("сер")) return "PURE STATUESQUE WHITE AND BRIGHT SILVER GREY";
-        if (val.includes("розов")) return "vibrant pastel pink";
-        if (val.includes("син") || val.includes("голуб")) return "vivid blue";
-        if (val.includes("зелен") || val.includes("зелён")) return "vivid green";
-        if (val.includes("фиолет")) return "vivid purple";
-        if (val.includes("красн")) return "vivid red";
+        val = val.toLowerCase().trim();
+        if (val.includes("светло-каштанов") || val.includes("светло каштанов") || val.includes("light chestnut") || val.includes("light brown chestnut")) {
+          return "solid uniform light chestnut brown";
+        }
+        if (val.includes("тёмно-каштан") || val.includes("темно-каштан") || val.includes("dark chestnut") || val.includes("dark brown")) {
+          return "rich deep dark chestnut brown";
+        }
+        if (val.includes("блонд") || val.includes("светл") || val.includes("blonde") || val.includes("light hair") || val.includes("platinum")) {
+          return "solid uniform bright platinum blonde";
+        }
+        if (val.includes("рус") || val.includes("light brown") || val.includes("medium brown") || val.includes("ash brown") || val.includes("ash blonde")) {
+          return "solid uniform medium ash blonde and light brown";
+        }
+        if (val.includes("каштан") || val.includes("шатен") || val.includes("brown") || val.includes("chestnut")) {
+          return "solid uniform rich chestnut brown";
+        }
+        if (val.includes("черн") || val.includes("тёмн") || val.includes("темн") || val.includes("black") || val.includes("dark hair") || val.includes("pure black")) {
+          return "solid uniform pure jet black";
+        }
+        if (val.includes("рыж") || val.includes("медн") || val.includes("ginger") || val.includes("red hair") || val.includes("copper")) {
+          return "solid uniform intense copper ginger-red";
+        }
+        if (val.includes("сед") || val.includes("пепел") || val.includes("бел") || val.includes("сер") || val.includes("grey") || val.includes("gray") || val.includes("white") || val.includes("silver")) {
+          return "solid uniform pure silver white and grey";
+        }
+        if (val.includes("розов") || val.includes("pink")) return "vibrant pastel pink";
+        if (val.includes("син") || val.includes("голуб") || val.includes("blue")) return "vivid blue";
+        if (val.includes("зелен") || val.includes("зелён") || val.includes("green")) return "vivid green";
+        if (val.includes("фиолет") || val.includes("purple")) return "vivid purple";
+        if (val.includes("красн") || val.includes("red")) return "vivid red";
         return val;
       };
 
@@ -775,28 +792,44 @@ generateRouter.post("/generate-full", async (req, res) => {
       
       if (!isStudioShot) {
           baseImageForFlux = selfieImageFull;
-          if (requestedStrength === 0) {
-              fluxStrength = 0.22; // Very safe strength to keep face completely intact and only change hair color
+          if (isCustomColorRequested) {
+              // Set stronger fluxStrength (0.65 to 0.85) to completely change hair color from dark to light or vice versa.
+              if (requestedStrength === 0) {
+                  fluxStrength = 0.65; // High enough to change color completely but keeps original shape as template
+              } else {
+                  // Scale from 0.65 up to 0.85 to transition into hairstyle shape modifications with complete color wash
+                  fluxStrength = 0.65 + (requestedStrength / 74) * 0.20; 
+              }
           } else {
-              // Linear scale from 0.28 up to 0.58, preventing high-strength face corruption
-              fluxStrength = 0.28 + (requestedStrength / 74) * 0.30; 
+              // Standard style change with natural hair color
+              if (requestedStrength === 0) {
+                  fluxStrength = 0.15; // Kept very low because no change is requested
+              } else {
+                  // Hairstyle shape change only, from 0.32 to 0.46 - preserves face structure perfectly!
+                  fluxStrength = 0.32 + (requestedStrength / 74) * 0.14; 
+              }
           }
       } else {
+          // Studio Shot (using reference image)
           if (targetImageUrl) {
               baseImageForFlux = targetImageUrl.startsWith('http') || targetImageUrl.startsWith('data:') 
                   ? targetImageUrl 
                   : `data:image/jpeg;base64,${targetImageUrl}`;
               
               if (isCustomColorRequested) {
-                  fluxStrength = 0.80 + ((requestedStrength - 75) / 25) * 0.15; // 0.80 to 0.95
+                  // Keep reference style but completely recolor hair, use 0.85 to 0.92 to wash out white/gray/other starting colors
+                  fluxStrength = 0.85 + ((requestedStrength - 75) / 25) * 0.07; 
               } else {
-                  fluxStrength = requestedStrength === 75 ? 0.05 : 0.40 + ((requestedStrength - 75) / 25) * 0.40; // 0.40 to 0.80
+                  // Just apply reference style, strength from 0.35 to 0.55
+                  fluxStrength = requestedStrength === 75 ? 0.05 : 0.35 + ((requestedStrength - 75) / 25) * 0.20; 
               }
           } else {
               baseImageForFlux = selfieImageFull;
-              fluxStrength = isCustomColorRequested 
-                  ? 0.80 + ((requestedStrength - 75) / 25) * 0.15
-                  : 0.50 + ((requestedStrength - 75) / 25) * 0.30; // 0.50 to 0.80
+              if (isCustomColorRequested) {
+                  fluxStrength = 0.68 + ((requestedStrength - 75) / 25) * 0.12;
+              } else {
+                  fluxStrength = 0.42 + ((requestedStrength - 75) / 25) * 0.15;
+              }
           }
       }
 
@@ -830,6 +863,21 @@ generateRouter.post("/generate-full", async (req, res) => {
         }
       }
 
+      const isGreyColorRequested = finalColor && (finalColor.includes("grey") || finalColor.includes("gray") || finalColor.includes("white") || finalColor.includes("silver"));
+      
+      const removeGrayAndAgingBias = (text: string) => {
+        if (!finalColor || isGreyColorRequested) return text;
+        return text
+          .replace(/\b(grey|gray|silver|white|platinum|ash|blonde-grey|grey-blonde|natural-grey|salt-and-pepper|salt\s+and\s+pepper)\b/gi, "")
+          .replace(/\b(mature|elderly|senior|old|aged|aging|aged-looking)\b/gi, "middle-aged")
+          .replace(/\s+/g, " ")
+          .trim();
+      };
+
+      if (englishDescription) {
+        englishDescription = removeGrayAndAgingBias(englishDescription);
+      }
+
       const descriptorEng = getDemographicDescriptor(gender, ageRange);
 
       // Extract english keyword from something like "Пляжные волны (Beach Waves)"
@@ -838,12 +886,16 @@ generateRouter.post("/generate-full", async (req, res) => {
       if (bracketMatch && bracketMatch[1]) {
          englishKeyword = bracketMatch[1];
       }
+      if (englishKeyword) {
+          englishKeyword = removeGrayAndAgingBias(englishKeyword);
+      }
 
       let promptEng = "";
       
       let extraColorPrompt = "";
       if (finalColor) {
-         extraColorPrompt = ` The person has ${finalColor.toUpperCase()} hair. The hair is STRICTLY AND ABSOLUTELY ${finalColor.toUpperCase()} IN COLOR. Every single hair strand must be 100% ${finalColor.toUpperCase()}. DO NOT mix with any other colors, shades, roots or highlights.`;
+          const colorUpper = finalColor.toUpperCase();
+          extraColorPrompt = ` [COLOR DEFINITION: HAIR MUST BE 100% UNIQUELY AND SOLIDLY COLOURED IN ${colorUpper}. Every single hair strand, segment, root, and tip must be strictly and uniformly ${colorUpper}. ABSOLUTELY NO other color shades, no gradients, no highlights, no lowlights, no dark roots, no grey hair if not specified, and no mixed tones are allowed under any circumstances. Clear, deep, and perfectly saturated ${colorUpper} hair dye coverage over the entire hairstyle].`;
       }
 
       // For english translation of the russian description, we provide a structured request to flux
@@ -860,17 +912,24 @@ generateRouter.post("/generate-full", async (req, res) => {
       const qualityEng = translateHairQualityToEng(hairQuality);
       if (qualityEng) fluxHairDetails += ` Hair characteristics: ${qualityEng}`;
 
-      const agePromptEng = getDetailedAgePromptEng(ageRange || "");
+      fluxHairDetails = removeGrayAndAgingBias(fluxHairDetails);
+
+      let agePromptEng = getDetailedAgePromptEng(ageRange || "");
+      if (finalColor && !isGreyColorRequested) {
+          agePromptEng = "young-looking handsome healthy person, 33 years old, thick vibrant hair, youthful features";
+      }
       
       if (!isStudioShot) {
           if (requestedStrength === 0) {
-             promptEng = `The exact same face and person from the original image. CRITICAL: PRESERVE THE EXACT FACE, EYES, NOSE, MOUTH, AND FACIAL DETAILS 100% EXPLICITLY UNCHANGED. Keep the exact same hairstyle shape, but change the hair color. ${extraColorPrompt} Keep EVERYTHING ELSE EXACTLY the same: background, clothing, lighting, face, and pose.`;
+             promptEng = `The exact same face and person from the original image. CRITICAL FACIAL CLARITY REQUIREMENT FOR DETECTOR: The person must look directly at the camera with a clear, unobstructed face. Absolutely NO hair strands, bangs, blockages, shadows, or hats should cover or touch any part of the face, eyes, nose, or mouth. The face must be in perfect sharp focus, crystal clear, with studio-quality frontlighting, ensuring that all facial features are fully visible and highly detectable. No face warping, no distortions. Keep the exact same hairstyle shape, but change the hair color. ${extraColorPrompt} Keep EVERYTHING ELSE EXACTLY the same: background, clothing, lighting, face, and pose.`;
           } else {
-             promptEng = `The exact same person from the original image, with a NEW HAIRSTYLE. ${fluxHairDetails} ${extraColorPrompt} This person is a ${agePromptEng}. CRITICAL: Preserve the exact face structure, eyes, nose, mouth, skin pore details, and facial likeness 100% identical and unchanged. Only modify the hairstyle and color. Keep the same background, clothing, lighting, and pose. Context: ${englishDescription || ""}`;
+             promptEng = `The exact same person from the original image, with a NEW HAIRSTYLE. ${fluxHairDetails} ${extraColorPrompt} This person is a ${agePromptEng}. CRITICAL FACIAL CLARITY REQUIREMENT FOR DETECTOR: The person must look directly at the camera with a clear, unobstructed face. Absolutely NO hair strands, bangs, blockages, shadows, or hats should cover or touch any part of the face, eyes, nose, or mouth. The face must be in perfect sharp focus, crystal clear, with studio-quality frontlighting, ensuring that all facial features are fully visible and highly detectable. No face warping, no distortions. CRITICAL: Preserve the exact face structure, eyes, nose, mouth, skin pore details, and facial likeness 100% identical and unchanged. Only modify the hairstyle and color. Keep the same background, clothing, lighting, and pose. Context: ${englishDescription || ""}`;
           }
       } else {
-          promptEng = `A photorealistic portrait of a ${descriptorEng} with the exact facial features, face shape, and likeness of the person in the reference image. This person is a ${agePromptEng}. NEW HAIRSTYLE TO APPLY: ${fluxHairDetails} ${extraColorPrompt} Look directly at the camera, clean portrait lighting. Context: ${englishDescription || ""}`;
+          promptEng = `A photorealistic portrait of a ${descriptorEng}. This person is a ${agePromptEng}. NEW HAIRSTYLE TO APPLY (guided by reference image scene/structure): ${fluxHairDetails} ${extraColorPrompt} CRITICAL FACIAL CLARITY REQUIREMENT FOR DETECTOR: The person must look directly at the camera with a clear, unobstructed face. Absolutely NO hair strands, bangs, blockages, shadows, or hats should cover or touch any part of the face, eyes, nose, or mouth. The face must be in perfect sharp focus, crystal clear, with studio-quality frontlighting, ensuring that all facial features are fully visible and highly detectable. No face warping, no distortions. Look directly at the camera, clean portrait lighting. Context: ${englishDescription || ""}`;
       }
+      
+
       
       const translateFaceShape = (val: string) => {
         val = val.toLowerCase();
@@ -992,6 +1051,52 @@ generateRouter.post("/generate-full", async (req, res) => {
          const swapUrl = falData.image?.url || falData.image_url || falData.url;
          if (swapUrl) {
             swappedImageUrl = swapUrl;
+
+            // --- STRICT COLOR DYE PASS for custom hair color request ---
+            if (false) {
+               try {
+                  console.log("Applying final Color Dye pass via Flux Image-to-Image on face-swapped target...");
+                  const dyeEndpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
+                  const colorUpper = finalColor.toUpperCase();
+                  
+                  // This prompt specifies that the face, identity, clothing, background, and surroundings are identical,
+                  // but ALL hair (including temples, sideburns, eyebrows, beard, mustache, and neck hair) MUST be dyed uniformly in the target color.
+                  const dyePrompt = `[COLOR RE-DYE UPGRADE] A highly detailed, realistic snapshot of the exact same person. CRITICAL DYE TARGET: Every single hair strand, sideburn, root, temple-hair, eyebrow, and beard/mustache hair must be dyed solidly and uniformly in rich, vivid ${colorUpper}. Absolutely NO grey hairs, white hair, grey roots, or mixed grey tones remaining in the hair or beard. All grays must be covered 100% with solid ${colorUpper} color. The facial features, gaze, emotion, skin pores, lighting, clothing, pose, and background are 100% identical and unchanged to the input image.`;
+
+                  const dyePayload = {
+                     prompt: dyePrompt,
+                     image_url: swappedImageUrl,
+                     strength: 0.28, // 0.28 strength is perfect: changes color seamlessly but does not affect the face structure or background geometry
+                     num_inference_steps: 28,
+                     guidance_scale: 3.5
+                  };
+
+                  const dyeRes = await fetch(dyeEndpoint, {
+                     method: "POST",
+                     headers: {
+                        "Authorization": `Key ${falKey}`,
+                        "Content-Type": "application/json"
+                     },
+                     body: JSON.stringify(dyePayload)
+                  });
+
+                  if (dyeRes.ok) {
+                     const dyeData = await dyeRes.json();
+                     const dyeGeneratedUrl = dyeData.images?.[0]?.url || dyeData.image?.url || dyeData.image_url || dyeData.url;
+                     if (dyeGeneratedUrl) {
+                        console.log("Success! Color Dye Post-Processing Pass completed successfully.");
+                        swappedImageUrl = dyeGeneratedUrl;
+                      }
+                  } else {
+                     const errText = await dyeRes.text();
+                     console.error("Dye Refinement pass failed:", errText);
+                  }
+               } catch (dyeErr: any) {
+                  console.error("Failed to run Dye Refinement pass:", dyeErr);
+               }
+            }
+            // --- END STRICT COLOR DYE PASS ---
+
          } else {
               throw new Error(`Unexpected FAL.AI FaceSwap output format: ${JSON.stringify(falData)}`);
          }
