@@ -119,6 +119,38 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
       canvas.height = origImg.height;
       const ctx = canvas.getContext("2d")!;
       
+      // Fast manual box blur for alpha/red channel to avoid cross-browser Canvas filter issues
+      const applyManualBlur = (imgData: ImageData, radius: number) => {
+        const w = imgData.width;
+        const h = imgData.height;
+        const tempAlpha = new Float32Array(w * h);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            let sum = 0, count = 0;
+            for (let k = -radius; k <= radius; k++) {
+              const px = x + k;
+              if (px >= 0 && px < w) { sum += imgData.data[(y * w + px) * 4]; count++; }
+            }
+            tempAlpha[y * w + x] = sum / count;
+          }
+        }
+        for (let x = 0; x < w; x++) {
+          for (let y = 0; y < h; y++) {
+            let sum = 0, count = 0;
+            for (let k = -radius; k <= radius; k++) {
+              const py = y + k;
+              if (py >= 0 && py < h) { sum += tempAlpha[py * w + x]; count++; }
+            }
+            const val = sum / count;
+            const px = (y * w + x) * 4;
+            imgData.data[px] = val;
+            imgData.data[px+1] = val;
+            imgData.data[px+2] = val;
+            imgData.data[px+3] = 255;
+          }
+        }
+      };
+
       // 1. Возвращаем оригинальный фон или закрашиваем
       if (bgMode === "Студийный") {
          const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -141,7 +173,7 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           const fgCanvas = document.createElement("canvas");
           fgCanvas.width = canvas.width;
           fgCanvas.height = canvas.height;
-          const ftx = fgCanvas.getContext("2d")!;
+          const ftx = fgCanvas.getContext("2d", { willReadFrequently: true })!;
           const fgMaskData = ftx.createImageData(canvas.width, canvas.height);
           for (let y = 0; y < canvas.height; y++) {
             for (let x = 0; x < canvas.width; x++) {
@@ -159,22 +191,18 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
               fgMaskData.data[px+3] = 255;
             }
           }
+          
+          applyManualBlur(fgMaskData, 4);
           ftx.putImageData(fgMaskData, 0, 0);
-
-          const blurredFgMask = document.createElement("canvas");
-          blurredFgMask.width = canvas.width;
-          blurredFgMask.height = canvas.height;
-          const bftx = blurredFgMask.getContext("2d")!;
-          bftx.filter = "blur(4px)";
-          bftx.drawImage(fgCanvas, 0, 0);
 
           const personCanvas = document.createElement("canvas");
           personCanvas.width = canvas.width;
           personCanvas.height = canvas.height;
           const pctx = personCanvas.getContext("2d")!;
-          pctx.drawImage(origImg, 0, 0);
+          pctx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
+          
           pctx.globalCompositeOperation = "destination-in";
-          pctx.drawImage(blurredFgMask, 0, 0);
+          pctx.drawImage(fgCanvas, 0, 0);
 
           ctx.globalCompositeOperation = "source-over"; 
           ctx.drawImage(personCanvas, 0, 0);
@@ -185,7 +213,7 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           const hairMaskCanvas = document.createElement("canvas");
           hairMaskCanvas.width = canvas.width;
           hairMaskCanvas.height = canvas.height;
-          const hmtx = hairMaskCanvas.getContext("2d")!;
+          const hmtx = hairMaskCanvas.getContext("2d", { willReadFrequently: true })!;
           const hData = hmtx.createImageData(canvas.width, canvas.height);
           for (let y = 0; y < canvas.height; y++) {
             for (let x = 0; x < canvas.width; x++) {
@@ -193,8 +221,10 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
               const mY = Math.floor((y / canvas.height) * maskHeight);
               const maskIdx = mY * maskWidth + mX;
               
-              const isHair = maskArray[maskIdx] === 1; // 1 - это волосы
-              const val = isHair ? 255 : 0;
+              const isHair = maskArray[maskIdx] === 1 || maskArray[maskIdx] === 2; // Sometimes 2 can be part of hair/head depending on segmenter, but let's stick to 1 (Hair)
+              // Actually selfie_multiclass: 0=bg, 1=hair, 2=body, 3=face, 4=clothes
+              const isHairStrict = maskArray[maskIdx] === 1;
+              const val = isHairStrict ? 255 : 0;
               
               const px = (y * canvas.width + x) * 4;
               hData.data[px] = val;
@@ -203,23 +233,21 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
               hData.data[px+3] = 255;
             }
           }
+          
+          applyManualBlur(hData, 5);
           hmtx.putImageData(hData, 0, 0);
 
-          const blurHairMaskCanvas = document.createElement("canvas");
-          blurHairMaskCanvas.width = canvas.width;
-          blurHairMaskCanvas.height = canvas.height;
-          const bhtx = blurHairMaskCanvas.getContext("2d")!;
-          bhtx.filter = "blur(15px)";
-          bhtx.drawImage(hairMaskCanvas, 0, 0);
-          const blurredHairData = bhtx.getImageData(0, 0, canvas.width, canvas.height).data;
+          const blurredHairData = hmtx.getImageData(0, 0, canvas.width, canvas.height).data;
 
           const hairLayerCanvas = document.createElement("canvas");
           hairLayerCanvas.width = canvas.width;
           hairLayerCanvas.height = canvas.height;
-          const ahctx = hairLayerCanvas.getContext("2d")!;
-          ahctx.drawImage(origImg, 0, 0);
+          const ahctx = hairLayerCanvas.getContext("2d", { willReadFrequently: true })!;
+          ahctx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
           const hDataActual = ahctx.getImageData(0, 0, canvas.width, canvas.height);
           for (let i = 0; i < hDataActual.data.length; i += 4) {
+              // Set pixel transparency based on the blurred mask we computed
+              // R channel holds the blurred intensity, so we map it to alpha
               hDataActual.data[i + 3] = blurredHairData[i];
           }
           ahctx.putImageData(hDataActual, 0, 0);
@@ -230,19 +258,19 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           const ttx = tintCanvas.getContext("2d")!;
           
           const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, needsLighten?: boolean }> = {
-            "Блонд": { hex: "#F3E5AB", mode: "soft-light", opacity: 0.9, needsLighten: true },
-            "Рыжий": { hex: "#D95C14", mode: "overlay", opacity: 0.8 },
-            "Шоколадный": { hex: "#3B1E08", mode: "multiply", opacity: 0.7 },
-            "Русый": { hex: "#8A6F4E", mode: "overlay", opacity: 0.7 },
-            "Пепельный": { hex: "#B0B4B8", mode: "color", opacity: 0.9, needsLighten: true },
-            "Черный": { hex: "#111111", mode: "multiply", opacity: 0.9 },
-            "Красный": { hex: "#DC2626", mode: "overlay", opacity: 0.85 },
-            "Розовый": { hex: "#EC4899", mode: "soft-light", opacity: 0.9, needsLighten: true },
-            "Синий": { hex: "#2563EB", mode: "overlay", opacity: 0.85, needsLighten: true },
-            "Каштан": { hex: "#4A2F1D", mode: "multiply", opacity: 0.7 },
-            "Светло-каштановый": { hex: "#8A5A44", mode: "overlay", opacity: 0.6 },
-            "Седой": { hex: "#E5E7EB", mode: "color", opacity: 1.0, needsLighten: true },
-            "Мелирование": { hex: "#FDE047", mode: "overlay", opacity: 0.6, needsLighten: true }
+            "Блонд": { hex: "#DEB878", mode: "soft-light", opacity: 1.0, needsLighten: true },
+            "Рыжий": { hex: "#C64600", mode: "overlay", opacity: 0.85 },
+            "Шоколадный": { hex: "#2C1405", mode: "multiply", opacity: 0.6 },
+            "Русый": { hex: "#6D5337", mode: "overlay", opacity: 0.75 },
+            "Пепельный": { hex: "#9BA3A9", mode: "color", opacity: 0.9, needsLighten: true },
+            "Черный": { hex: "#080808", mode: "multiply", opacity: 0.9 },
+            "Красный": { hex: "#AF1111", mode: "overlay", opacity: 0.85 },
+            "Розовый": { hex: "#DB2777", mode: "soft-light", opacity: 0.9, needsLighten: true },
+            "Синий": { hex: "#1D4ED8", mode: "overlay", opacity: 0.85, needsLighten: true },
+            "Каштан": { hex: "#3B2211", mode: "multiply", opacity: 0.65 },
+            "Светло-каштановый": { hex: "#6B442B", mode: "overlay", opacity: 0.65 },
+            "Седой": { hex: "#B8B8B8", mode: "color", opacity: 1.0, needsLighten: true },
+            "Мелирование": { hex: "#E9CD6F", mode: "overlay", opacity: 0.7, needsLighten: true }
           };
 
           const cfg = colorsCfg[colorName] || { hex: "#F5D061", mode: "color", opacity: 0.8 };
@@ -260,20 +288,18 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           shtx.drawImage(hairLayerCanvas, 0, 0);
 
           if (cfg.needsLighten) {
-             // Screen original hair over itself to lighten dark hair substantially
-             shtx.globalAlpha = 0.55;
+             shtx.globalAlpha = 0.45;
              shtx.globalCompositeOperation = "screen";
              shtx.drawImage(hairLayerCanvas, 0, 0);
-             shtx.drawImage(hairLayerCanvas, 0, 0); // Double screen for better highlights
+             shtx.drawImage(hairLayerCanvas, 0, 0); 
           }
 
           shtx.globalAlpha = cfg.opacity;
           shtx.globalCompositeOperation = cfg.mode;
           shtx.drawImage(tintCanvas, 0, 0);
           
-          // Additional color preservation step
           if (cfg.mode !== "color") {
-            shtx.globalAlpha = 0.5;
+            shtx.globalAlpha = 0.4;
             shtx.globalCompositeOperation = "color";
             shtx.drawImage(tintCanvas, 0, 0);
           }
