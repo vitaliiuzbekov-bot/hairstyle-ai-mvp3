@@ -11,7 +11,7 @@ export const getFaceDetector = async () => {
   faceDetectorInstance = await FaceDetector.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
-      delegate: "GPU"
+      delegate: "CPU"
     },
     runningMode: "IMAGE"
   });
@@ -28,7 +28,7 @@ export const getMulticlassSegmenter = async () => {
   multiclassSegmenterInstance = await ImageSegmenter.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
-      delegate: "GPU"
+      delegate: "CPU"
     },
     runningMode: "IMAGE",
     outputCategoryMask: true,
@@ -44,7 +44,7 @@ export const getImageSegmenter = async () => {
   imageSegmenterInstance = await ImageSegmenter.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite",
-      delegate: "GPU"
+      delegate: "CPU"
     },
     runningMode: "IMAGE",
     outputCategoryMask: true,

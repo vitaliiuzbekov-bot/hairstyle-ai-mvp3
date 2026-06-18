@@ -229,20 +229,20 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           tintCanvas.height = canvas.height;
           const ttx = tintCanvas.getContext("2d")!;
           
-          const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, needsScreen?: boolean }> = {
-            "Блонд": { hex: "#F3E5AB", mode: "soft-light", opacity: 0.9, needsScreen: true },
-            "Рыжий": { hex: "#D95C14", mode: "overlay", opacity: 0.9 },
-            "Шоколадный": { hex: "#3B1E08", mode: "multiply", opacity: 0.8 },
-            "Русый": { hex: "#8A6F4E", mode: "overlay", opacity: 0.8 },
-            "Пепельный": { hex: "#B0B4B8", mode: "color", opacity: 0.85 },
-            "Черный": { hex: "#111111", mode: "multiply", opacity: 0.95 },
+          const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, needsLighten?: boolean }> = {
+            "Блонд": { hex: "#F3E5AB", mode: "soft-light", opacity: 0.9, needsLighten: true },
+            "Рыжий": { hex: "#D95C14", mode: "overlay", opacity: 0.8 },
+            "Шоколадный": { hex: "#3B1E08", mode: "multiply", opacity: 0.7 },
+            "Русый": { hex: "#8A6F4E", mode: "overlay", opacity: 0.7 },
+            "Пепельный": { hex: "#B0B4B8", mode: "color", opacity: 0.9, needsLighten: true },
+            "Черный": { hex: "#111111", mode: "multiply", opacity: 0.9 },
             "Красный": { hex: "#DC2626", mode: "overlay", opacity: 0.85 },
-            "Розовый": { hex: "#EC4899", mode: "overlay", opacity: 0.9 },
-            "Синий": { hex: "#2563EB", mode: "overlay", opacity: 0.85 },
-            "Каштан": { hex: "#4A2F1D", mode: "multiply", opacity: 0.8 },
-            "Светло-каштановый": { hex: "#6B4423", mode: "multiply", opacity: 0.7 },
-            "Седой": { hex: "#D1D5DB", mode: "color", opacity: 0.9, needsScreen: true },
-            "Мелирование": { hex: "#FDE047", mode: "overlay", opacity: 0.8 }
+            "Розовый": { hex: "#EC4899", mode: "soft-light", opacity: 0.9, needsLighten: true },
+            "Синий": { hex: "#2563EB", mode: "overlay", opacity: 0.85, needsLighten: true },
+            "Каштан": { hex: "#4A2F1D", mode: "multiply", opacity: 0.7 },
+            "Светло-каштановый": { hex: "#8A5A44", mode: "overlay", opacity: 0.6 },
+            "Седой": { hex: "#E5E7EB", mode: "color", opacity: 1.0, needsLighten: true },
+            "Мелирование": { hex: "#FDE047", mode: "overlay", opacity: 0.6, needsLighten: true }
           };
 
           const cfg = colorsCfg[colorName] || { hex: "#F5D061", mode: "color", opacity: 0.8 };
@@ -256,20 +256,24 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           styledHairCanvas.width = canvas.width;
           styledHairCanvas.height = canvas.height;
           const shtx = styledHairCanvas.getContext("2d")!;
+          
           shtx.drawImage(hairLayerCanvas, 0, 0);
 
-          if (cfg.needsScreen) {
-             shtx.globalAlpha = 0.4;
+          if (cfg.needsLighten) {
+             // Screen original hair over itself to lighten dark hair substantially
+             shtx.globalAlpha = 0.55;
              shtx.globalCompositeOperation = "screen";
-             shtx.drawImage(tintCanvas, 0, 0);
+             shtx.drawImage(hairLayerCanvas, 0, 0);
+             shtx.drawImage(hairLayerCanvas, 0, 0); // Double screen for better highlights
           }
 
           shtx.globalAlpha = cfg.opacity;
           shtx.globalCompositeOperation = cfg.mode;
           shtx.drawImage(tintCanvas, 0, 0);
           
+          // Additional color preservation step
           if (cfg.mode !== "color") {
-            shtx.globalAlpha = 0.6;
+            shtx.globalAlpha = 0.5;
             shtx.globalCompositeOperation = "color";
             shtx.drawImage(tintCanvas, 0, 0);
           }
