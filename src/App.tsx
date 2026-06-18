@@ -16,7 +16,7 @@ import { useTokenManager } from "./hooks/useTokenManager";
 import { useOfflineStatus } from "./hooks/useOfflineStatus";
 import { ToastContainer } from "./components/ToastContainer";
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import { HistoryPage } from "./components/HistoryPage";
 import { useTelegramBackButton } from "./hooks/useTelegramBackButton";
@@ -179,6 +179,7 @@ function App() {
              isLightMode={isLightMode}
           />
         } />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
         <React.Suspense fallback={null}>
