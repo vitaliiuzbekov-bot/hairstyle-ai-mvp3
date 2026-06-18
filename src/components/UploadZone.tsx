@@ -210,47 +210,61 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                       </p>
 
                       <div className="flex flex-col sm:flex-row gap-4 w-full px-6 max-w-[400px]">
-                        <button
-                          onClick={(e) => handleTelegramUploadClick(true, e)}
-                          className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
-                            consentGiven 
-                              ? (isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95") 
-                              : (isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed")
-                          }`}
-                        >
-                          <Camera size={16} />
-                          Сделать фото
-                        </button>
-                        <button
-                          onClick={(e) => handleTelegramUploadClick(false, e)}
-                          className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
-                            consentGiven 
-                              ? (isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95") 
-                              : (isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed")
-                          }`}
-                        >
-                          <ImageIcon size={16} />
-                          Галерея
-                        </button>
+                        {consentGiven ? (
+                          <>
+                            <label
+                              className={`cursor-pointer flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                                isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95"
+                              }`}
+                            >
+                              <Camera size={16} />
+                              Сделать фото
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="user"
+                                className="hidden"
+                                onChange={handleFileUpload}
+                              />
+                            </label>
+                            <label
+                              className={`cursor-pointer flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                                isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95"
+                              }`}
+                            >
+                              <ImageIcon size={16} />
+                              Галерея
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileUpload}
+                              />
+                            </label>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={(e) => handleTelegramUploadClick(true, e)}
+                              className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                                isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed"
+                              }`}
+                            >
+                              <Camera size={16} />
+                              Сделать фото
+                            </button>
+                            <button
+                              onClick={(e) => handleTelegramUploadClick(false, e)}
+                              className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                                isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed"
+                              }`}
+                            >
+                              <ImageIcon size={16} />
+                              Галерея
+                            </button>
+                          </>
+                        )}
                       </div>
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
-                        onChange={handleFileUpload}
-                        tabIndex={-1}
-                      />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        ref={cameraInputRef}
-                        capture="user"
-                        className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
-                        onChange={handleFileUpload}
-                        tabIndex={-1}
-                      />
                     </>
                   )}
                 </div>

@@ -53,23 +53,31 @@ export const exportToPDF = async (
     clone.style.lineHeight = "1.6";
     clone.style.fontFamily = "system-ui, -apple-system, sans-serif";
 
-    const htmlContent = clone.outerHTML;
+    // Append to body temporarily so html2canvas can compute styles correctly
+    clone.style.position = "absolute";
+    clone.style.left = "-9999px";
+    clone.style.top = "-9999px";
+    document.body.appendChild(clone);
 
     const html2pdf = (await import("html2pdf.js")).default;
 
     const opt = {
-      margin: 15,
+      margin: [15, 15, 15, 15],
       filename: filename,
       image: { type: "jpeg" as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 800, logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
 
-    const worker = html2pdf().set(opt as any).from(htmlContent);
+    const worker = html2pdf().set(opt as any).from(clone);
     
     let shared = false;
     let sentToBot = false;
     const pdfBlob = await worker.output('blob');
+    
+    // Clean up
+    document.body.removeChild(clone);
+
     const file = new File([pdfBlob], filename, { type: "application/pdf" });
 
     const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : null;

@@ -222,9 +222,10 @@ export const HaircutList: React.FC<HaircutListProps> = ({
         <input 
           type="file" 
           ref={fileInputRef} 
-          className="hidden" 
+          className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]" 
           accept="image/*" 
           onChange={handleCustomUpload} 
+          tabIndex={-1}
         />
         
         <button

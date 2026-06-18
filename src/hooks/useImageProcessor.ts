@@ -38,7 +38,7 @@ export const useImageProcessor = () => {
              let compressedDataUrl = "";
              if (ctx) {
                ctx.drawImage(img, 0, 0, width, height);
-               compressedDataUrl = canvas.toDataURL("image/webp", 0.75);
+               compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
              } else {
                compressedDataUrl = dataUrl;
              }
@@ -77,7 +77,7 @@ export const useImageProcessor = () => {
             dataUrl,
             maxDim: 800,
             quality: 0.75,
-            mimeType: "image/webp"
+            mimeType: "image/jpeg"
           });
         } catch (err) {
           // Fallback if worker fails to initialize

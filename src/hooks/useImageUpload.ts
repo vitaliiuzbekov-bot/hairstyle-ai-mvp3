@@ -39,10 +39,10 @@ export const useImageUpload = () => {
             return;
         }
         
-        // 10 MB limit
-        if (file.size > 10 * 1024 * 1024) {
-             addToast("Размер изображения не должен превышать 10 МБ.", "error");
-             setError("Слишком большой файл. Лимит: 10 МБ.");
+        // 25 MB limit
+        if (file.size > 25 * 1024 * 1024) {
+             addToast("Размер изображения не должен превышать 25 МБ.", "error");
+             setError("Слишком большой файл. Лимит: 25 МБ.");
              return;
         }
 
