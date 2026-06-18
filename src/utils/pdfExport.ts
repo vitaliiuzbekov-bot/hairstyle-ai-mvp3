@@ -17,6 +17,58 @@ export const exportToPDF = async (
     clone.style.color = "#000000";
     clone.style.padding = "20px";
 
+    // Try to find the images in the DOM to include them in the PDF
+    const beforeImageElement = document.querySelector('img[alt="Ваша база"], img[alt="До"]') as HTMLImageElement;
+    const refImageElement = document.querySelector('img[alt="Свой референс"], img[alt="Референс"]') as HTMLImageElement;
+    const afterImageElement = document.querySelector('img[alt="После"]') as HTMLImageElement;
+
+    const imagesContainer = document.createElement("div");
+    imagesContainer.style.display = "flex";
+    imagesContainer.style.gap = "15px";
+    imagesContainer.style.marginBottom = "30px";
+    imagesContainer.style.justifyContent = "center";
+
+    const addImageToPdf = (imgEl: HTMLImageElement | null, label: string) => {
+        if (!imgEl || !imgEl.src) return;
+        const col = document.createElement("div");
+        col.style.flex = "1";
+        col.style.display = "flex";
+        col.style.flexDirection = "column";
+        col.style.alignItems = "center";
+        
+        const labelEl = document.createElement("div");
+        labelEl.innerText = label;
+        labelEl.style.fontWeight = "bold";
+        labelEl.style.marginBottom = "8px";
+        labelEl.style.fontSize = "14px";
+        
+        const img = document.createElement("img");
+        img.src = imgEl.src;
+        img.style.width = "100%";
+        img.style.maxHeight = "300px";
+        img.style.objectFit = "cover";
+        img.style.borderRadius = "8px";
+        img.style.border = "1px solid #ddd";
+        
+        col.appendChild(labelEl);
+        col.appendChild(img);
+        imagesContainer.appendChild(col);
+    };
+
+    addImageToPdf(beforeImageElement, "ДО (Ваша база)");
+    addImageToPdf(refImageElement, "РЕФЕРЕНС (Стиль)");
+    // Try to find VTON result if available
+    const vtonResultEl = document.querySelector('.ReactCompareSliderImage, img[alt="Результат"]') as HTMLImageElement;
+    if (afterImageElement) {
+       addImageToPdf(afterImageElement, "ПОСЛЕ (Результат)");
+    } else if (vtonResultEl && vtonResultEl !== beforeImageElement && vtonResultEl !== refImageElement) {
+       // Just a fallback
+    }
+
+    if (imagesContainer.children.length > 0) {
+        clone.insertBefore(imagesContainer, clone.firstChild);
+    }
+
     // We must change text colors inside the clone since they are white in the UI
     const textElements = clone.querySelectorAll("*");
     textElements.forEach((el) => {

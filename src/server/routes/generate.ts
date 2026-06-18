@@ -349,6 +349,17 @@ generateRouter.post("/generate-full", async (req, res) => {
       
       // We process the reference image (targetImageUrl), which comes from either catalog, uploaded reference, or YandexART.
       if (finalTargetImageUrl) {
+          if (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/')) {
+              // Convert local public path to base64
+              const normalizePath = finalTargetImageUrl.startsWith('/') ? finalTargetImageUrl : '/' + finalTargetImageUrl;
+              const localPath = path.join(process.cwd(), 'public', normalizePath);
+              if (fs.existsSync(localPath)) {
+                  const localBytes = fs.readFileSync(localPath);
+                  let ext = path.extname(localPath).slice(1) || 'jpeg';
+                  if (ext === 'jpg') ext = 'jpeg';
+                  finalTargetImageUrl = `data:image/${ext};base64,${localBytes.toString('base64')}`;
+              }
+          }
           baseImageForFlux = finalTargetImageUrl.startsWith('http') || finalTargetImageUrl.startsWith('data:') 
               ? finalTargetImageUrl 
               : `data:image/jpeg;base64,${finalTargetImageUrl}`;

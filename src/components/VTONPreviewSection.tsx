@@ -86,7 +86,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   tryOnStyle.imageKeyword || tryOnStyle.name,
                   tryOnStyle.name,
                   tryOnStyle.description,
-                  null, // No customHairColor
+                  customHairColor,
                   targetUrlToPass
                 );
               }
@@ -119,28 +119,6 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
             beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
             afterImage={vtonResultUrl}
           />
-          <div className="absolute bottom-6 right-6 z-20 flex items-center gap-2 transition-all opacity-100">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                shareResult(vtonResultUrl);
-              }}
-              className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-black/70 shadow-xl"
-              title="Поделиться результатом"
-            >
-              <Send size={16} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                downloadImage(vtonResultUrl, "ai_result.jpg");
-              }}
-              className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-black/70 shadow-xl"
-              title="Сохранить результат"
-            >
-              <Download size={16} />
-            </button>
-          </div>
           <div className="flex flex-col sm:flex-row gap-3 mt-4">
              <button 
                onClick={async (e) => {
@@ -207,6 +185,30 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                 <FileDown size={16} />
                 <span>Коллаж</span>
              </button>
+             <div className="flex gap-2">
+                 <button
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     shareResult(vtonResultUrl);
+                   }}
+                   className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                   title="Поделиться фото"
+                 >
+                   <Share2 size={16} className="sm:mx-auto" />
+                   <span className="sm:hidden">Поделиться</span>
+                 </button>
+                 <button
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     downloadImage(vtonResultUrl, "ai_result.jpg");
+                   }}
+                   className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                   title="Скачать фото"
+                 >
+                   <Download size={16} className="sm:mx-auto" />
+                   <span className="sm:hidden">Скачать</span>
+                 </button>
+             </div>
           </div>
         </div>
       )}

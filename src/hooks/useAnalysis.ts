@@ -153,12 +153,9 @@ export const useAnalysis = ({
           if (preferredStyle) formData.append("preferredStyle", preferredStyle);
           
           if (localStats) {
-              formData.append("skipVision", "true");
               formData.append("faceApiGender", localStats.gender);
               formData.append("faceApiShape", localStats.faceShape);
               formData.append("faceApiAge", localStats.ageRange);
-              formData.append("localSkinTone", localStats.skinTone);
-              formData.append("localHairColor", localStats.hairColor);
           }
 
           let parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;

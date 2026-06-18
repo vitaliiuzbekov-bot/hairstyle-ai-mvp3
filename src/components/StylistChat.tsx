@@ -48,9 +48,13 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
           text: m.text
         }));
 
+      const initData = (window as any).Telegram?.WebApp?.initData || "";
       const res = await fetch("/api/chat-stylist", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(initData ? { "x-telegram-init-data": initData } : {})
+        },
         body: JSON.stringify({
           messages: apiMessages,
           features,
@@ -112,9 +116,13 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
               reader.readAsDataURL(audioBlob);
            });
 
+           const initData = (window as any).Telegram?.WebApp?.initData || "";
            const res = await fetch("/api/transcribe", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { 
+                "Content-Type": "application/json",
+                ...(initData ? { "x-telegram-init-data": initData } : {})
+              },
               body: JSON.stringify({ audioBase64: base64, mimeType: audioBlob.type || 'audio/webm' })
            });
 

@@ -78,7 +78,7 @@ ${preDetectedFacts}
 3) EXACT hair length in cm and category (bald, buzz, short, medium, long). 
 4) EXACT hair density (thick, medium, thin, sparse, balding) and exact status of the hairline (is there a receding hairline, temporal thinning, bald spots?). 
 5) Hair texture (straight, wavy, curly, coily). 
-6) Current hair color. (USE PRE-DETECTED FACTS IF AVAILABLE)
+6) Current true hair color. CRITICAL: Closely examine the roots and overall tone! Brown hair can look yellowish under lighting glare, do NOT mistake light brown / chestnut hair for blonde due to lighting. (USE PRE-DETECTED FACTS IF AVAILABLE)
 7) Skin tone and facial hair style (beard, mustache, clean shaven). 
 8) ONLY a concise description of clothing (exact color, type) and background (color/setting). Evaluate hair quality objectively. Be brutally honest.`;
 
@@ -150,7 +150,7 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 - hairQuality (ОБЯЗАТЕЛЬНО: Оценка структуры, здоровья и толщины волос на русском языке, например: "Ослабленные, тонкие и сухие волосы с признаками истончения", "Густые, жесткие, здоровые волосы с плотной структурой", или "Слегка истонченные мягкие волосы средней густоты")
 - skinTone (на английском)
 - skinDetails (на английском)
-- hairColor (на английском)
+- hairColor (на английском, переведи дословно. ВНИМАНИЕ: Если в описании hair color указан brown или chestnut, НЕ переводи и не классифицируй это как blonde!)
 - eyeColor (на английском)
 - ageRange (на английском, например "40-45" или "50-60" или "elderly grandmother 70-75", СТРОГО определи реальный возраст из фото!)
 - facialFeatures (на английском)

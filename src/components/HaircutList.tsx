@@ -8,37 +8,37 @@ const FEMALE_LIBRARY = [
   {
     name: "Пикси (Pixie)",
     description: "Короткая элегантная женская стрижка.",
-    customImageUrl: "/golden_base/f_pixie.jpg",
+    customImageUrl: "golden_base/f_pixie.jpg",
     stylingTips: "Используйте текстурирующий спрей или легкую пасту."
   },
   {
     name: "Классический Боб",
     description: "Элегантное каре, прямые волосы.",
-    customImageUrl: "/golden_base/f_bob.jpg",
+    customImageUrl: "golden_base/f_bob.jpg",
     stylingTips: "Гладкая укладка феном и утюжком."
   },
   {
     name: "Удлиненный боб",
     description: "Универсальный боб до ключиц (Lob).",
-    customImageUrl: "/golden_base/f_long_bob.jpg",
+    customImageUrl: "golden_base/f_long_bob.jpg",
     stylingTips: "Легкие волны спреем с морской солью."
   },
   {
     name: "Длинные прямые",
     description: "Длинные идеально прямые волосы.",
-    customImageUrl: "/golden_base/f_long_straight.jpg",
+    customImageUrl: "golden_base/f_long_straight.jpg",
     stylingTips: "Термозащита и сыворотка для блеска."
   },
   {
     name: "Длинные волнистые",
     description: "Роскошные объемные волны.",
-    customImageUrl: "/golden_base/f_long_wavy.jpg",
+    customImageUrl: "golden_base/f_long_wavy.jpg",
     stylingTips: "Нанесите мусс для объема и накрутите на брашинг."
   },
   {
     name: "Длинные с челкой",
     description: "Прямые волосы с классической челкой.",
-    customImageUrl: "/golden_base/f_bangs.jpg",
+    customImageUrl: "golden_base/f_bangs.jpg",
     stylingTips: "Уложите челку круглой щеткой и феном."
   }
 ];
@@ -47,19 +47,19 @@ const MALE_LIBRARY = [
   {
     name: "Buzz Cut",
     description: "Очень короткая мужская стрижка под машинку.",
-    customImageUrl: "/golden_base/m_buzz.jpg",
+    customImageUrl: "golden_base/m_buzz.jpg",
     stylingTips: "Не требует укладки, идеальна для спорта."
   },
   {
     name: "Текстурный Кроп",
     description: "Короткая стрижка с текстурированной челкой.",
-    customImageUrl: "/golden_base/m_crop.jpg",
+    customImageUrl: "golden_base/m_crop.jpg",
     stylingTips: "Используйте матовую пасту для подчеркивания текстуры."
   },
   {
     name: "Помпадур",
     description: "Классическая мужская объемная укладка назад.",
-    customImageUrl: "/golden_base/m_pompadour.jpg",
+    customImageUrl: "golden_base/m_pompadour.jpg",
     stylingTips: "Потребуется помада сильной фиксации и сушка феном."
   }
 ];
@@ -145,13 +145,18 @@ export const HaircutList: React.FC<HaircutListProps> = ({
             </div>
             
             <div className="overflow-y-auto p-5 custom-scrollbar">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={`w-full p-4 mb-6 rounded-2xl flex items-center justify-center gap-3 border-2 border-dashed transition-all group ${isLightMode ? 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 text-gray-700' : 'border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/90'}`}
+              <label
+                className={`cursor-pointer w-full p-4 mb-6 rounded-2xl flex items-center justify-center gap-3 border-2 border-dashed transition-all group ${isLightMode ? 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 text-gray-700' : 'border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/90'}`}
               >
                 <Upload size={20} className={`group-hover:-translate-y-1 transition-transform ${isLightMode ? 'text-gray-400' : 'text-white/50'}`} />
                 <span className="font-medium">Загрузить фото с устройства</span>
-              </button>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleCustomUpload} 
+                />
+              </label>
               
               <div className="flex items-center gap-4 mb-4">
                 <div className={`h-px flex-1 ${isLightMode ? 'bg-gray-200' : 'bg-white/10'}`}></div>
@@ -219,14 +224,6 @@ export const HaircutList: React.FC<HaircutListProps> = ({
       </div>
 
       <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]" 
-          accept="image/*" 
-          onChange={handleCustomUpload} 
-          tabIndex={-1}
-        />
         
         <button
           onClick={() => setIsLibraryOpen(true)}

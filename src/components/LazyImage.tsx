@@ -27,7 +27,7 @@ export const LazyImage = memo(({
   results?: AnalysisResult;
   onImageLoaded?: (url: string) => void;
 }) => {
-  const cacheKey = `${gender}_${keyword}_v2_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}`;
+  const cacheKey = `${gender}_${keyword}_v2_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
     globalImageCache[cacheKey] || null,
   );
@@ -78,10 +78,12 @@ export const LazyImage = memo(({
     setErrorString(null);
 
     try {
+      const initData = (window as any).Telegram?.WebApp?.initData || "";
       const response = await fetch("/api/generate-reference", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(initData ? { "x-telegram-init-data": initData } : {}),
         },
         body: JSON.stringify({
           keyword,
