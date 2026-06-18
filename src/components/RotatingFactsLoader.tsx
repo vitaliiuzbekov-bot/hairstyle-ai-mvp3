@@ -21,6 +21,20 @@ interface Props {
 export const RotatingFactsLoader: React.FC<Props> = ({ isLightMode, title = "ИИ анализирует образ...", className = "" }) => {
   const { progress } = useLoadingState(20000, 200);
 
+  let displayTitle = title;
+  if (title === "Примерка стиля...") {
+    if (progress < 20) displayTitle = "Анализ особенностей лица...";
+    else if (progress < 45) displayTitle = "Генерация базового стиля...";
+    else if (progress < 75) displayTitle = "Адаптация структуры и цвета...";
+    else if (progress < 90) displayTitle = "Нейросетевой FaceSwap...";
+    else displayTitle = "Финальные штрихи...";
+  } else if (title === "ИИ анализирует образ...") {
+     if (progress < 30) displayTitle = "Сканирование структуры лица...";
+     else if (progress < 60) displayTitle = "Определение цветотипа и тона...";
+     else if (progress < 85) displayTitle = "Анализ текущей прически...";
+     else displayTitle = "Подбор индивидуальных рекомендаций...";
+  }
+
   return (
     <div className={`flex flex-col items-center justify-center p-6 gap-6 text-center ${className} w-full overflow-hidden`}>
       <div className="relative">
@@ -29,8 +43,8 @@ export const RotatingFactsLoader: React.FC<Props> = ({ isLightMode, title = "И�
       </div>
       
       <div className="w-full justify-center flex flex-col items-center max-w-sm space-y-3">
-        <h3 className={`font-medium sm:text-lg ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
-          {title}
+        <h3 className={`font-medium sm:text-lg ${isLightMode ? 'text-gray-900' : 'text-white/90'} transition-all duration-300`}>
+          {displayTitle}
         </h3>
         
         {/* Progress Bar */}
@@ -45,6 +59,18 @@ export const RotatingFactsLoader: React.FC<Props> = ({ isLightMode, title = "И�
             {Math.round(progress)}%
           </div>
         </div>
+        {progress > 15 && (
+          <div className={`mt-4 p-3 border rounded-xl text-xs sm:text-sm animate-fade-in-up flex items-start gap-2 text-left ${
+            isLightMode 
+              ? 'bg-blue-50 border-blue-200 text-blue-900' 
+              : 'bg-blue-500/10 border-blue-500/20 text-blue-200'
+          }`}>
+            <Info size={16} className={`mt-0.5 shrink-0 ${isLightMode ? 'text-blue-600' : 'text-blue-400'}`} />
+            <span>
+              <b>Генерация может занять 15–25 секунд.</b> Вы можете свернуть или закрыть приложение, бот автоматически пришлет вам готовый результат прямо в чат!
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="w-full max-w-md relative overflow-hidden rounded-xl py-3 border transition-all duration-500 mt-2">
@@ -52,8 +78,8 @@ export const RotatingFactsLoader: React.FC<Props> = ({ isLightMode, title = "И�
         <div className={`absolute inset-0 border rounded-xl ${isLightMode ? 'border-blue-200' : 'border-blue-500/20'}`}></div>
         
         {/* Gradients to hide the edges smoothly */}
-        <div className={`absolute top-0 left-0 h-full w-12 z-10 bg-gradient-to-r pointer-events-none from-[#f8fafc] to-transparent dark:from-[#050508] ${isLightMode ? 'from-indigo-50' : 'from-[#050508]'}`} style={{ backgroundImage: isLightMode ? 'linear-gradient(to right, rgb(238, 242, 255), transparent)' : 'linear-gradient(to right, rgb(15, 12, 27), transparent)'}}></div>
-        <div className={`absolute top-0 right-0 h-full w-12 z-10 bg-gradient-to-l pointer-events-none from-[#f8fafc] to-transparent dark:from-[#050508] ${isLightMode ? 'from-indigo-50' : 'from-[#050508]'}`} style={{ backgroundImage: isLightMode ? 'linear-gradient(to left, rgb(238, 242, 255), transparent)' : 'linear-gradient(to left, rgb(15, 12, 27), transparent)'}}></div>
+        <div className={`absolute top-0 left-0 h-full w-12 z-10 bg-gradient-to-r pointer-events-none from-[#f8fafc] to-transparent dark:from-[#050508] ${isLightMode ? 'from-white' : 'from-[#050508]'}`} style={{ backgroundImage: isLightMode ? 'linear-gradient(to right, rgba(255,255,255,0.9), transparent)' : 'linear-gradient(to right, rgb(15, 12, 27), transparent)'}}></div>
+        <div className={`absolute top-0 right-0 h-full w-12 z-10 bg-gradient-to-l pointer-events-none from-[#f8fafc] to-transparent dark:from-[#050508] ${isLightMode ? 'from-white' : 'from-[#050508]'}`} style={{ backgroundImage: isLightMode ? 'linear-gradient(to left, rgba(255,255,255,0.9), transparent)' : 'linear-gradient(to left, rgb(15, 12, 27), transparent)'}}></div>
 
         <div className={`flex w-[fit-content] animate-marquee whitespace-nowrap items-center ${isLightMode ? 'text-blue-800' : 'text-blue-200'}`}>
           {/* We duplicate the array to ensure smooth circular scrolling */}

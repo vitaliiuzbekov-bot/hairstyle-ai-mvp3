@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Camera, Upload, X, Sparkles, AlertCircle, RefreshCw, BookOpen, Image as ImageIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useTelegram } from "../hooks/useTelegram";
 
 interface UploadZoneProps {
   imageBase64: string | null;
@@ -19,14 +21,13 @@ interface UploadZoneProps {
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleTelegramUploadClick: (isCamera: boolean, e: React.MouseEvent) => void;
   resetApp: () => void;
-  setIsFaqOpen: (val: boolean) => void;
   preferredStyle: string;
   setPreferredStyle: (val: string) => void;
   analyzeImage: () => void;
   isLightMode: boolean;
 }
 
-export const UploadZone: React.FC<UploadZoneProps> = ({
+const UploadZoneComponent: React.FC<UploadZoneProps> = ({
   imageBase64,
   imageUrl,
   mimeType,
@@ -43,13 +44,42 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
   handleFileUpload,
   handleTelegramUploadClick,
   resetApp,
-  setIsFaqOpen,
   preferredStyle,
   setPreferredStyle,
   analyzeImage,
   isLightMode,
 }) => {
+  const { tg } = useTelegram();
   const [isDragging, setIsDragging] = React.useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (tg?.MainButton) {
+      if (!results && !error && imageBase64 && !isAnalyzing && !isUploadingImage) {
+        tg.MainButton.text = "Запустить ИИ-Анализ 🚀";
+        tg.MainButton.show();
+        tg.MainButton.onClick(analyzeImage);
+      } else {
+        tg.MainButton.hide();
+        tg.MainButton.offClick(analyzeImage);
+      }
+      
+      if (isAnalyzing || isUploadingImage) {
+         tg.MainButton.text = isUploadingImage ? "Обработка фото..." : "Нейросеть в работе...";
+         tg.MainButton.show();
+         tg.MainButton.disable();
+      } else {
+         tg.MainButton.enable();
+      }
+    }
+    
+    return () => {
+      if (tg?.MainButton) {
+        tg.MainButton.hide();
+        tg.MainButton.offClick(analyzeImage);
+      }
+    }
+  }, [tg, results, error, imageBase64, isAnalyzing, isUploadingImage, analyzeImage]);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -97,9 +127,9 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       className={`col-span-1 lg:col-span-5 transition-all duration-700 ${imageBase64 ? "" : "lg:col-span-8 lg:col-start-3"}`}
     >
       <div className="relative group">
-        <div className={`relative rounded-2xl border overflow-hidden shadow-sm flex flex-col ${isLightMode ? 'bg-white text-gray-900 border-gray-200' : 'bg-transparent text-white/90 border-white/10'}`}>
+        <div className={`relative rounded-[1.5rem] border overflow-hidden transition-all duration-500 flex flex-col ${isLightMode ? 'bg-white text-gray-900 border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'bg-[#0a0a0a]/80 backdrop-blur-xl text-white/90 border-white/5 shadow-2xl'}`}>
           {/* Header of the card */}
-          <div className={`px-6 py-5 border-b flex justify-between items-center ${isLightMode ? 'bg-gray-50/50 border-gray-100' : 'border-white/10 glass-panel'}`}>
+          <div className={`px-6 py-5 border-b flex justify-between items-center ${isLightMode ? 'bg-gray-50/50 border-gray-100' : 'border-white/5 bg-white/[0.02]'}`}>
             <h3 className={`font-medium text-sm tracking-widest uppercase flex items-center gap-2 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
               <Camera size={14} /> ФОТО ПРОФИЛЯ
             </h3>
@@ -132,83 +162,97 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                 </div>
 
                 <div
-                  className={`w-full border border-dashed rounded-xl flex flex-col items-center justify-center min-h-[360px] md:min-h-[440px] relative transition-colors duration-300 ${
+                  className={`w-full rounded-[1.25rem] flex flex-col items-center justify-center min-h-[360px] md:min-h-[440px] relative transition-all duration-300 ${
                     consentError 
-                      ? isLightMode ? "border-red-400 bg-red-50" : "border-red-500/50 bg-red-500/5" 
+                      ? isLightMode ? "border-2 border-dashed border-red-400 bg-red-50/50" : "border-2 border-dashed border-red-500/50 bg-red-500/5" 
+                      : isUploadingImage
+                        ? isLightMode ? "border border-gray-200 bg-gray-50 animate-pulse" : "border border-white/5 bg-white/5 animate-pulse"
                       : isDragging
-                        ? isLightMode ? "border-blue-400 bg-blue-50/50" : "border-blue-500/50 bg-blue-500/5"
-                        : isLightMode ? "border-gray-300 hover:border-gray-400 bg-gray-50/50" : "border-white/10 hover:border-white/20 glass-panel"
+                        ? isLightMode ? "border-2 border-dashed border-blue-400 bg-blue-50/50 scale-[1.02]" : "border-2 border-dashed border-blue-500/50 bg-blue-500/10 scale-[1.02]"
+                        : isLightMode ? "border border-dashed border-gray-300 hover:border-gray-400 bg-gray-50/50 hover:bg-gray-100/50" : "border border-dashed border-white/10 hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04]"
                   }`}
                   onDragEnter={handleDragEnter}
                   onDragLeave={handleDragLeave}
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                 >
-                  {consentError && (
-                    <div className="absolute top-4 left-0 right-0 flex justify-center animate-pulse">
-                      <span className={`text-xs px-3 py-1 rounded-full border font-medium ${isLightMode ? 'bg-red-100 text-red-700 border-red-200' : 'bg-red-500/20 text-red-100 border-red-500/30'}`}>
-                        Необходимо согласие на обработку данных
-                      </span>
+                  {isUploadingImage ? (
+                    <div className="flex flex-col items-center justify-center">
+                       <RefreshCw size={36} className={`animate-spin mb-4 ${isLightMode ? 'text-blue-500' : 'text-white/80'}`} />
+                       <h4 className={`text-lg font-medium mb-2 pr-2 pl-2 ${isLightMode ? 'text-gray-800' : 'text-white/90'}`}>Подготовка фото...</h4>
+                       <div className={`w-32 h-1.5 rounded-full overflow-hidden ${isLightMode ? 'bg-gray-200' : 'bg-white/10'}`}>
+                         <div className="w-full h-full bg-blue-500 origin-left animate-[scale-x_2s_ease-in-out_infinite]"></div>
+                       </div>
                     </div>
+                  ) : (
+                    <>
+                      {consentError && (
+                        <div className="absolute top-4 left-0 right-0 flex justify-center animate-pulse">
+                          <span className={`text-xs px-3 py-1 rounded-full border font-medium ${isLightMode ? 'bg-red-100 text-red-700 border-red-200' : 'bg-red-500/20 text-red-100 border-red-500/30'}`}>
+                            Необходимо согласие на обработку данных
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm border transition-all duration-500 ${
+                          consentGiven 
+                            ? (isLightMode ? "text-gray-700 bg-white border-gray-200 hover:scale-105 shadow-md" : "text-white/90 border-white/10 bg-transparent hover:scale-105") 
+                            : (isLightMode ? "text-gray-300 border-gray-200 bg-gray-100 grayscale" : "text-white/40 border-white/10 bg-transparent grayscale")
+                        }`}
+                      >
+                        <Upload size={28} strokeWidth={1.5} />
+                      </div>
+                      <h4 className={`text-xl sm:text-2xl font-serif mb-2 tracking-tight text-center ${isLightMode ? 'text-gray-800' : 'text-white/90'}`}>
+                        Загрузите селфи
+                      </h4>
+                      <p className={`text-sm max-w-[320px] text-center mb-8 font-light leading-relaxed px-4 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
+                        Сделайте фото камерой, выберите из галереи или перетащите файл сюда. Лицо должно быть хорошо освещено.
+                      </p>
+
+                      <div className="flex flex-col sm:flex-row gap-4 w-full px-6 max-w-[400px]">
+                        <button
+                          onClick={(e) => handleTelegramUploadClick(true, e)}
+                          className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                            consentGiven 
+                              ? (isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95") 
+                              : (isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed")
+                          }`}
+                        >
+                          <Camera size={16} />
+                          Сделать фото
+                        </button>
+                        <button
+                          onClick={(e) => handleTelegramUploadClick(false, e)}
+                          className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                            consentGiven 
+                              ? (isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95") 
+                              : (isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed")
+                          }`}
+                        >
+                          <ImageIcon size={16} />
+                          Галерея
+                        </button>
+                      </div>
+
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
+                        onChange={handleFileUpload}
+                        tabIndex={-1}
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={cameraInputRef}
+                        capture="user"
+                        className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
+                        onChange={handleFileUpload}
+                        tabIndex={-1}
+                      />
+                    </>
                   )}
-                  <div
-                    className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm border transition-all duration-500 ${
-                      consentGiven 
-                        ? (isLightMode ? "text-gray-700 bg-white border-gray-200 hover:scale-105 shadow-md" : "text-white/90 border-white/10 bg-transparent hover:scale-105") 
-                        : (isLightMode ? "text-gray-300 border-gray-200 bg-gray-100 grayscale" : "text-white/40 border-white/10 bg-transparent grayscale")
-                    }`}
-                  >
-                    <Upload size={28} strokeWidth={1.5} />
-                  </div>
-                  <h4 className={`text-xl sm:text-2xl font-serif mb-2 tracking-tight text-center ${isLightMode ? 'text-gray-800' : 'text-white/90'}`}>
-                    Загрузите селфи
-                  </h4>
-                  <p className={`text-sm max-w-[320px] text-center mb-8 font-light leading-relaxed px-4 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
-                    Сделайте фото камерой, выберите из галереи или перетащите файл сюда. Лицо должно быть хорошо освещено.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row gap-4 w-full px-6 max-w-[400px]">
-                    <button
-                      onClick={(e) => handleTelegramUploadClick(true, e)}
-                      className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
-                        consentGiven 
-                          ? (isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95") 
-                          : (isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed")
-                      }`}
-                    >
-                      <Camera size={16} />
-                      Сделать фото
-                    </button>
-                    <button
-                      onClick={(e) => handleTelegramUploadClick(false, e)}
-                      className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
-                        consentGiven 
-                          ? (isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95") 
-                          : (isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "glass-button opacity-50 border-white/10 text-white/90 grayscale cursor-not-allowed")
-                      }`}
-                    >
-                      <ImageIcon size={16} />
-                      Галерея
-                    </button>
-                  </div>
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    ref={fileInputRef}
-                    className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
-                    onChange={handleFileUpload}
-                    tabIndex={-1}
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    ref={cameraInputRef}
-                    capture="user"
-                    className="absolute w-px h-px p-0 m-0 border-0 overflow-hidden opacity-0 z-[-1]"
-                    onChange={handleFileUpload}
-                    tabIndex={-1}
-                  />
                 </div>
                 <div
                   className={`mt-6 p-3 rounded-xl border flex items-start gap-3 w-full max-w-[340px] cursor-pointer transition-all ${
@@ -245,7 +289,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
 
                 <div className="mt-6 w-full max-w-[340px]">
                   <button 
-                    onClick={() => setIsFaqOpen(true)}
+                    onClick={() => navigate('/faq')}
                     className={`w-full flex items-center p-4 rounded-xl border transition-all text-left group ${isLightMode ? 'bg-white/50 border-gray-200 hover:border-gray-300 hover:bg-white' : 'glass-panel border-white/10 hover:border-white/20'}`}
                   >
                     <div className="flex items-center gap-3 w-full">
@@ -265,7 +309,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                 {/* Preview */}
                 <div className={`relative rounded-xl overflow-hidden aspect-[3/4] flex items-center justify-center max-h-[500px] ring-1 ${isLightMode ? 'bg-gray-100 ring-gray-200' : 'glass-panel ring-white/10'}`}>
                   <img
-                    src={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
+                    src={imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) : undefined)}
                     alt="Ваше фото"
                     className={`max-w-full max-h-full object-contain w-full h-full transition-all duration-1000 ${isAnalyzing ? "scale-105 blur-sm opacity-50 grayscale hover:grayscale-0" : "scale-100"}`}
                   />
@@ -312,7 +356,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                            <RefreshCw size={16} />
                            Загрузить новое фото
                          </button>
-                         <button onClick={() => setIsFaqOpen(true)} className={isLightMode ? "flex-1 bg-transparent hover:bg-gray-100 border border-transparent text-gray-700 py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2" : "flex-1 bg-transparent hover:bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"}>
+                         <button onClick={() => navigate('/faq')} className={isLightMode ? "flex-1 bg-transparent hover:bg-gray-100 border border-transparent text-gray-700 py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2" : "flex-1 bg-transparent hover:bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"}>
                            <BookOpen size={16} />
                            Гайд по съёмке
                          </button>
@@ -367,14 +411,15 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
 
                 {/* Action Button */}
                 {!results && !error && (
+                  <>
                   <button
                     onClick={analyzeImage}
                     disabled={isAnalyzing || isUploadingImage || !imageBase64}
-                    className={`relative w-full font-bold py-4 sm:py-5 px-6 flex items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group ${
+                    className={`${tg?.initDataUnsafe?.user ? 'hidden' : 'flex'} relative w-full font-bold py-4 sm:py-5 px-6 items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${
                       isAnalyzing || isUploadingImage || !imageBase64
                         ? (isLightMode ? "bg-gray-100 text-gray-400 border border-transparent cursor-not-allowed" : "bg-white/5 text-white/40 border-transparent cursor-not-allowed")
-                        : (isLightMode ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl hover:shadow-blue-500/30 border border-transparent active:scale-[0.98]" : "bg-white text-black hover:bg-gray-100 shadow-[0_0_40px_rgba(255,255,255,0.3)] active:scale-[0.98]")
-                    } focus:ring-4 focus:ring-blue-500/50`}
+                        : (isLightMode ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-[0.98]" : "bg-white text-black hover:bg-gray-100 shadow-md active:scale-[0.98]")
+                    }`}
                   >
                     {!isAnalyzing && !isUploadingImage && imageBase64 && (
                        <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
@@ -387,6 +432,8 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
                           : "Запустить ИИ-Анализ 🚀"}
                     </span>
                   </button>
+                  {/* Telegram WebApp Integration for MainButton is handled via hook, but we keep an invisible/fallback button for non-TG env */}
+                  </>
                 )}
               </div>
             )}
@@ -396,3 +443,5 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
     </div>
   );
 };
+
+export const UploadZone = React.memo(UploadZoneComponent);

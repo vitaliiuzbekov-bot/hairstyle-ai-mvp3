@@ -65,7 +65,7 @@ export const generateCollage = async (beforeUrl: string, afterUrl: string, salon
             ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
             ctx.font = "italic 24px sans-serif";
             ctx.textAlign = "right";
-            ctx.fillText("@neirostilist_bot", canvas.width - padding, canvas.height - padding/2);
+            ctx.fillText("https://t.me/neirostilist_bot", canvas.width - padding, canvas.height - padding/2);
 
             resolve(canvas.toDataURL("image/jpeg", 0.9));
          };

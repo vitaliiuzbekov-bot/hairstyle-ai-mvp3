@@ -3,8 +3,45 @@ import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
 import { adminApp, adminDb } from "../firebase";
 import { FieldValue } from "firebase-admin/firestore";
+import multer from "multer";
 
 export const authRouter = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+authRouter.post('/send-pdf', upload.single('pdf'), async (req: Request, res: Response) => {
+  try {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken || botToken === "MY_TELEGRAM_BOT_TOKEN" || botToken === "") {
+      return res.status(500).json({ error: "Токен бота не настроен" });
+    }
+
+    const tgUserId = req.body.tgUserId;
+    if (!tgUserId || !req.file) {
+      return res.status(400).json({ error: "Missing tgUserId or pdf file" });
+    }
+
+    // Node 18+ FormData
+    const formData = new FormData();
+    formData.append("chat_id", tgUserId);
+    formData.append("document", new Blob([req.file.buffer], { type: 'application/pdf' }), "Neurostylist-Guide.pdf");
+
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      res.json({ success: true });
+    } else {
+      console.error(data);
+      res.status(500).json({ error: data.description });
+    }
+  } catch (error: any) {
+    console.error("PDF Send error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 const PACKAGES: Record<string, { title: string; description: string; amount: number; count: number }> = {
   "basic": { title: "Базовый пакет", description: "1 стрижка + базовый цвет", amount: 99, count: 1 },
@@ -66,12 +103,16 @@ authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => 
     return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not configured" });
   }
   const { webAppUrl } = req.body;
+  const crypto = require("crypto");
+  const secretToken = crypto.createHash('sha256').update(botToken).digest('hex');
+
   try {
     const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         url: `${webAppUrl.replace(/\/$/, "")}/api/webhook/telegram`,
+        secret_token: secretToken,
         allowed_updates: ["message", "pre_checkout_query"]
       })
     });
@@ -84,6 +125,18 @@ authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => 
 
 authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return res.status(500).send("No token configured.");
+  }
+  const crypto = require("crypto");
+  const expectedToken = crypto.createHash('sha256').update(botToken).digest('hex');
+  const providedToken = req.headers['x-telegram-bot-api-secret-token'];
+  
+  if (providedToken !== expectedToken) {
+    console.error("Unauthorized webhook request!");
+    return res.status(403).send("Unauthorized");
+  }
+
   const body = req.body;
   
   if (body.pre_checkout_query) {

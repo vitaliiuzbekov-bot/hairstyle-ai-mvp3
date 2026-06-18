@@ -27,7 +27,7 @@ export const LazyImage = memo(({
   results?: AnalysisResult;
   onImageLoaded?: (url: string) => void;
 }) => {
-  const cacheKey = `${gender}_${keyword}_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairQuality || ""}`;
+  const cacheKey = `${gender}_${keyword}_v2_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}`;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
     globalImageCache[cacheKey] || null,
   );
@@ -98,12 +98,20 @@ export const LazyImage = memo(({
           ageRange: results?.ageRange,
           facialFeatures: results?.facialFeatures,
           facialHair: results?.facialHair,
+          clothingContext: results?.clothingContext,
           hairlineStatus: results?.hairlineStatus,
           hairQuality: results?.hairQuality,
+          description: description,
         }),
       });
 
-      const data = await response.json();
+      let data: any = {};
+      const textResponse = await response.text();
+      try {
+          data = JSON.parse(textResponse);
+      } catch(e) {
+          throw new Error("Invalid format from server");
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to generate image");
@@ -146,7 +154,7 @@ export const LazyImage = memo(({
     return (
       <div className="relative w-full h-full group/lazy flex">
         <CachedImage
-          src={loadedUrl}
+          src={loadedUrl || undefined as any}
           alt={uniqueName}
           className={`w-full h-full ${className || "object-cover"}`}
           style={{ display: "block", width: "100%", height: "100%" }}

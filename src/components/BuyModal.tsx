@@ -1,5 +1,6 @@
 import React from "react";
 import { X, Star, Gift, Share2 } from "lucide-react";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 interface BuyModalProps {
   showBuyModal: boolean;
@@ -20,6 +21,8 @@ export const BuyModal: React.FC<BuyModalProps> = ({
   processPayment,
   isLightMode,
 }) => {
+  useScrollLock(showBuyModal);
+
   if (!showBuyModal) return null;
 
   return (

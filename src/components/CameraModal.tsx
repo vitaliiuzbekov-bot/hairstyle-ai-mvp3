@@ -1,5 +1,6 @@
 import React from "react";
 import { X, RefreshCw } from "lucide-react";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 interface CameraModalProps {
   isCameraModalOpen: boolean;
@@ -18,6 +19,8 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   capturePhoto,
   startCameraLocal,
 }) => {
+  useScrollLock(isCameraModalOpen);
+
   if (!isCameraModalOpen) return null;
 
   return (

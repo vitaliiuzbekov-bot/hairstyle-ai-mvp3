@@ -1,4 +1,5 @@
 import React from "react";
+import { formatHistoryDate } from "../utils/historyHelper";
 import { ImageIcon, X } from "lucide-react";
 import { CachedImage } from "./CachedImage";
 
@@ -12,15 +13,13 @@ interface HistoryCarouselProps {
   history: HistoryItem[];
   imageBase64: string | null;
   deleteHistoryItem: (e: React.MouseEvent, item: HistoryItem) => void;
-  formatHistoryDate: (timestamp: number) => string;
   isLightMode?: boolean;
 }
 
-export const HistoryCarousel: React.FC<HistoryCarouselProps> = ({
+const HistoryCarouselComponent: React.FC<HistoryCarouselProps> = ({
   history,
   imageBase64,
   deleteHistoryItem,
-  formatHistoryDate,
   isLightMode,
 }) => {
   if (!history || history.length === 0 || imageBase64) return null;
@@ -45,7 +44,7 @@ export const HistoryCarousel: React.FC<HistoryCarouselProps> = ({
             }}
           >
             <CachedImage
-              src={item.url}
+              src={item.url || undefined as any}
               alt={item.keyword}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
@@ -74,3 +73,5 @@ export const HistoryCarousel: React.FC<HistoryCarouselProps> = ({
     </div>
   );
 };
+
+export const HistoryCarousel = React.memo(HistoryCarouselComponent);

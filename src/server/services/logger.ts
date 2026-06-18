@@ -3,6 +3,12 @@ import "dotenv/config";
 export async function logToTelegram(message: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  
+  try {
+    const fs = require('fs');
+    fs.appendFileSync('/app/applet/app.log', new Date().toISOString() + ': ' + message + '\n');
+  } catch(e) {}
+
   if (!botToken || !adminChatId) return;
 
   try {

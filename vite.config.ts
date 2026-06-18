@@ -35,8 +35,51 @@ export default defineConfig(() => {
           ]
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
+             {
+               urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@vladmandic\/face-api\/model\/.*/i,
+               handler: 'CacheFirst',
+               options: {
+                 cacheName: 'face-api-models-cache',
+                 expiration: {
+                   maxEntries: 20,
+                   maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                 },
+                 cacheableResponse: {
+                   statuses: [0, 200]
+                 }
+               }
+             },
+             {
+               urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@mediapipe\/tasks-vision@.*\/.*/i,
+               handler: 'CacheFirst',
+               options: {
+                 cacheName: 'mediapipe-wasm-cache',
+                 expiration: {
+                   maxEntries: 10,
+                   maxAgeSeconds: 60 * 60 * 24 * 365
+                 },
+                 cacheableResponse: {
+                   statuses: [0, 200]
+                 }
+               }
+             },
+             {
+               urlPattern: /^https:\/\/storage\.googleapis\.com\/mediapipe-models\/.*/i,
+               handler: 'CacheFirst',
+               options: {
+                 cacheName: 'mediapipe-models-cache',
+                 expiration: {
+                   maxEntries: 10,
+                   maxAgeSeconds: 60 * 60 * 24 * 365
+                 },
+                 cacheableResponse: {
+                   statuses: [0, 200]
+                 }
+               }
+             },
              {
                urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
                handler: 'CacheFirst',
@@ -73,6 +116,17 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'firebase-vendor': ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+            'lucide-vendor': ['lucide-react']
+          }
+        }
+      }
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

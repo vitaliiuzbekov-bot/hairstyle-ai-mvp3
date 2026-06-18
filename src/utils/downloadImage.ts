@@ -1,3 +1,5 @@
+import { applyWatermark } from "./watermark";
+
 export const downloadImage = async (url: string, filename: string) => {
   try {
     const tg = window.Telegram?.WebApp;
@@ -14,9 +16,11 @@ export const downloadImage = async (url: string, filename: string) => {
       return;
     }
 
-    if (url.startsWith("data:")) {
+    const finalUrl = await applyWatermark(url).catch(() => url);
+
+    if (finalUrl.startsWith("data:")) {
       const link = document.createElement("a");
-      link.href = url;
+      link.href = finalUrl;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
@@ -24,7 +28,7 @@ export const downloadImage = async (url: string, filename: string) => {
       return;
     }
 
-    const response = await fetch(url);
+    const response = await fetch(finalUrl);
     if (!response.ok) throw new Error("Network response was not ok");
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);

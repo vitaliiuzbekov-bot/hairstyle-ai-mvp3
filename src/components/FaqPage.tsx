@@ -1,16 +1,16 @@
 import React, { useState, useMemo } from "react";
-import { X, HelpCircle, RefreshCw, Search, ChevronDown } from "lucide-react";
+import { ChevronLeft, HelpCircle, RefreshCw, Search, ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-interface FaqModalProps {
-  isFaqOpen: boolean;
-  setIsFaqOpen: (open: boolean) => void;
+interface FaqPageProps {
   faqData: { q: string; a: string }[];
   isLightMode?: boolean;
 }
 
-export const FaqModal: React.FC<FaqModalProps> = ({ isFaqOpen, setIsFaqOpen, faqData, isLightMode }) => {
+export const FaqPage: React.FC<FaqPageProps> = ({ faqData, isLightMode }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const filteredFaq = useMemo(() => {
     if (!searchQuery.trim()) return faqData;
@@ -20,25 +20,23 @@ export const FaqModal: React.FC<FaqModalProps> = ({ isFaqOpen, setIsFaqOpen, faq
     );
   }, [faqData, searchQuery]);
 
-  if (!isFaqOpen) return null;
-
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm p-4 ${isLightMode ? 'bg-black/40' : 'bg-black/80'}`}>
-      <div className={`w-full max-w-lg border rounded-3xl p-6 shadow-2xl relative flex flex-col max-h-[85vh] ${isLightMode ? 'bg-white border-gray-200' : 'bg-[#111] border-white/10'}`}>
+    <div className={`min-h-screen p-6 animate-in fade-in slide-in-from-right-8 ${isLightMode ? 'bg-gray-50' : 'bg-[#050508]'}`}>
+      <div className={`max-w-xl mx-auto border rounded-3xl p-6 relative shadow-xl backdrop-blur-md mt-8 flex flex-col ${isLightMode ? 'bg-white border-gray-200' : 'bg-white/10 border-white/10 text-white'}`}>
         <button
-          onClick={() => setIsFaqOpen(false)}
-          className={`absolute top-4 right-4 p-2 rounded-full transition-colors ${isLightMode ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`}
+          onClick={() => navigate(-1)}
+          className={`absolute top-6 left-6 p-2 rounded-full transition-colors ${isLightMode ? 'hover:bg-gray-100 bg-gray-50' : 'hover:bg-white/20 bg-white/10'}`}
         >
-          <X size={20} className={isLightMode ? 'text-gray-500' : 'text-white/60'} />
+          <ChevronLeft size={20} className={isLightMode ? 'text-gray-500' : 'text-white/60'} />
         </button>
-        <div className="flex items-center gap-3 mb-4 shrink-0">
-          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-            <HelpCircle size={20} />
+        <div className="flex flex-col items-center gap-3 mb-6 shrink-0 mt-2">
+          <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+            <HelpCircle size={24} />
           </div>
-          <h2 className={`text-xl font-medium ${isLightMode ? 'text-gray-900' : 'text-white'}`}>Вопросы и ответы</h2>
+          <h2 className={`text-2xl font-serif font-bold ${isLightMode ? 'text-gray-900' : 'text-white'}`}>Вопросы и ответы</h2>
         </div>
         
-        <div className="mb-4 relative shrink-0">
+        <div className="mb-6 relative shrink-0">
           <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isLightMode ? 'text-gray-400' : 'text-white/40'}`} />
           <input
             type="text"
@@ -49,7 +47,7 @@ export const FaqModal: React.FC<FaqModalProps> = ({ isFaqOpen, setIsFaqOpen, faq
           />
         </div>
         
-        <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
+        <div className="space-y-3 pr-2 custom-scrollbar flex-1 pb-10">
           {faqData.length === 0 ? (
             <div className={`text-center py-8 ${isLightMode ? 'text-gray-400' : 'text-white/40'}`}>
               <RefreshCw className="animate-spin mx-auto mb-2" size={24} />

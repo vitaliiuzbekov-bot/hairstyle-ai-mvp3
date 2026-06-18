@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { signInAnonymously } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { useUI } from "../context/UIContext";
+import { getHistory } from "../services/localHistory";
 
 export const useTokenManager = () => {
+  const { addToast } = useUI();
   const [generationsLeft, setGenerationsLeft] = useState<number | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -17,11 +20,20 @@ export const useTokenManager = () => {
     return isDevUrl || localStorage.getItem("isDeveloperMode") === "true";
   });
 
-  const tg = window.Telegram?.WebApp;
+  const tg = (window as any).Telegram?.WebApp as any;
   const isTelegramEnv = !!tg?.initDataUnsafe?.user;
 
   useEffect(() => {
     const initUser = async () => {
+      // Async load local history immediately
+      let localHistory: any[] = [];
+      try {
+        localHistory = await getHistory();
+        setHistory(localHistory);
+      } catch (e) {
+        console.error(e);
+      }
+
       let currentUid = null;
       let tgUser = tg?.initDataUnsafe?.user;
 
@@ -71,12 +83,6 @@ export const useTokenManager = () => {
         } else {
           setGenerationsLeft(isDevUser ? 999 : parseInt(localGens, 10));
         }
-        try {
-          const localHistory = JSON.parse(
-            localStorage.getItem("localHistory") || "[]",
-          );
-          setHistory(localHistory);
-        } catch (e) {}
       }
 
       try {
@@ -123,21 +129,19 @@ export const useTokenManager = () => {
              }
           }
 
+          setGenerationsLeft(startGens);
+
           try {
-            await Promise.race([
-              setDoc(userRef, {
-                generationsLeft: startGens,
-                createdAt: serverTimestamp(),
-                history: [],
-                ...(tgUser?.id ? { tgId: tgUser.id } : {}),
-                ...(tgUser?.username ? { tgUsername: tgUser.username } : {}),
-                ...(referredBy ? { referredBy } : {})
-              }),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("timeout")), 5000),
-              ),
-            ]);
-            setGenerationsLeft(startGens);
+            setDoc(userRef, {
+              generationsLeft: startGens,
+              createdAt: serverTimestamp(),
+              ...(tgUser?.id ? { tgId: tgUser.id } : {}),
+              ...(tgUser?.username ? { tgUsername: tgUser.username } : {}),
+              ...(referredBy ? { referredBy } : {})
+            }).catch(createErr => {
+               console.warn("Background setDoc failed:", createErr?.message || createErr);
+            });
+            
             fetch("/api/log", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -148,13 +152,32 @@ export const useTokenManager = () => {
               }),
             }).catch(console.error);
           } catch (createErr: any) {
-             console.warn("setDoc create failed:", createErr?.message || createErr);
-             throw new Error("fallback_to_local");
+             console.warn("setDoc create dispatch failed:", createErr?.message || createErr);
           }
         } else {
           const data = userDoc.data();
           setGenerationsLeft(isDevUser ? 999 : (data?.generationsLeft ?? 0));
-          setHistory(data?.history ?? []);
+          
+          // Фоновая синхронизация истории (тихая)
+          const cloudHistoryStr = data?.historyCache;
+          if (cloudHistoryStr) {
+            try {
+              const cloudHistory = JSON.parse(cloudHistoryStr);
+              if (Array.isArray(cloudHistory) && cloudHistory.length > localHistory.length) {
+                // Если в облаке больше элементов (например, зашел с другого устройства),
+                // обогащаем локальную историю
+                const existingUrls = new Set(localHistory.map(h => h.originalUrl || h.url));
+                const newItems = cloudHistory.filter(h => !(existingUrls.has(h.originalUrl || h.url)));
+                if (newItems.length > 0) {
+                  const mergedHistory = [...newItems, ...localHistory].sort((a,b) => b.timestamp - a.timestamp);
+                  setHistory(mergedHistory);
+                  import('../services/localHistory').then(m => m.saveHistory(mergedHistory));
+                }
+              }
+            } catch (e) {
+              console.warn("Failed to parse cloud history", e);
+            }
+          }
         }
       } catch (err: any) {
         if (err.message !== "fallback_to_local") {
@@ -168,12 +191,6 @@ export const useTokenManager = () => {
         } else {
           setGenerationsLeft(isDevUser ? 999 : parseInt(localGens, 10));
         }
-        try {
-          const localHistory = JSON.parse(
-            localStorage.getItem("localHistory") || "[]",
-          );
-          setHistory(localHistory);
-        } catch (e) {}
         setUserId(isDevUser ? "8585130589" : "local-user");
         setInitError(null);
       }
@@ -205,21 +222,12 @@ export const useTokenManager = () => {
       return true;
     }
 
-    try {
-      const userRef = doc(db, "users", userId);
-      await Promise.race([
-        updateDoc(userRef, { generationsLeft: increment(-1) }),
-        new Promise((_, reject) => setTimeout(() => reject("timeout"), 5000)),
-      ]);
-      setGenerationsLeft((prev) => (prev ? prev - 1 : 0));
-      return true;
-    } catch (err: any) {
-      console.warn("Failed to consume token via DB. Falling back to local storage.", err);
-      const next = generationsLeft - 1;
-      setGenerationsLeft(next);
-      localStorage.setItem("localGenerationsLeft", next.toString());
-      return true;
-    }
+    // Optimistic UI update
+    setGenerationsLeft((prev) => (prev ? prev - 1 : 0));
+
+    // The backend now securely deducts the token during /api/generate-full via billing.ts.
+    // We just optimistically update the UI here. We no longer write directly to Firestore to avoid double charging.
+    return true;
   };
 
   const buyTokens = () => setShowBuyModal(true);
@@ -241,7 +249,7 @@ export const useTokenManager = () => {
           },
         );
       } else {
-        alert("Закончились генерации. Пополните баланс.");
+        addToast("Закончились генерации. Пополните баланс.", "error", 5000);
         buyTokens();
       }
       return false;
@@ -271,10 +279,15 @@ export const useTokenManager = () => {
 
         const response = await fetch("/api/create-invoice", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": (tg as any)?.initData || ""
+          },
           body: JSON.stringify({ userId, tgUserId, packageId }),
         });
-        const data = await response.json();
+        const text = await response.text();
+        let data: any = {};
+        try { data = JSON.parse(text); } catch(e){}
         if (!response.ok || !data.invoiceUrl) {
           throw new Error(data.error || "Ошибка при создании счета");
         }
@@ -346,19 +359,60 @@ export const useTokenManager = () => {
       }
     } catch (err: any) {
       console.error("Error creating invoice: ", err);
-      if (tg && tg.showAlert) {
-        if (err.message && err.message.includes("bot owner")) {
-           tg.showAlert("Оплата временно недоступна. Владелец бота еще не принял условия.");
+      const fallbackPrompt = "Оплата Stars временно недоступна на стороне Telegram. В качестве извинения, начислить вам 1 бесплатную генерацию?";
+      
+      const applyFallback = async () => {
+        if (userId === "local-user") {
+          const next = (generationsLeft || 0) + 1;
+          localStorage.setItem("localGenerationsLeft", next.toString());
+          setGenerationsLeft(next);
         } else {
-           tg.showAlert(err.message || "Ошибка при оплате");
+          try {
+            const userRef = doc(db, "users", userId);
+            await updateDoc(userRef, { generationsLeft: increment(1) });
+          } catch (e) {
+             console.warn("Could not write fallback to Firestore", e);
+          }
+          setGenerationsLeft((prev) => (prev || 0) + 1);
         }
+        setShowBuyModal(false);
+      };
+
+      if (tg && tg.showConfirm) {
+         tg.showConfirm(fallbackPrompt, (confirmed: boolean) => {
+             if (confirmed) {
+                 applyFallback();
+             }
+         });
       } else {
-        alert("Ошибка создания счета: " + (err.message || "Неизвестная ошибка"));
+        if (window.confirm(fallbackPrompt)) {
+           applyFallback();
+        }
       }
     } finally {
       setIsBuying(false);
     }
   };
+
+  useEffect(() => {
+    if (userId && userId !== "local-user" && history.length > 0) {
+      const lightweightHistory = history.map(h => ({
+        url: h.url?.startsWith('data:image') || h.url?.startsWith('blob:') ? '' : h.url,
+        originalUrl: h.originalUrl?.startsWith('data:image') || h.originalUrl?.startsWith('blob:') ? '' : h.originalUrl,
+        keyword: h.keyword,
+        timestamp: h.timestamp
+      })).filter(h => h.originalUrl || h.url);
+      
+      if (lightweightHistory.length > 0) {
+        try {
+           const userRef = doc(db, "users", userId);
+           updateDoc(userRef, { historyCache: JSON.stringify(lightweightHistory) }).catch(() => {});
+        } catch (e) {
+           console.warn("Failed to sync history to cloud", e);
+        }
+      }
+    }
+  }, [history, userId]);
 
   return {
     generationsLeft,

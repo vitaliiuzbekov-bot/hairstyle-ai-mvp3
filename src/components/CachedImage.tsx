@@ -7,11 +7,32 @@ interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
 }
 
-export const CachedImage: React.FC<CachedImageProps> = ({ src, alt, className, style, ...props }) => {
-  const [imgSrc, setImgSrc] = useState<string>(src);
+export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, className, style, ...props }) => {
+  const [imgSrc, setImgSrc] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isVisible, setIsVisible] = useState<boolean>(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' } 
+    );
+    
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    
     let objectUrl = '';
     let isMounted = true;
 
@@ -60,15 +81,15 @@ export const CachedImage: React.FC<CachedImageProps> = ({ src, alt, className, s
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [src]);
+  }, [src, isVisible]);
 
   return (
-    <div className={`relative ${className || ''}`} style={style}>
+    <div ref={containerRef} className={`relative ${className || ''}`} style={style}>
       {isLoading && (
         <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse" />
       )}
       <LazyLoadImage 
-        src={imgSrc} 
+        src={imgSrc || undefined} 
         alt={alt || ""}
         effect="blur" 
         className={`w-full h-full object-cover transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
@@ -78,4 +99,4 @@ export const CachedImage: React.FC<CachedImageProps> = ({ src, alt, className, s
       />
     </div>
   );
-};
+});

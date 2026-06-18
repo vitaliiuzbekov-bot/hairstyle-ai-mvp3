@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Scissors, User, Store } from "lucide-react";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 interface WelcomeModalProps {
   showWelcome: boolean;
@@ -22,6 +23,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
   setShowSalonNameInput,
   isLightMode,
 }) => {
+  useScrollLock(showWelcome);
+
   if (!showWelcome) return null;
 
   return (
@@ -56,6 +59,13 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
                     localStorage.setItem("userRole", "salon");
                     localStorage.setItem("welcomeShown", "true");
                     localStorage.setItem("salonName", salonName);
+                    
+                    const tg = (window as any).Telegram?.WebApp as any;
+                    if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
+                      tg.CloudStorage.setItem('welcomeShown', 'true', () => {});
+                      tg.CloudStorage.setItem('userRole', 'salon', () => {});
+                      tg.CloudStorage.setItem('salonName', salonName, () => {});
+                    }
                 }}
                 disabled={!salonName.trim()}
                 className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-purple-500 to-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
@@ -77,6 +87,12 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
                   setShowWelcome(false);
                   localStorage.setItem("userRole", "client");
                   localStorage.setItem("welcomeShown", "true");
+                  
+                  const tg = (window as any).Telegram?.WebApp as any;
+                  if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
+                    tg.CloudStorage.setItem('welcomeShown', 'true', () => {});
+                    tg.CloudStorage.setItem('userRole', 'client', () => {});
+                  }
                 }}
                 className={`w-full text-left p-4 rounded-2xl border active:scale-[0.98] transition-all group flex items-center gap-4 ${isLightMode ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-900' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white'}`}
               >
@@ -95,6 +111,12 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
                   setShowWelcome(false);
                   localStorage.setItem("userRole", "master");
                   localStorage.setItem("welcomeShown", "true");
+                  
+                  const tg = (window as any).Telegram?.WebApp as any;
+                  if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
+                    tg.CloudStorage.setItem('welcomeShown', 'true', () => {});
+                    tg.CloudStorage.setItem('userRole', 'master', () => {});
+                  }
                 }}
                 className={`w-full text-left p-4 rounded-2xl border active:scale-[0.98] transition-all group flex items-center gap-4 ${isLightMode ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-900' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white'}`}
               >

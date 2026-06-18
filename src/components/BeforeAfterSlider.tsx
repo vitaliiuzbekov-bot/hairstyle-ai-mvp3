@@ -6,7 +6,7 @@ interface BeforeAfterSliderProps {
   afterImage: string;
 }
 
-export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afterImage }) => {
+const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afterImage }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
 
   return (
     <div 
-      className="relative w-full h-[50vh] sm:h-[60vh] max-h-[600px] overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
+      className="relative w-full mx-auto overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
       ref={containerRef}
       onMouseDown={(e) => {
         setIsDragging(true);
@@ -66,11 +66,11 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
         handleMove(e.touches[0].clientX);
       }}
     >
-      {/* After Image (Background) */}
+      {/* After Image (Background) - dictating aspect ratio */}
       <CachedImage
         src={afterImage}
         alt="После"
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+        className="w-full h-auto object-contain pointer-events-none block"
       />
       
       {/* Before Image (Foreground/Clipped) */}
@@ -81,7 +81,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
         <CachedImage
           src={beforeImage}
           alt="До"
-          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         />
       </div>
 
@@ -103,3 +103,5 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
     </div>
   );
 };
+
+export const BeforeAfterSlider = React.memo(BeforeAfterSliderComponent);

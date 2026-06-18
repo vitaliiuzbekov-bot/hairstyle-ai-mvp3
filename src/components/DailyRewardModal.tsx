@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Gift, Zap, X } from "lucide-react";
 import { useTokenManager } from "../hooks/useTokenManager";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 interface DailyRewardModalProps {
   isLightMode?: boolean;
@@ -21,6 +22,8 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isLightMode 
       }, 3000); // delay so it doesn't pop up immediately upon mounting before welcome modal
     }
   }, []);
+
+  useScrollLock(showModal);
 
   const handleClaim = async () => {
     setIsClaiming(true);
@@ -83,23 +86,28 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isLightMode 
           <button
             onClick={handleClaim}
             disabled={isClaiming}
-            className={`w-full group font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
+            className={`relative w-full font-bold py-4 sm:py-5 px-6 flex items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${
               isClaiming
-                ? 'opacity-70 cursor-not-allowed bg-orange-400 text-white'
-                : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-[0_8px_30px_rgba(245,158,11,0.4)] hover:shadow-[0_8px_40px_rgba(245,158,11,0.5)]'
+                ? (isLightMode ? "bg-gray-100 text-gray-400 border border-transparent cursor-not-allowed" : "bg-white/5 text-white/40 border-transparent cursor-not-allowed")
+                : (isLightMode ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-[0.98]" : "bg-white text-black hover:bg-gray-100 shadow-md active:scale-[0.98]")
             }`}
           >
-            {isClaiming ? (
-              <span className="flex items-center gap-2">
-                 <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin"></div>
-                 Получаем...
-              </span>
-            ) : (
-              <>
-                <Zap size={20} className="fill-current text-white/90 group-hover:text-white transition-colors" />
-                Забрать бонус!
-              </>
+            {!isClaiming && (
+               <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
             )}
+            <span className="relative z-10 flex items-center gap-2">
+              {isClaiming ? (
+                <>
+                  <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin"></div>
+                  Получаем...
+                </>
+              ) : (
+                <>
+                  <Zap size={20} className="fill-current transition-colors" />
+                  Забрать бонус!
+                </>
+              )}
+            </span>
           </button>
         </div>
       </div>

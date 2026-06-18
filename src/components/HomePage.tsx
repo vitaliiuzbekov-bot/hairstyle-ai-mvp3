@@ -1,0 +1,317 @@
+import React, { useState, useEffect } from "react";
+import { UploadZone } from "../components/UploadZone";
+import { AnalysisResults } from "../components/AnalysisResults";
+import { ImageEditorModal } from "../components/ImageEditorModal";
+import { exportToPDF } from "../utils/pdfExport";
+import { useCamera } from "../hooks/useCamera";
+import { useImageUpload } from "../hooks/useImageUpload";
+import { useAnalysis } from "../hooks/useAnalysis";
+import { usePhotoHandlers } from "../hooks/usePhotoHandlers";
+import { useAnalysisContext } from "../context/AnalysisContext";
+import { useUser } from "../context/UserContext";
+import { useUI } from "../context/UIContext";
+
+const BarberBlueprintModal = React.lazy(() => import("../components/BarberBlueprintModal").then(m => ({ default: m.BarberBlueprintModal })));
+const CameraModal = React.lazy(() => import("../components/CameraModal").then(m => ({ default: m.CameraModal })));
+const StylistChat = React.lazy(() => import("../components/StylistChat").then(m => ({ default: m.StylistChat })));
+
+interface HomePageProps {
+  generationsLeft: number;
+  userId: string | null;
+  initError: string | null;
+  checkLimits: () => Promise<boolean>;
+  setShowBuyModal: (show: boolean) => void;
+  setHistory: React.Dispatch<React.SetStateAction<any[]>>;
+  processPayment: (packageId: string, starsAmount: number, generationsCount: number) => void;
+  history: any[];
+  telegramInitData: string;
+  isLightMode: boolean;
+  isDeveloper: boolean;
+}
+
+export const HomePage: React.FC<HomePageProps> = ({
+  generationsLeft,
+  userId,
+  initError,
+  checkLimits,
+  setShowBuyModal,
+  setHistory,
+  processPayment,
+  history,
+  telegramInitData,
+  isLightMode,
+  isDeveloper
+}) => {
+  const { consentGiven, setConsentGiven, consentError, setConsentError, userRole, salonName } = useUser();
+  const { addToast, chatStyleName, setChatStyleName, isChatOpen, setIsChatOpen } = useUI();
+  const { tryOnStyle, setTryOnStyle, preferredStyle, setPreferredStyle } = useAnalysisContext();
+
+  const {
+    imageBase64,
+    setImageBase64,
+    imageUrl,
+    setImageUrl,
+    mimeType,
+    isUploadingImage,
+    error: uploadError,
+    setError,
+    fileInputRef,
+    cameraInputRef,
+    handleFileUpload: originalHandleFileUpload,
+    resetImageState,
+    isCompressing,
+    rawImageBase64,
+    setRawImageBase64,
+    processFinalImage
+  } = useImageUpload();
+
+  const {
+      isAnalyzing,
+      results,
+      setResults,
+      loadingARStyles,
+      arGeneratedImageUrl,
+      setArGeneratedImageUrl,
+      teaserUrl,
+      teaserRecName,
+      isGeneratingTeaser,
+      styleConsultations,
+      arError,
+      setArError,
+      loadingVTONStyles,
+      vtonResultUrl,
+      setVtonResultUrl,
+      isTeaserResult,
+      vtonError,
+      setVtonError,
+      customHairColor,
+      setCustomHairColor,
+      vtonStrength,
+      setVtonStrength,
+      isLoadingMore,
+      analyzeImage,
+      generateARPreview,
+      generateVirtualTryOn,
+      loadMoreRecommendations
+  } = useAnalysis({
+      imageBase64,
+      imageUrl,
+      mimeType,
+      preferredStyle,
+      telegramInitData,
+      userId,
+      initError,
+      generationsLeft,
+      isDeveloper,
+      checkLimits,
+      setShowBuyModal,
+      setHistory,
+      setError,
+      addToast
+  });
+
+  const handleFileUploadWrapper = (e: React.ChangeEvent<HTMLInputElement>) => {
+      originalHandleFileUpload(e, () => {
+          setResults(null);
+          setArGeneratedImageUrl({});
+          setTryOnStyle(null);
+      });
+  };
+
+  useEffect(() => {
+    setVtonResultUrl(null);
+    setVtonError(null);
+    setCustomHairColor(null);
+    
+    // Auto-select Studio Shot mode (85) for catalog/custom images to ensure 100% geometry match and save money (skips flux)
+    if (tryOnStyle?.customImageUrl) {
+        setVtonStrength(85);
+    }
+  }, [tryOnStyle, setVtonResultUrl, setVtonError, setCustomHairColor, setVtonStrength]);
+
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const handleExportPDF = async (elementIdOrEvent?: string | React.MouseEvent, filename?: string) => {
+    setIsExportingPDF(true);
+    await exportToPDF(elementIdOrEvent, filename);
+    setIsExportingPDF(false);
+  };
+
+  const resetApp = () => {
+    resetImageState();
+    setResults(null);
+    setArError(null);
+    setArGeneratedImageUrl({});
+  };
+
+  const {
+    isCameraModalOpen,
+    cameraStream,
+    facingMode,
+    customVideoRef,
+    startCameraLocal,
+    stopCamera,
+    capturePhoto,
+  } = useCamera((file: File) => {
+    const fakeEvent = {
+        target: { files: [file], value: '' },
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+    handleFileUploadWrapper(fakeEvent);
+  });
+
+  const {
+    triggerFileInput,
+    triggerCameraInput,
+    handleTelegramUploadClick
+  } = usePhotoHandlers({
+    consentGiven,
+    setConsentError,
+    fileInputRef,
+    cameraInputRef,
+    startCameraLocal,
+    handleFileUploadWrapper
+  });
+
+  return (
+    <>
+      <ImageEditorModal
+        isOpen={!!rawImageBase64}
+        onClose={() => setRawImageBase64(null)}
+        originalBase64={rawImageBase64 || ''}
+        mimeType={mimeType}
+        onSave={(finalBase64) => {
+          setRawImageBase64(null);
+          processFinalImage(finalBase64);
+        }}
+      />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-16">
+        {/* Intro */}
+        {!imageBase64 && (
+          <div className="text-center max-w-2xl mx-auto mb-10 md:mb-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <h2 className={`font-serif text-3xl sm:text-4xl md:text-5xl lg:text-5xl mb-4 md:mb-6 leading-tight tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+              Какая стрижка подойдет <br className="hidden sm:block" />{" "}
+              <span className={`italic ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>именно вам?</span>
+            </h2>
+            <p className={`leading-relaxed max-w-lg mx-auto font-light text-sm sm:text-base px-2 ${isLightMode ? 'text-gray-600' : 'text-white/60'}`}>
+              Загрузите селфи, и наш умный эксперт определит форму вашего лица
+              для подбора стрижек, которые подчеркнут ваши лучшие черты.
+            </p>
+          </div>
+        )}
+
+        {/* History Link */}
+        {!imageBase64 && history && history.length > 0 && (
+          <div className="flex justify-center mb-8 fade-in">
+             <button 
+              onClick={() => window.location.hash = "#/history"}
+              className={`px-6 py-3 rounded-full text-sm font-medium border transition-colors ${isLightMode ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+             >
+               Посмотреть историю генераций ({history.length})
+             </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
+          {/* Left / Top: Upload Zone */}
+          <UploadZone
+            imageBase64={imageBase64}
+            imageUrl={imageUrl}
+            mimeType={mimeType}
+            isAnalyzing={isAnalyzing}
+            isUploadingImage={isUploadingImage || isCompressing}
+            error={uploadError}
+            results={results}
+            consentGiven={consentGiven}
+            setConsentGiven={setConsentGiven}
+            consentError={consentError}
+            setConsentError={setConsentError}
+            fileInputRef={fileInputRef}
+            cameraInputRef={cameraInputRef}
+            handleFileUpload={handleFileUploadWrapper}
+            handleTelegramUploadClick={handleTelegramUploadClick}
+            resetApp={resetApp}
+            preferredStyle={preferredStyle}
+            setPreferredStyle={setPreferredStyle}
+            analyzeImage={analyzeImage}
+            isLightMode={isLightMode}
+          />
+
+          {/* Right: Results */}
+          <AnalysisResults
+            isAnalyzing={isAnalyzing}
+            results={results}
+            generationsLeft={generationsLeft}
+            teaserUrl={teaserUrl}
+            isGeneratingTeaser={isGeneratingTeaser}
+            setShowBuyModal={setShowBuyModal}
+            setTryOnStyle={setTryOnStyle}
+            loadMoreRecommendations={loadMoreRecommendations}
+            isLoadingMore={isLoadingMore}
+            isLightMode={isLightMode}
+            exportToPDF={handleExportPDF}
+            isExportingPDF={isExportingPDF}
+            imageUrl={imageUrl}
+            imageBase64={imageBase64}
+            mimeType={mimeType}
+            generateVirtualTryOn={generateVirtualTryOn}
+            vtonResultUrl={vtonResultUrl}
+            loadingVTONStyles={loadingVTONStyles}
+            vtonError={vtonError}
+            onGenerationSuccess={() => {
+              checkLimits();
+            }}
+          />
+        </div>
+      </main>
+
+      <React.Suspense fallback={null}>
+        <BarberBlueprintModal
+          tryOnStyle={tryOnStyle}
+          setTryOnStyle={setTryOnStyle}
+          results={results}
+          imageUrl={imageUrl}
+          mimeType={mimeType}
+          imageBase64={imageBase64}
+          styleConsultations={styleConsultations}
+          loadingARStyles={loadingARStyles}
+          arError={arError}
+          vtonResultUrl={vtonResultUrl}
+          isTeaserResult={isTeaserResult}
+          processPayment={processPayment}
+          customHairColor={customHairColor}
+          setCustomHairColor={setCustomHairColor}
+          vtonStrength={vtonStrength}
+          setVtonStrength={setVtonStrength}
+          generateARPreview={generateARPreview}
+          exportToPDF={handleExportPDF}
+          isExportingPDF={isExportingPDF}
+          userRole={userRole}
+          salonName={salonName}
+          setChatStyleName={setChatStyleName}
+          setIsChatOpen={setIsChatOpen}
+          loadingVTONStyles={loadingVTONStyles}
+          generateVirtualTryOn={generateVirtualTryOn}
+          vtonError={vtonError}
+          isLightMode={isLightMode}
+        />
+
+        <CameraModal
+          isCameraModalOpen={isCameraModalOpen}
+          customVideoRef={customVideoRef}
+          facingMode={facingMode}
+          stopCamera={stopCamera}
+          capturePhoto={capturePhoto}
+          startCameraLocal={startCameraLocal}
+        />
+
+        {isChatOpen && results && (
+            <StylistChat 
+               onClose={() => setIsChatOpen(false)}
+               features={results}
+               styleName={chatStyleName}
+               isLightMode={isLightMode}
+            />
+        )}
+      </React.Suspense>
+    </>
+  );
+};

@@ -34,7 +34,26 @@ declare global {
         colorScheme?: 'light' | 'dark';
         ready?: () => void;
         expand?: () => void;
+        initData?: string;
+        onEvent?: (eventType: string, eventHandler: () => void) => void;
+        offEvent?: (eventType: string, eventHandler: () => void) => void;
         openInvoice?: (url: string, callback?: (status: string) => void) => void;
+        showPopup?: (params: any, callback: (buttonId: string) => void) => void;
+        showAlert?: (message: string) => void;
+        openTelegramLink?: (url: string) => void;
+        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;
+        switchInlineQuery?: (query: string, choose_chat_types?: string[]) => void;
+        BackButton?: {
+          show: () => void;
+          hide: () => void;
+          onClick: (callback: () => void) => void;
+          offClick: (callback: () => void) => void;
+        };
+        HapticFeedback?: {
+          impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+          notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
+          selectionChanged: () => void;
+        };
       };
     };
   }

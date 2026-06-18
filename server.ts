@@ -4,27 +4,99 @@ import path from "path";
 import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
 import jwt from "jsonwebtoken";
+import helmet from "helmet";
+import compression from "compression";
 import "dotenv/config";
 
 
 import { analysisRouter } from "./src/server/routes/analysis";
 import { generateRouter } from "./src/server/routes/generate";
 import { authRouter } from "./src/server/routes/auth";
+import { referenceRouter } from "./src/server/routes/reference";
+import { tgStorageRouter } from "./src/server/routes/tgStorage";
 import { logToTelegram } from "./src/server/services/logger";
+import crypto from "crypto";
+import multer from "multer";
+
+const telegramValidationMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const initData = req.headers['x-telegram-init-data'] as string;
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const isDev = process.env.NODE_ENV !== "production";
+  
+  const userId = req.body?.userId;
+
+  // В режиме разработки или если токена нет - разрешаем
+  // В ПРОДАКШЕНЕ запрещаем обход через local-user!
+  if (!botToken || (isDev && userId === "local-user")) {
+     return next();
+  }
+
+  // Если мы в Telegram (бота токен есть), то initData ОБЯЗАТЕЛЕН
+  if (!initData) {
+    res.status(403).json({ error: "Access Denied: Telegram Init Data is required" });
+    return;
+  }
+
+  try {
+    const parsedData = new URLSearchParams(initData);
+    const hash = parsedData.get('hash');
+    if (!hash) {
+      res.status(403).json({ error: "Invalid Telegram Init Data: Missing hash" });
+      return;
+    }
+
+    parsedData.delete('hash');
+    const keys = Array.from(parsedData.keys()).sort();
+    const dataCheckString = keys.map(key => `${key}=${parsedData.get(key)}`).join('\n');
+
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+    if (calculatedHash !== hash) {
+      res.status(403).json({ error: "Invalid Telegram Init Data: Signature mismatch" });
+      return;
+    }
+    
+    const userParam = parsedData.get('user');
+    if (userParam && req.body?.tgUserId) {
+      const userObj = JSON.parse(userParam);
+      if (userObj.id.toString() !== req.body.tgUserId.toString()) {
+         res.status(403).json({ error: "Telegram User ID mismatch in request and Init Data" });
+         return;
+      }
+    }
+
+    next();
+  } catch (e) {
+    console.error("Telegram Validation Error:", e);
+    res.status(403).json({ error: "Telegram Validation Exception" });
+    return;
+  }
+};
+
 async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  // Enhance security with Helmet
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disabled for dev with inline styles/scripts and third-party APIs
+    crossOriginEmbedderPolicy: false
+  }));
+
+  // Compress responses for better performance
+  app.use(compression());
 
   // Middleware for parsing JSON with a larger limit for images
   app.use(express.json({ limit: "50mb" }));
 
   // Rate Limiter to prevent bankruptcy from GenAI usage overhead
   const apiLimiter = rateLimit({
-    windowMs: 24 * 60 * 60 * 1000, // 24 hours
-    max: 1000, 
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 150, // Limit each IP to 150 requests per windowMs
     message: { 
-      error: "Суточный бесплатный лимит запросов исчерпан. Пожалуйста, попробуйте позже.",
+      error: "Слишком много запросов. Пожалуйста, подождите немного.",
       fallback: true
     },
     standardHeaders: true,
@@ -35,13 +107,15 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  app.use("/api/analyze", apiLimiter);
-  app.use("/api/generate-ar", apiLimiter);
-  app.use("/api/load-more", apiLimiter);
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { 
+      fileSize: 15 * 1024 * 1024,
+      fieldSize: 15 * 1024 * 1024
+    }
+  });
 
-  // API Routes
-  
-  
+  // Setup middlewares for protected API routes
   app.post("/api/log", async (req, res) => {
     try {
       const { level = 'info', message, userId } = req.body;
@@ -54,9 +128,28 @@ async function startServer() {
     }
   });
 
+  app.use("/api/analyze", telegramValidationMiddleware, apiLimiter, upload.single("image"));
+  app.use("/api/generate-reference", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/generate-full", telegramValidationMiddleware, apiLimiter, upload.single("image"));
+  app.use("/api/generate-ar", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/chat-stylist", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/transcribe", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/load-more", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/create-invoice", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/set-telegram-webhook", apiLimiter);
+  
   app.use("/api", analysisRouter);
   app.use("/api", generateRouter);
   app.use("/api", authRouter);
+  app.use("/api", referenceRouter);
+  app.use("/api/tg", tgStorageRouter);
+
+
+  // Global API Error Handler
+  app.use("/api", (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Express API Error:", err);
+    res.status(err.status || 500).json({ error: err.message || "Internal Server Error", fallback: !!err.fallback });
+  });
 
 if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -70,6 +163,9 @@ if (process.env.NODE_ENV !== "production") {
     app.use("*", async (req, res, next) => {
       try {
         const url = req.originalUrl;
+        if (url.startsWith('/api/')) {
+           return res.status(404).json({ error: "API route not found" });
+        }
         let template = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
         template = await vite.transformIndexHtml(url, template);
         res.status(200).set({ "Content-Type": "text/html" }).end(template);
@@ -82,6 +178,9 @@ if (process.env.NODE_ENV !== "production") {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      if (req.originalUrl.startsWith('/api/')) {
+        return res.status(404).json({ error: "API route not found" });
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
