@@ -67,17 +67,29 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
     }
     
     const origImg = await loadImage(safeOrigSrc);
+
+    // Limit size for mobile stability
+    let maxDim = 1024;
+    let ratio = 1;
+    if (origImg.width > maxDim || origImg.height > maxDim) {
+      ratio = Math.min(maxDim / origImg.width, maxDim / origImg.height);
+    }
+    const canvasW = Math.floor(origImg.width * ratio);
+    const canvasH = Math.floor(origImg.height * ratio);
+
     const canvas = document.createElement("canvas");
-    canvas.width = origImg.width;
-    canvas.height = origImg.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(origImg, 0, 0);
-    const origData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(origImg, 0, 0, canvasW, canvasH);
+    const origData = ctx.getImageData(0, 0, canvasW, canvasH);
 
     const segmenter = await getMulticlassSegmenter();
     return new Promise((resolve, reject) => {
         try {
-            segmenter.segment(origImg, (result) => {
+            // Need to pass the canvas or resized image to segmenter. 
+            // We pass the canvas so it processes the smaller version.
+            segmenter.segment(canvas, (result) => {
                 const maskObj = result.categoryMask;
                 if (!maskObj) throw new Error("No mask returned");
                 
@@ -87,7 +99,7 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
                     width: maskObj.width,
                     height: maskObj.height,
                     origData,
-                    origImg
+                    origImg: canvas // use the resized canvas as the source image
                 };
                 resolve(maskCacheRef.current);
             });
@@ -217,20 +229,20 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           tintCanvas.height = canvas.height;
           const ttx = tintCanvas.getContext("2d")!;
           
-          const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number }> = {
-            "Блонд": { hex: "#D9C09E", mode: "color", opacity: 0.85 },
-            "Рыжий": { hex: "#D95C14", mode: "overlay", opacity: 0.85 },
+          const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, needsScreen?: boolean }> = {
+            "Блонд": { hex: "#F3E5AB", mode: "soft-light", opacity: 0.9, needsScreen: true },
+            "Рыжий": { hex: "#D95C14", mode: "overlay", opacity: 0.9 },
             "Шоколадный": { hex: "#3B1E08", mode: "multiply", opacity: 0.8 },
-            "Русый": { hex: "#8A6F4E", mode: "color", opacity: 0.85 },
-            "Пепельный": { hex: "#9ca3af", mode: "color", opacity: 0.85 },
-            "Черный": { hex: "#080808", mode: "multiply", opacity: 0.9 },
+            "Русый": { hex: "#8A6F4E", mode: "overlay", opacity: 0.8 },
+            "Пепельный": { hex: "#B0B4B8", mode: "color", opacity: 0.85 },
+            "Черный": { hex: "#111111", mode: "multiply", opacity: 0.95 },
             "Красный": { hex: "#DC2626", mode: "overlay", opacity: 0.85 },
-            "Розовый": { hex: "#EC4899", mode: "soft-light", opacity: 1.0 },
+            "Розовый": { hex: "#EC4899", mode: "overlay", opacity: 0.9 },
             "Синий": { hex: "#2563EB", mode: "overlay", opacity: 0.85 },
-            "Каштан": { hex: "#5C3A21", mode: "multiply", opacity: 0.8 },
-            "Светло-каштановый": { hex: "#8B5A2B", mode: "multiply", opacity: 0.8 },
-            "Седой": { hex: "#D3D3D3", mode: "color", opacity: 0.9 },
-            "Мелирование": { hex: "#FDE047", mode: "soft-light", opacity: 0.8 }
+            "Каштан": { hex: "#4A2F1D", mode: "multiply", opacity: 0.8 },
+            "Светло-каштановый": { hex: "#6B4423", mode: "multiply", opacity: 0.7 },
+            "Седой": { hex: "#D1D5DB", mode: "color", opacity: 0.9, needsScreen: true },
+            "Мелирование": { hex: "#FDE047", mode: "overlay", opacity: 0.8 }
           };
 
           const cfg = colorsCfg[colorName] || { hex: "#F5D061", mode: "color", opacity: 0.8 };
@@ -245,12 +257,19 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           styledHairCanvas.height = canvas.height;
           const shtx = styledHairCanvas.getContext("2d")!;
           shtx.drawImage(hairLayerCanvas, 0, 0);
+
+          if (cfg.needsScreen) {
+             shtx.globalAlpha = 0.4;
+             shtx.globalCompositeOperation = "screen";
+             shtx.drawImage(tintCanvas, 0, 0);
+          }
+
           shtx.globalAlpha = cfg.opacity;
           shtx.globalCompositeOperation = cfg.mode;
           shtx.drawImage(tintCanvas, 0, 0);
           
           if (cfg.mode !== "color") {
-            shtx.globalAlpha = 0.5;
+            shtx.globalAlpha = 0.6;
             shtx.globalCompositeOperation = "color";
             shtx.drawImage(tintCanvas, 0, 0);
           }

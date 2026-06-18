@@ -150,7 +150,7 @@ export const useAnalysis = ({
           if (imageUrl) formData.append("imageUrl", imageUrl);
           if (mimeType) formData.append("mimeType", mimeType);
           if (userId) formData.append("userId", userId);
-          if (preferredStyle) formData.append("preferredStyle", preferredStyle);
+          if (preferredStyle) formData.append("preferredStyle", encodeURIComponent(preferredStyle));
           
           if (localStats) {
               formData.append("faceApiGender", localStats.gender);
@@ -271,9 +271,9 @@ export const useAnalysis = ({
             for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
             formData.append("image", new Blob([ab], { type: mimeType || "image/jpeg" }), "upload.jpg");
           }
-          formData.append("keyword", styleKeyword);
-          formData.append("description", styleDescription);
-          if (selectedColor) formData.append("customHairColor", selectedColor);
+          formData.append("keyword", encodeURIComponent(styleKeyword));
+          formData.append("description", encodeURIComponent(styleDescription));
+          if (selectedColor) formData.append("customHairColor", encodeURIComponent(selectedColor));
           formData.append("vtonStrength", String(vtonStrength));
           if (results?.gender) formData.append("gender", results.gender);
           if (results?.faceShape) formData.append("faceShape", results.faceShape);

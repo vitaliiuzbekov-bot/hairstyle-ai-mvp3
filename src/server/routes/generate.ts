@@ -246,12 +246,16 @@ generateRouter.post("/generate-full", async (req, res) => {
 
     try {
       const { 
-        userId, gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
-        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
+        userId, gender, faceShape, hairLength, hairDensity, hairType, skinTone, 
+        skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
         vtonStrength, // Number from 50 to 100
         targetImageUrl, // Optional, generated reference image URL
         hairlineStatus, hairQuality, idempotencyKey
       } = req.body;
+      
+      const keyword = decodeURIComponent(req.body.keyword || "");
+      const description = decodeURIComponent(req.body.description || "");
+      const customHairColor = req.body.customHairColor ? decodeURIComponent(req.body.customHairColor) : undefined;
       
       let selfieImage = req.body.selfieImage;
       if (req.file) {

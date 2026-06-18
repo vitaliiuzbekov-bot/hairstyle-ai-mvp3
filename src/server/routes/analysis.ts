@@ -24,8 +24,13 @@ async function fetchImageAsBase64(url: string | null, fallbackBase64: string | n
 
 analysisRouter.post("/analyze", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { imageUrl, mimeType, preferredStyle, faceApiGender, faceApiShape, faceApiAge } = req.body;
+    const { imageUrl, mimeType, faceApiGender, faceApiShape, faceApiAge } = req.body;
     let imageBase64 = req.body.imageBase64;
+    let preferredStyle = req.body.preferredStyle;
+    
+    if (preferredStyle) {
+      preferredStyle = decodeURIComponent(preferredStyle);
+    }
     
     // Support multipart/form-data upload via multer
     if (req.file) {
