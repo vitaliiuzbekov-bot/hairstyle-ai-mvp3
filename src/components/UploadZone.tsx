@@ -212,35 +212,39 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                       <div className="flex flex-col sm:flex-row gap-4 w-full px-6 max-w-[400px]">
                         {consentGiven ? (
                           <>
-                            <label
-                              className={`cursor-pointer flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                            <button
+                              onClick={(e) => handleTelegramUploadClick(true, e)}
+                              className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
                                 isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95"
                               }`}
                             >
                               <Camera size={16} />
                               Сделать фото
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture="user"
-                                className="hidden"
-                                onChange={handleFileUpload}
-                              />
-                            </label>
-                            <label
-                              className={`cursor-pointer flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                            </button>
+                            <button
+                              onClick={(e) => handleTelegramUploadClick(false, e)}
+                              className={`flex-1 border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
                                 isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm active:scale-95" : "glass-button text-white/90 hover:bg-white/10 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95"
                               }`}
                             >
                               <ImageIcon size={16} />
                               Галерея
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleFileUpload}
-                              />
-                            </label>
+                            </button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture
+                              className="hidden"
+                              ref={cameraInputRef}
+                              onChange={handleFileUpload}
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              ref={fileInputRef}
+                              onChange={handleFileUpload}
+                            />
                           </>
                         ) : (
                           <>

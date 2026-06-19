@@ -55,7 +55,7 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
 
   return (
     <div 
-      className="relative w-full mx-auto overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
+      className="relative w-full aspect-[3/4] sm:aspect-square md:aspect-[3/4] mx-auto overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
       ref={containerRef}
       onMouseDown={(e) => {
         setIsDragging(true);

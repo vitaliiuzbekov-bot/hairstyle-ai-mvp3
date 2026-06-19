@@ -212,22 +212,22 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           const ttx = tintCanvas.getContext("2d")!;
           
           const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, lightness?: number }> = {
-            "Блонд": { hex: "#ebdcb6", mode: "overlay", opacity: 0.95, lightness: 0.6 }, 
+            "Блонд": { hex: "#EAD5A6", mode: "color", opacity: 0.8, lightness: 0.35 }, 
             "Рыжий": { hex: "#a62c00", mode: "overlay", opacity: 0.85, lightness: 0.1 },
-            "Шоколадный": { hex: "#3a1d0d", mode: "overlay", opacity: 0.6 },
-            "Русый": { hex: "#7a624f", mode: "overlay", opacity: 0.7, lightness: 0.15 },
-            "Пепельный": { hex: "#a3abb3", mode: "color", opacity: 0.9, lightness: 0.4 },
+            "Шоколадный": { hex: "#3e2723", mode: "color", opacity: 0.75 },
+            "Русый": { hex: "#8d6e63", mode: "color", opacity: 0.7, lightness: 0.15 },
+            "Пепельный": { hex: "#9E9E9E", mode: "color", opacity: 0.85, lightness: 0.2 },
             "Черный": { hex: "#080808", mode: "multiply", opacity: 0.85 },
-            "Красный": { hex: "#990e0e", mode: "overlay", opacity: 0.85 },
-            "Розовый": { hex: "#cf3a75", mode: "soft-light", opacity: 0.9, lightness: 0.3 },
-            "Синий": { hex: "#1c40a6", mode: "overlay", opacity: 0.85, lightness: 0.2 },
-            "Каштан": { hex: "#45220c", mode: "overlay", opacity: 0.75 },
+            "Красный": { hex: "#800000", mode: "color", opacity: 0.85, lightness: 0.1 },
+            "Розовый": { hex: "#f48fb1", mode: "color", opacity: 0.85, lightness: 0.25 },
+            "Синий": { hex: "#1a237e", mode: "color", opacity: 0.8 },
+            "Каштан": { hex: "#4e342e", mode: "color", opacity: 0.8 },
             "Светло-каштановый": { hex: "#75462b", mode: "overlay", opacity: 0.7 },
-            "Седой": { hex: "#c7c7c7", mode: "color", opacity: 0.9, lightness: 0.5 },
-            "Мелирование": { hex: "#dbbf74", mode: "overlay", opacity: 0.7, lightness: 0.3 }
+            "Седой": { hex: "#ECEFF1", mode: "color", opacity: 0.85, lightness: 0.35 },
+            "Мелирование": { hex: "#E8C396", mode: "color", opacity: 0.75, lightness: 0.2 }
           };
 
-          const cfg = colorsCfg[colorName] || { hex: "#dfc785", mode: "overlay", opacity: 0.8 };
+          const cfg = colorsCfg[colorName] || { hex: "#dfc785", mode: "color", opacity: 0.8 };
 
           ttx.fillStyle = cfg.hex;
           ttx.fillRect(0, 0, canvas.width, canvas.height);
@@ -252,7 +252,7 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
              lxt.drawImage(hairLayerCanvas, 0, 0);
 
              shtx.globalAlpha = cfg.lightness;
-             shtx.globalCompositeOperation = "color-dodge";
+             shtx.globalCompositeOperation = "screen";
              shtx.drawImage(lightenCanvas, 0, 0);
           }
 

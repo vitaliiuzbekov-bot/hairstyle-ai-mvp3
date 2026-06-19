@@ -266,15 +266,18 @@ generateRouter.post("/generate-full", async (req, res) => {
       }
 
       let finalTargetImageUrl = targetImageUrl;
-      if (finalTargetImageUrl && finalTargetImageUrl.startsWith('/')) {
+      if (finalTargetImageUrl && (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/'))) {
+        const normalizePath = finalTargetImageUrl.startsWith('/') ? finalTargetImageUrl : '/' + finalTargetImageUrl;
         // Try reading from public or dist folders
-        let localPath = path.join(process.cwd(), 'dist', finalTargetImageUrl);
+        let localPath = path.join(process.cwd(), 'dist', normalizePath);
         if (!fs.existsSync(localPath)) {
-            localPath = path.join(process.cwd(), 'public', finalTargetImageUrl);
+            localPath = path.join(process.cwd(), 'public', normalizePath);
         }
         if (fs.existsSync(localPath)) {
             const buf = fs.readFileSync(localPath);
-            finalTargetImageUrl = `data:image/jpeg;base64,${buf.toString('base64')}`;
+            const ext = path.extname(localPath).toLowerCase();
+            const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+            finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
         }
       }
 

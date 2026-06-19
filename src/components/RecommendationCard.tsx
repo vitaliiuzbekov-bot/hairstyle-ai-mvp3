@@ -93,14 +93,22 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
             </div>
           ) : (
             <>
-              <LazyImage
-                keyword={rec.imageKeyword || rec.name}
-                gender={results?.gender || ""}
-                uniqueName={rec.name}
-                description={rec.description}
-                results={results}
-                className={`absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ${isLightMode ? 'opacity-100' : 'opacity-90'}`}
-              />
+              {rec.customImageUrl ? (
+                <img
+                  src={rec.customImageUrl}
+                  alt={rec.name}
+                  className={`absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ${isLightMode ? 'opacity-100' : 'opacity-90'}`}
+                />
+              ) : (
+                <LazyImage
+                  keyword={rec.imageKeyword || rec.name}
+                  gender={results?.gender || ""}
+                  uniqueName={rec.name}
+                  description={rec.description}
+                  results={results}
+                  className={`absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ${isLightMode ? 'opacity-100' : 'opacity-90'}`}
+                />
+              )}
               <div className={`absolute inset-x-0 bottom-0 h-24 sm:hidden pointer-events-none z-10 ${isLightMode ? 'bg-gradient-to-t from-black/50 to-transparent' : 'bg-gradient-to-t from-black/80 to-transparent'}`}></div>
               <div className={`absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium z-20 shadow-sm border backdrop-blur-md ${isLightMode ? 'bg-white/80 text-gray-800 border-gray-200' : 'bg-white/5 text-white/90 border-white/10'}`}>
                 {idx + 1}
