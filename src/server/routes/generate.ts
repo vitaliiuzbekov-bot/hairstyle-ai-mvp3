@@ -27,6 +27,7 @@ import {
 } from "../utils/promptGenerator";
 
 import { checkAndDeductGeneration, refundGeneration } from "../utils/billing";
+import { uploadImageToFal } from "../services/falClient";
 
 export const generateRouter = Router();
 
@@ -187,38 +188,8 @@ generateRouter.post("/generate-reference", async (req, res) => {
          lastError += "[Яндекс Облако не настроено, отсутствуют YANDEX_SERVICE_ACCOUNT_KEY или YANDEX_FOLDER_ID]";
       }
 
-      // Fallback
       if (!finalImageUrl) {
-          console.error(`Не удалось сгенерировать изображение: ${lastError}. Попытка использовать Gemini-2.5-flash-image.`);
-          try {
-              const { GoogleGenAI, Modality } = await import("@google/genai");
-              const geminiApiKey = process.env.GEMINI_API_KEY;
-              if (geminiApiKey) {
-                  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-                  const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash-image',
-                    contents: {
-                      parts: [
-                        { text: `A highly photorealistic, amateur portrait photo of an average individual with this specific hairstyle: ${prompt}. CRITICAL INSTRUCTION: STYLED HAIR MUST HAVE ABSOLUTELY ZERO VOLUME AND ZERO MESSINESS. IT MUST LIE COMPLETELY FLAT AGAINST THE HEAD OR HAVE A VERY MODEST, NATURAL EVERYDAY LOOK. Do not generate puffy, curly, tall, voluminous, or "messy/hurricane" hair. Do not make it look like a fashion magazine cover. Strictly amateur style lighting, simple wall background, flat hair.` },
-                      ],
-                    },
-                    config: {
-                        responseModalities: [Modality.IMAGE],
-                    },
-                  });
-                  for (const part of response.candidates?.[0]?.content?.parts || []) {
-                    if (part.inlineData) {
-                      finalImageUrl = `data:image/jpeg;base64,${part.inlineData.data}`;
-                      break;
-                    }
-                  }
-              }
-          } catch(e: any) {
-              console.error(`Gemini Fallback Failed:`, e);
-          }
-          if (!finalImageUrl) {
-             throw new Error('К сожалению, не удалось сгенерировать референс прически. Сервера перегружены, попробуйте еще раз.');
-          }
+          throw new Error(`К сожалению, не удалось сгенерировать референс прически через Yandex ART. Ошибка: ${lastError}`);
       } else {
           // Save to cache for 30 days (30 * 24 * 60 * 60 seconds)
           await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
@@ -351,28 +322,24 @@ generateRouter.post("/generate-full", async (req, res) => {
       const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
       
       let baseImageForFlux = selfieImageFull;
-      let fluxStrength = 0.40;
       
-      // We process the reference image (targetImageUrl), which comes from either catalog, uploaded reference, or YandexART.
-      if (finalTargetImageUrl) {
-          baseImageForFlux = finalTargetImageUrl.startsWith('http') || finalTargetImageUrl.startsWith('data:') 
-              ? finalTargetImageUrl 
-              : `data:image/jpeg;base64,${finalTargetImageUrl}`;
-          
-          if (isCustomColorRequested) {
-              // Apply a dye pass to the reference image before FaceSwapping with the user's face
-              // Increased from 0.28 to 0.45 to ensure the color applies successfully without destroying shape
-              fluxStrength = 0.45;
-          } else {
-              // Exact match, no color change needed - skip straight to FaceSwap
-              fluxStrength = 0.05;
-          }
+      // Map UI vtonStrength (50-100) to fluxStrength (0.3 - 0.75). 
+      // Higher strength means more hair change, lower means strict adherence to original jaw/face.
+      let uiStrength = Number(vtonStrength) || 45; 
+      let fluxStrength = 0.75; // Increased to ensure 100% hair replacement
+
+      if (uiStrength === 85 && finalTargetImageUrl) {
+          // Studio Shot logic: Use catalog image as base and completely skip flux for exact 100% hair shape. 
+          // Note: This results in the catalog model's body being used.
+          baseImageForFlux = finalTargetImageUrl;
+          fluxStrength = 0.05; 
       } else {
-          baseImageForFlux = selfieImageFull;
+          // Map linearly: 50 -> 0.45, 100 -> 0.75
+          if (uiStrength >= 50 && uiStrength <= 100) {
+              fluxStrength = 0.45 + ((uiStrength - 50) / 50) * 0.30;
+          }
           if (keyword && keyword.includes("same exact current hairstyle")) {
-              fluxStrength = 0.85;
-          } else {
-              fluxStrength = 0.50;
+              fluxStrength = 0.35; // keep original structure
           }
       }
 
@@ -477,7 +444,7 @@ generateRouter.post("/generate-full", async (req, res) => {
 
       let agePromptEng = getDetailedAgePromptEng(ageRange || "");
       
-      promptEng = `A photorealistic portrait of a ${descriptorEng}. This person is a ${agePromptEng}. [CRITICAL HAIRSTYLE REPLICATION: YOU MUST EXACTLY AND PERFECTLY REPLICATE THE HAIRSTYLE, VOLUME, SHAPE, AND TEXTURE PORTRAYED IN THE IMAGE. DO NOT CHANGE THE HAIRSTYLE STRUCTURE OR TYPE. THIS IS STRICTLY REQUIRED. STYLE OVERVIEW: ${englishKeyword} - ${englishDescription || ""}]. ${fluxHairDetails} ${extraColorPrompt} CRITICAL FACIAL CLARITY REQUIREMENT: The person must look directly at the camera with a clear, unobstructed face. The face must be in perfect sharp focus, crystal clear. No face warping, no distortions. Look directly at the camera, beautiful portrait lighting. CRITICAL INSTRUCTION: NO HYPER-VOLUME. HAIR MUST LIE FLAT AND NATURAL unless explicitly requested.`;
+      promptEng = `A photorealistic portrait of a ${descriptorEng}. This person is a ${agePromptEng}. [CRITICAL HAIRSTYLE REPLICATION: YOU MUST EXACTLY AND PERFECTLY REPLICATE THE HAIRSTYLE, VOLUME, SHAPE, AND TEXTURE PORTRAYED IN THE IMAGE. DO NOT CHANGE THE HAIRSTYLE STRUCTURE OR TYPE. THIS IS STRICTLY REQUIRED. STYLE OVERVIEW: ${englishKeyword} - ${englishDescription || ""}]. ${fluxHairDetails} ${extraColorPrompt} CRITICAL FACIAL CLARITY REQUIREMENT: The person must look directly at the camera with a clear, unobstructed face. The face must be in perfect sharp focus, crystal clear. No face warping, no distortions. Look directly at the camera. CRITICAL INSTRUCTION: DO NOT ALTER THE PERSON'S ORIGINAL FACE STRUCTURE, JAWLINE, CHIN, EYES, NOSE, SHOULDERS, OR BODY SHAPE. PRESERVE THE IDENTITY EXACTLY. Only change the hair. CRITICAL INSTRUCTION: NO HYPER-VOLUME. HAIR MUST LIE FLAT AND NATURAL unless explicitly requested.`;
       
       const translateFaceShape = (val: string) => {
         val = val.toLowerCase();
@@ -530,12 +497,13 @@ generateRouter.post("/generate-full", async (req, res) => {
             console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
             let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
             
+            const fluxBaseImageUrl = baseImageForFlux.startsWith('data:') ? await uploadImageToFal(baseImageForFlux) : baseImageForFlux;
+
             const bodyPayload: any = {
                prompt: promptEng,
-               image_url: baseImageForFlux,
+               image_url: fluxBaseImageUrl,
                strength: fluxStrength,
-               num_inference_steps: 15,
-               guidance_scale: 3.5
+               num_inference_steps: 15
             };
             
             const fluxRes = await fetch(endpoint, {
@@ -571,9 +539,13 @@ generateRouter.post("/generate-full", async (req, res) => {
       // Always run FaceSwap to ensure 100% facial feature retention
       try {
          console.log("Starting Virtual Try-On FaceSwap via FAL.AI...");
+         
+         const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
+         const swapImageUrlForFal = selfieImageFull.startsWith('data:') ? await uploadImageToFal(selfieImageFull) : selfieImageFull;
+
          const faceSwapPayload = {
-           base_image_url: finalImageUrl,
-           swap_image_url: selfieImageFull
+           base_image_url: baseImageUrlForFal,
+           swap_image_url: swapImageUrlForFal
          };
          console.log("FaceSwap Payload:", JSON.stringify(faceSwapPayload).substring(0, 500) + "... (truncated)");
          
@@ -832,78 +804,20 @@ generateRouter.post("/transcribe", async (req, res) => {
 
       const folderId = process.env.YANDEX_FOLDER_ID;
       const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
-      const geminiApiKey = process.env.GEMINI_API_KEY;
 
       const cleanMimeType = mimeType.split(";")[0].trim();
       const isOgg = cleanMimeType.includes("ogg") || cleanMimeType.includes("opus");
 
-      // Check if Yandex is not set up, or if this is a webm/mp4 structure that Yandex cannot parse directly
-      if (!isOgg || !folderId || !saKey) {
-        if (geminiApiKey) {
-          console.log("Transcribing via Gemini API for browser compatibility:", cleanMimeType);
-          try {
-            const { GoogleGenAI } = await import("@google/genai");
-            const ai = new GoogleGenAI({ 
-              apiKey: geminiApiKey,
-              httpOptions: {
-                headers: {
-                  'User-Agent': 'aistudio-build'
-                }
-              }
-            });
-
-            let transcribedText = "";
-            let retries = 5;
-            let attempt = 0;
-            while (retries > 0) {
-              try {
-                const response = await ai.models.generateContent({
-                  model: "gemini-2.5-flash",
-                  contents: [
-                    {
-                      text: "Преврати аудиозапись в текст. Напиши только распознанный текст на русском языке и ничего больше. Не добавляй никаких пояснений, хэштегов или кавычек."
-                    },
-                    {
-                      inlineData: {
-                        mimeType: cleanMimeType,
-                        data: audioBase64
-                      }
-                    }
-                  ]
-                });
-                transcribedText = response.text?.trim() || "";
-                break;
-              } catch (geminiErr: any) {
-                retries--;
-                attempt++;
-                let errMsg = geminiErr.message || JSON.stringify(geminiErr);
-                if (retries === 0) {
-                  if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand")) {
-                      throw new Error("Нейросеть сейчас испытывает высокую нагрузку. Пожалуйста, подождите минуту и попробуйте снова.");
-                  }
-                  throw geminiErr;
-                }
-                console.warn(`Gemini fallback STT attempt failed, retrying... (${attempt}/5)`, geminiErr.message);
-                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-              }
-            }
-
-            return res.json({ text: transcribedText });
-          } catch (geminiErr: any) {
-            console.error("Gemini fallback STT failed:", geminiErr);
-            throw new Error(`Ошибка распознавания аудио: ${geminiErr.message}`);
-          }
-        } else {
-             throw new Error("Yandex SpeechKit не настроен, а GEMINI_API_KEY отсутствует для резервного распознавания.");
-        }
+      if (!folderId || !saKey) {
+          throw new Error("Yandex SpeechKit не настроен (отсутствует YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY).");
       }
 
-      // If it has ogg format, use Yandex SpeechKit
       const cleanFolderId = extractFolderId(folderId);
       const iamToken = await getYandexIamToken(saKey);
       const audioBuffer = Buffer.from(audioBase64, 'base64');
 
-      const url = `https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId=${cleanFolderId}&lang=ru-RU&format=oggopus`;
+      const formatArg = isOgg ? "oggopus" : "lpcm";
+      const url = `https://stt.api.cloud.yandex.net/speech/v1/stt:recognize?folderId=${cleanFolderId}&lang=ru-RU&format=${formatArg}`;
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -915,48 +829,6 @@ generateRouter.post("/transcribe", async (req, res) => {
 
       if (!response.ok) {
          const errText = await response.text();
-         // If Yandex fails due to format / ogg header issue, try Gemini as safety net
-         if ((errText.includes("header") || response.status === 400) && geminiApiKey) {
-            console.warn("Yandex STT failed with 400. Trying Gemini API fallback...");
-            const { GoogleGenAI } = await import("@google/genai");
-            const ai = new GoogleGenAI({ 
-              apiKey: geminiApiKey,
-              httpOptions: {
-                headers: {
-                  'User-Agent': 'aistudio-build'
-                }
-              }
-            });
-            let textResult = "";
-            let retries = 5;
-            let attempt = 0;
-            while (retries > 0) {
-              try {
-                  const fallbackResponse = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
-                    contents: [
-                      { text: "Преврати аудиозапись в текст. Напиши только распознанный текст на русском языке и ничего больше." },
-                      { inlineData: { mimeType: cleanMimeType, data: audioBase64 } }
-                    ]
-                  });
-                  textResult = fallbackResponse.text?.trim() || "";
-                  break;
-              } catch (geminiErr: any) {
-                  retries--;
-                  attempt++;
-                  let errMsg = geminiErr.message || JSON.stringify(geminiErr);
-                  if (retries === 0) {
-                    if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand")) {
-                        throw new Error("Нейросеть сейчас испытывает высокую нагрузку. Пожалуйста, подождите минуту и попробуйте снова.");
-                    }
-                    throw geminiErr;
-                  }
-                  console.warn(`Gemini API fallback attempt failed, retrying... (${attempt}/5)`, geminiErr.message);
-                  await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-              }
-            }
-            return res.json({ text: textResult });
-         }
          throw new Error(`Ошибка Yandex SpeechKit STT (HTTP ${response.status}): ${errText}`);
       }
 
@@ -973,14 +845,23 @@ generateRouter.post("/load-more", async (req, res) => {
   try {
     const { userId, existingNames, features, preferredStyle } = req.body;
     
-    const { GoogleGenAI, Type } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
     let existingStr = "";
     if (Array.isArray(existingNames) && existingNames.length > 0) {
       existingStr = existingNames.join(", ");
     }
     
+    const systemInstruction = `Ты стилист-ассистент. Отвечай СТРОГО в формате JSON без markdown:
+{
+  "recommendations": [
+    {
+      "name": "Название прически",
+      "imageKeyword": "keyword",
+      "description": "Описание",
+      "stylingTips": "Советы"
+    }
+  ]
+}`;
+
     const prompt = `Пользователь ищет варианты причесок.
 Сгенерируй 4 новых и УНИКАЛЬНЫХ рекомендации причесок.
 ОНИ НЕ ДОЛЖНЫ СТРЕЧАТЬСЯ В ЭТОМ СПИСКЕ: ${existingStr}.
@@ -991,63 +872,15 @@ generateRouter.post("/load-more", async (req, res) => {
 Форма лица: ${features?.faceShape || "Не указана"}
 Густота волос: ${features?.hairDensity || "Не указана"}
 Тип волос: ${features?.hairType || "Не указан"}
-Длина: ${features?.hairLength || "Не указана"}
-
-Для каждого варианта:
-- name: Название прически (например "Удлиненный боб", "Пикси", "Crop"). Возвращай короткое и понятное название на русском!
-- imageKeyword: Транслителированное или английское название для запроса в нейросеть (стабильное имя стиля).
-- description: Почему это подойдет пользователю (1-2 предложения на русском).
-- stylingTips: Краткий совет по укладке.`;
+Длина: ${features?.hairLength || "Не указана"}`;
 
     let data: any = null;
-    let retries =  5;
-    let attempt = 0;
-    while(retries > 0) {
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                recommendations: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      description: { type: Type.STRING },
-                      imageKeyword: { type: Type.STRING },
-                      stylingTips: { type: Type.STRING }
-                    },
-                    required: ["name", "description", "imageKeyword", "stylingTips"]
-                  }
-                }
-              },
-              required: ["recommendations"]
-            }
-          }
-        });
-        
-        const responseText = response.text || "{}";
-        data = JSON.parse(responseText);
-        break; // Success
-      } catch (geminiErr: any) {
-        retries--;
-        attempt++;
-        let errMsg = geminiErr.message || JSON.stringify(geminiErr);
-        if (retries === 0) {
-          if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand") || errMsg.includes("429")) {
-              throw new Error("Нейросеть сейчас испытывает высокую нагрузку. Пожалуйста, подождите минуту и попробуйте снова.");
-          }
-          throw geminiErr;
-        }
-        console.warn(`Gemini API fallback attempt failed, retrying... (${attempt}/5)`, geminiErr?.message);
-        // wait exponential backoff
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-      }
+    try {
+        const responseText = await callYandexGPT(systemInstruction, prompt);
+        let cleanHtml = responseText.replace(/```json\s*/g, "").replace(/```\s*$/g, "").trim();
+        data = JSON.parse(cleanHtml);
+    } catch (err: any) {
+        throw new Error("Ошибка генерации новых вариантов через YandexGPT.");
     }
     
     res.json({ recommendations: data?.recommendations || [] });

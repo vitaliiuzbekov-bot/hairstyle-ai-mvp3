@@ -444,7 +444,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                     )}
                     <span className="relative z-10 flex items-center gap-2">
                       {isUploadingImage
-                        ? "Обработка фото..."
+                        ? "Обработка на устройстве..."
                         : isAnalyzing
                           ? "Нейросеть в работе..."
                           : "Запустить ИИ-Анализ 🚀"}

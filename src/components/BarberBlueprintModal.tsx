@@ -149,7 +149,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                 <img
                   src={imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) : undefined)}
                   alt="Ваша база"
-                  className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                  className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-20">
                   <span className="text-[10px] sm:text-xs text-white uppercase tracking-wider font-medium drop-shadow-md">
@@ -165,7 +165,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                     src={tryOnStyle.customImageUrl || undefined} 
                     alt="Свой референс"
                     onLoad={() => setLoadedReferenceUrl(tryOnStyle.customImageUrl)}
-                    className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                   />
                 ) : (
                   <LazyImage
@@ -175,7 +175,7 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                     description={tryOnStyle.description}
                     autoLoad={true}
                     results={results || undefined}
-                    className={`absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105`}
+                    className={`absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105`}
                     onImageLoaded={setLoadedReferenceUrl}
                   />
                 )}

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Cropper from "react-easy-crop";
 import { X, Check } from "lucide-react";
 
@@ -19,9 +20,12 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
-  const onCropChange = useCallback((croppedArea: any, croppedAreaPixels: any) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
+  const onCropChange = useCallback(
+    (croppedArea: any, croppedAreaPixels: any) => {
+      setCroppedAreaPixels(croppedAreaPixels);
+    },
+    [],
+  );
 
   const createImage = (url: string) =>
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -33,7 +37,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
   const getCroppedImg = async (
     imageSrc: string,
-    pixelCrop: any
+    pixelCrop: any,
   ): Promise<string> => {
     const image = await createImage(imageSrc);
     const canvas = document.createElement("canvas");
@@ -55,7 +59,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
       0,
       0,
       pixelCrop.width,
-      pixelCrop.height
+      pixelCrop.height,
     );
 
     // resize to max 1024x1024 if needed
@@ -76,10 +80,10 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     resizedCanvas.height = finalHeight;
     const resizedCtx = resizedCanvas.getContext("2d");
     if (resizedCtx) {
-       resizedCtx.drawImage(canvas, 0, 0, finalWidth, finalHeight);
-       return resizedCanvas.toDataURL("image/jpeg", 0.85);
+      resizedCtx.drawImage(canvas, 0, 0, finalWidth, finalHeight);
+      return resizedCanvas.toDataURL("image/jpeg", 0.85);
     }
-    
+
     return canvas.toDataURL("image/jpeg", 0.85);
   };
 
@@ -94,11 +98,22 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     }
   };
 
-  return (
-    <div className={`fixed inset-0 z-[120] flex flex-col ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}>
-      <div className={`p-4 flex justify-between items-center border-b ${isLightMode ? "border-gray-200" : "border-white/10"}`}>
-        <h3 className={`font-serif text-lg ${isLightMode ? "text-gray-900" : "text-white"}`}>Кадрирование референса</h3>
-        <button onClick={onClose} className={`p-2 rounded-full transition-colors ${isLightMode ? "hover:bg-gray-100 text-gray-500" : "hover:bg-white/10 text-white/50"}`}>
+  return createPortal(
+    <div
+      className={`fixed inset-0 z-[120] flex flex-col ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}
+    >
+      <div
+        className={`p-4 flex justify-between items-center border-b ${isLightMode ? "border-gray-200" : "border-white/10"}`}
+      >
+        <h3
+          className={`font-serif text-lg ${isLightMode ? "text-gray-900" : "text-white"}`}
+        >
+          Кадрирование референса
+        </h3>
+        <button
+          onClick={onClose}
+          className={`p-2 rounded-full transition-colors ${isLightMode ? "hover:bg-gray-100 text-gray-500" : "hover:bg-white/10 text-white/50"}`}
+        >
           <X size={20} />
         </button>
       </div>
@@ -118,7 +133,11 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
       <div className={`p-6 ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}>
         <div className="flex items-center gap-4 mb-6">
-          <span className={`text-sm ${isLightMode ? "text-gray-600" : "text-white/60"}`}>Масштаб</span>
+          <span
+            className={`text-sm ${isLightMode ? "text-gray-600" : "text-white/60"}`}
+          >
+            Масштаб
+          </span>
           <input
             type="range"
             value={zoom}
@@ -139,6 +158,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
           Применить
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
 import { getDemographicDetails, getDetailedAgePromptEng } from "../utils/promptGenerator";
 
+import { callYandexART } from "../services/yandex";
+
 export const referenceRouter = Router();
 
 referenceRouter.post("/reference", async (req: Request, res: Response): Promise<void> => {
@@ -16,10 +18,6 @@ referenceRouter.post("/reference", async (req: Request, res: Response): Promise<
       return;
     }
 
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    // Create prompt for the model
     const lowerGender = (gender || "person").toLowerCase();
     const isMale = lowerGender.includes("муж") || lowerGender.includes("male") || lowerGender.includes("man") || lowerGender.includes("пар");
     
@@ -34,18 +32,11 @@ referenceRouter.post("/reference", async (req: Request, res: Response): Promise<
 
     const prompt = `Hyper-realistic, unedited, authentic amateur smartphone selfie of an ordinary ${isMale ? 'man' : 'woman'}. ${ageProps}. ${faceProps}${colorProps}${eyeProps}${skinProps}${hairDensProps}${hairlineProps}${beardProps} Hairstyle: ${keyword}. Typical indoor room lighting or natural window light, asymmetric raw facial features, natural uneven skin texture with visible pores and slight blemishes. NOT a professional model, very casual daily look, no airbrushing, no studio lighting, completely raw unretouched photo. Cannot look like a GQ or Vogue model.`;
     
-    const response = await ai.models.generateImages({
-      model: 'imagen-4.0-generate-001', // According to guidance, high quality image task: imagen-4.0-generate-001 or gemini-2.5-flash-image
-      prompt: prompt,
-      config: {
-        numberOfImages: 1,
-        outputMimeType: 'image/jpeg',
-        aspectRatio: '3:4',
-      },
+    const imageUrl = await callYandexART({
+      prompt,
+      negativePrompt: "professional, studio lighting, airbrushed, retouched, perfect skin, cartoon, 3d, makeup, glamour",
+      aspectRatio: { widthRatio: "3", heightRatio: "4" }
     });
-
-    const base64ImageBytes = response.generatedImages[0].image.imageBytes;
-    const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
     
     await setCachedValue(cacheKey, imageUrl, 30 * 24 * 60 * 60);
 

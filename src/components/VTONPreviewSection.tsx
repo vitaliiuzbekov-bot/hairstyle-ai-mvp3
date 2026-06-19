@@ -78,47 +78,26 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
             Сгенерируйте фотореалистичный результат с вашим лицом. Нейросеть адаптирует прическу под ваши черты.
           </p>
 
-          <div className="mb-6 w-full max-w-sm">
-             <label className={`block text-[11px] font-semibold uppercase tracking-widest mb-3 text-center ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>Желаемый цвет (опционально)</label>
-             <div className="flex flex-wrap justify-center gap-2">
-                {["Блонд", "Русый", "Светло-каштановый", "Каштановый", "Черный", "Рыжий", "Седой", "Розовый", "Синий"].map(color => (
-                   <button 
-                     key={color}
-                     type="button"
-                     onClick={(e) => {
-                       e.preventDefault();
-                       setCustomHairColor(customHairColor === color ? null : color);
-                     }}
-                     className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-all ${customHairColor === color ? (isLightMode ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white text-black border-white shadow-lg') : (isLightMode ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300' : 'bg-transparent border-white/20 text-white/70 hover:bg-white/10 hover:text-white')}`}
-                   >
-                     {color}
-                   </button>
-                ))}
-             </div>
-          </div>
-
           <button
             type="button"
             onClick={async (e) => {
                 e.preventDefault();
-                let targetUrlToPass = tryOnStyle.customImageUrl || loadedReferenceUrl || (tryOnStyle as any).imageUrl || undefined;
-                
                 generateVirtualTryOn(
                   tryOnStyle.imageKeyword || tryOnStyle.name,
                   tryOnStyle.name,
                   tryOnStyle.description,
                   customHairColor,
-                  targetUrlToPass
+                  tryOnStyle.customImageUrl || loadedReferenceUrl || (tryOnStyle as any).imageUrl || undefined
                 );
               }
             }
             className={`relative w-full max-w-xs font-bold py-4 sm:py-5 px-6 flex items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${isLightMode ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-[0.98]' : 'bg-white text-black hover:bg-gray-100 shadow-md active:scale-[0.98]'}`}
           >
-            <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
-            <span className="relative z-10 flex items-center gap-2">
-               <Sparkles size={18} fill="currentColor" />
-               📸 Показать на мне
-            </span>
+             <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
+             <span className="relative z-10 flex items-center gap-2">
+                <Sparkles size={18} fill="currentColor" />
+                📸 Показать на мне
+             </span>
           </button>
           {vtonError && (
             <p className="mt-4 text-xs text-orange-200/90 bg-orange-500/20 border border-orange-500/30 p-2.5 rounded-lg max-w-xs">
@@ -135,12 +114,14 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
       )}
 
       {vtonResultUrl && !isTeaserResult && (
-        <div className={`mb-4 border rounded-2xl p-3 sm:p-4 relative group ${isLightMode ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
-          <BeforeAfterSlider 
-            beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
-            afterImage={vtonResultUrl}
-          />
-          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+        <div className={`mb-4 border rounded-2xl p-3 sm:p-4 relative group flex flex-col items-center ${isLightMode ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
+           <div className="w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
+             <BeforeAfterSlider 
+               beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
+               afterImage={vtonResultUrl}
+             />
+           </div>
+          <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full">
              <button 
                onClick={async (e) => {
                   e.stopPropagation();

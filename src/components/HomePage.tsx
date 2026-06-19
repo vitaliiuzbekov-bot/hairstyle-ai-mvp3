@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { UploadZone } from "../components/UploadZone";
 import { AnalysisResults } from "../components/AnalysisResults";
 import { ImageEditorModal } from "../components/ImageEditorModal";
@@ -10,6 +11,12 @@ import { usePhotoHandlers } from "../hooks/usePhotoHandlers";
 import { useAnalysisContext } from "../context/AnalysisContext";
 import { useUser } from "../context/UserContext";
 import { useUI } from "../context/UIContext";
+
+const LoadingFallback = ({ isLightMode }: { isLightMode: boolean }) => (
+  <div className={`flex items-center justify-center p-8 ${isLightMode ? 'text-blue-500' : 'text-blue-400'}`}>
+    <Loader2 className="animate-spin w-8 h-8" />
+  </div>
+);
 
 const BarberBlueprintModal = React.lazy(() => import("../components/BarberBlueprintModal").then(m => ({ default: m.BarberBlueprintModal })));
 const CameraModal = React.lazy(() => import("../components/CameraModal").then(m => ({ default: m.CameraModal })));
@@ -122,12 +129,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     setVtonResultUrl(null);
     setVtonError(null);
     setCustomHairColor(null);
-    
-    // Auto-select Studio Shot mode (85) for catalog/custom images to ensure 100% geometry match and save money (skips flux)
-    if (tryOnStyle?.customImageUrl) {
-        setVtonStrength(85);
-    }
-  }, [tryOnStyle, setVtonResultUrl, setVtonError, setCustomHairColor, setVtonStrength]);
+  }, [tryOnStyle, setVtonResultUrl, setVtonError, setCustomHairColor, vtonStrength]);
 
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const handleExportPDF = async (elementIdOrEvent?: string | React.MouseEvent, filename?: string) => {
@@ -263,7 +265,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </main>
 
-      <React.Suspense fallback={null}>
+      <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
         <BarberBlueprintModal
           tryOnStyle={tryOnStyle}
           setTryOnStyle={setTryOnStyle}

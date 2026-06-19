@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AnalysisResult } from '../types';
 import { analyzeImageApi, generateArApi, generateFullApi, loadMoreApi } from '../services/api';
-import { fallbackFaceApi } from '../services/fallbackAnalysis';
+// import { fallbackFaceApi } from '../services/fallbackAnalysis';
 import { addHistoryItem } from '../services/localHistory';
 import { hapticNotification } from '../utils/haptics';
 
@@ -42,7 +42,28 @@ export const useAnalysis = ({
     
     // States
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [results, setResults] = useState<AnalysisResult | null>(null);
+    const [results, setResultsState] = useState<AnalysisResult | null>(() => {
+        try {
+            const cached = localStorage.getItem("persistent_analysisResults");
+            return cached ? JSON.parse(cached) : null;
+        } catch {
+            return null;
+        }
+    });
+    
+    const setResults = (val: React.SetStateAction<AnalysisResult | null>) => {
+        setResultsState((prev) => {
+            const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
+            try {
+                if (nextVal) localStorage.setItem("persistent_analysisResults", JSON.stringify(nextVal));
+                else localStorage.removeItem("persistent_analysisResults");
+            } catch (e) {
+                console.error("Failed to save results to localStorage", e);
+            }
+            return nextVal;
+        });
+    };
+    
     const [loadingARStyles, setLoadingARStyles] = useState<Record<string, boolean>>({});
     const [arGeneratedImageUrl, setArGeneratedImageUrl] = useState<Record<string, string>>({});
     const [teaserUrl, setTeaserUrl] = useState<string | null>(null);
@@ -58,7 +79,10 @@ export const useAnalysis = ({
     const [vtonStrength, setVtonStrength] = useState<number>(45);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    const fallbackFaceApiWrapper = async () => fallbackFaceApi(imageBase64, mimeType, preferredStyle);
+    const fallbackFaceApiWrapper = async () => {
+        const { fallbackFaceApi } = await import('../services/fallbackAnalysis');
+        return fallbackFaceApi(imageBase64, mimeType, preferredStyle);
+    };
 
     const generateTeaser = async (rec: any, resultData: AnalysisResult) => {
         setIsGeneratingTeaser(true);

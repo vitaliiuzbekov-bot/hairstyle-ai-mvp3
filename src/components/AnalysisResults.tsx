@@ -76,7 +76,7 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
       )}
 
       {results && (
-        <div ref={resultsRef} className="col-span-1 lg:col-span-7 flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both" id="analysis-results-content">
+        <div ref={resultsRef} className="col-span-1 lg:col-span-7 flex flex-col gap-6 lg:gap-8 animate-in fade-in duration-1000 fill-mode-both" id="analysis-results-content">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
             <h3 className={`font-serif text-2xl sm:text-3xl ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
               Результаты анализа

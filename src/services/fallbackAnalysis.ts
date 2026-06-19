@@ -7,12 +7,20 @@ export interface SmartCropResult {
 }
 
 export const smartCropFace = async (imageBase64: string, mimeType: string): Promise<SmartCropResult> => {
+  // Fallback timeout to prevent infinite hanging
+  const withTimeout = (promise: Promise<any>, ms: number) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+    ]);
+  };
+
   try {
     const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
-    await Promise.all([
+    await withTimeout(Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl),
       faceapi.nets.faceLandmark68Net.loadFromUri(modelsUrl)
-    ]);
+    ]), 10000); // 10s timeout
 
     const img = new Image();
     await new Promise((resolve, reject) => {
@@ -20,6 +28,9 @@ export const smartCropFace = async (imageBase64: string, mimeType: string): Prom
       img.onerror = () => reject(new Error("Image load error in smartCrop"));
       img.src = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
     });
+
+    // Yield to allow browser to render loading states before heavy sync ML task
+    await new Promise(r => requestAnimationFrame(r));
 
     const detections = await faceapi.detectSingleFace(img).withFaceLandmarks();
     
@@ -110,13 +121,23 @@ export const fallbackFaceApi = async (
     if (!imageBase64) return null;
     const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
     
+    const withTimeout = (promise: Promise<any>, ms: number) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+      ]);
+    };
+
     // We assume faceapi is available globally (e.g. loaded via a script tag)
-    await Promise.all([
+    await withTimeout(Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl),
       faceapi.nets.faceLandmark68Net.loadFromUri(modelsUrl),
       faceapi.nets.faceExpressionNet.loadFromUri(modelsUrl),
       faceapi.nets.ageGenderNet.loadFromUri(modelsUrl),
-    ]);
+    ]), 10000); // 10s timeout
+    
+    // Yield to let UI update after models load
+    await new Promise(r => setTimeout(r, 10));
 
     const img = new Image();
     await new Promise((resolve, reject) => {
@@ -125,6 +146,9 @@ export const fallbackFaceApi = async (
       img.src = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
       if (img.complete) resolve(undefined);
     });
+
+    // Yield to allow browser to render loading states before heavy sync ML task
+    await new Promise(r => setTimeout(r, 10));
 
     const detections = await faceapi
       .detectSingleFace(img)

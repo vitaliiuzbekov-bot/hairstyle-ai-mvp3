@@ -6,9 +6,47 @@ import { useUI } from '../context/UIContext';
 export const useImageUpload = () => {
     const { processImage, isProcessing: isCompressing, error: compressError } = useImageProcessor();
     const { addToast } = useUI();
-    const [imageBase64, setImageBase64] = useState<string | null>(null);
+    const [imageBase64, setImageBase64State] = useState<string | null>(() => {
+        try {
+            return localStorage.getItem("persistent_imageBase64") || null;
+        } catch {
+            return null;
+        }
+    });
+    
+    const setImageBase64 = (val: React.SetStateAction<string | null>) => {
+        setImageBase64State((prev) => {
+            const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
+            try {
+                if (nextVal) localStorage.setItem("persistent_imageBase64", nextVal);
+                else localStorage.removeItem("persistent_imageBase64");
+            } catch (e) {
+                console.error("Failed to save image to localStorage", e);
+            }
+            return nextVal;
+        });
+    };
+
     const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [mimeType, setMimeType] = useState<string>("");
+    const [mimeType, setMimeTypeState] = useState<string>(() => {
+        try {
+            return localStorage.getItem("persistent_mimeType") || "image/jpeg";
+        } catch {
+            return "image/jpeg";
+        }
+    });
+
+    const setMimeType = (val: React.SetStateAction<string>) => {
+        setMimeTypeState((prev) => {
+            const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
+            try {
+                if (nextVal) localStorage.setItem("persistent_mimeType", nextVal);
+                else localStorage.removeItem("persistent_mimeType");
+            } catch {}
+            return nextVal;
+        });
+    };
+
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [rawImageBase64, setRawImageBase64] = useState<string | null>(null);

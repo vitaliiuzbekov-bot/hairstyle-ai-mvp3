@@ -87,50 +87,32 @@ ${preDetectedFacts}
 7) Skin tone and facial hair style (beard, mustache, clean shaven). 
 8) ONLY a concise description of clothing (exact color, type) and background (color/setting). Evaluate hair quality objectively. Be brutally honest.`;
 
-        let mimeTypeStr = "image/jpeg";
         let base64PrefixRemoved = targetBase64;
         if (targetBase64.startsWith("data:")) {
-            mimeTypeStr = targetBase64.substring("data:".length, targetBase64.indexOf(";base64,"));
             base64PrefixRemoved = targetBase64.replace(/^data:[\w-]+\/[\w-]+;base64,/, "");
         }
         
         try {
-            const { GoogleGenAI } = await import("@google/genai");
-            const ai = new GoogleGenAI({ 
-                apiKey: process.env.GEMINI_API_KEY
-            });
+            const geminiApiKey = process.env.GEMINI_API_KEY;
             
-            let retries = 5;
-            let attempt = 0;
-            while (retries > 0) {
-                try {
-                    const response = await ai.models.generateContent({
-                        model: "gemini-2.5-flash",
-                        contents: [
-                          { text: visionPrompt },
-                          {
-                            inlineData: {
-                              mimeType: mimeTypeStr || "image/jpeg",
-                              data: base64PrefixRemoved
-                            }
-                          }
-                        ]
-                    });
-                    visualDescription = preDetectedFacts + "\n" + (response.text || "");
-                    break;
-                } catch (err: any) {
-                    retries--;
-                    attempt++;
-                    let errMsg = err.message || JSON.stringify(err);
-                    if (retries === 0) {
-                        if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand")) {
-                            throw new Error("Нейросеть сейчас испытывает высокую нагрузку (503). Пожалуйста, подождите минуту и попробуйте снова.");
-                        }
-                        throw err;
+            if (geminiApiKey) {
+                const { GoogleGenAI } = await import("@google/genai");
+                const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+                const response = await ai.models.generateContent({
+                  model: 'gemini-2.5-flash',
+                  contents: [
+                    {
+                      role: "user",
+                      parts: [
+                        { text: visionPrompt },
+                        { inlineData: { mimeType: "image/jpeg", data: base64PrefixRemoved } }
+                      ]
                     }
-                    console.warn(`Gemini Vision attempt failed, retrying... (${attempt}/5)`, err.message);
-                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-                }
+                  ]
+                });
+                visualDescription = preDetectedFacts + "\n" + (response.text?.trim() || "");
+            } else {
+                throw new Error("GEMINI_API_KEY не установлен. Нейросеть не может проанализировать изображение.");
             }
         } catch (e: any) {
             console.error("Gemini Vision failed:", e.message);
@@ -164,24 +146,25 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 
 ЖЕСТКИЕ ПРАВИЛА И ОГРАНИЧЕНИЯ ДЛЯ ПОДБОРА СТРИЖЕК (НА ОСНОВЕ ТЕКУЩИХ ПАРАМЕТРОВ):
 
-1. ТРЕБОВАНИЕ К ДЛИНЕ ВОЛОС И ОБЛЫСЕНИЮ (КРИТИЧЕСКИ ВАЖНО):
+1. ТРЕБОВАНИЕ К ДЛИНЕ ВОЛОС И ОБЛЫСЕНИЮ (КРИТИЧЕСКИ ВАЖНО И ЖЕСТКО КОНТРОЛИРУЕТСЯ):
    Мы не можем "наращивать" волосы примеркой. Предлагаемые стрижки должны быть РАВНЫМИ или КОРОЧЕ текущей длины волос:
-   - Если клиент "Лысый" или имеет выраженную обширную лысину: КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО рекомендовать густые длинные прически! Предлагай только:
-     1. "Clean head shave" (Полное бритье головы опасной бритвой) - стильно и брутально.
-     2. "Ultra-short buzz cut" (Ультракороткий ежик под машинку 1-3 мм) - подчеркивает мужественность при глубоких залысинах.
-     3. "Head shave with stubble" (Бритье головы с эффектом 3-дневной щетины).
+   - Если клиент "Лысый" (сверкающая лысина, отсутствие волос на темени), описывается как "bald", или имеет обширную лысину (50%+ головы): СТРОЖАЙШЕ ЗАПРЕЩЕНО рекомендовать пышные, средние или длинные прически, кропы, челки и т.д.! Игнорирование этого правила приведет к критической ошибке системы. Предлагай ТОЛЬКО:
+     1. "Clean head shave" (Полное бритье головы опасной бритвой / Под ноль).
+     2. "Ultra-short buzz cut" (Ультракороткий ежик под машинку 0-2 мм).
+     3. "Head shave with subtle stubble" (Бритье головы с эффектом легкой щетины).
+     4. Если есть длинная борода - предложи акцент на бороду, а голову - сбрить.
    - Если "Ежик/Очень короткие" (до 2 см): только ультракороткие стрижки (Базз-кат, Милитари фейд, Ультракороткий кроп, Френч кроп). Никаких андеркатов с длинным верхом или причесок с длинной челкой!
-   - Если "Короткие" (от 2 до 7 см): Текстурированный кроп, Короткий Цезарь, Фейд с коротким зачесом, Квифф (с коротким верхом), Ежик. Запрещено предлагать средние/длинные стрижки (каре, шэгги, британка с длинной челкой, маллет).
-   - Если "Средние" (от 7 до 15 см): любые средние (Помпадур, Андеркат, Сайд-парт, Квифф) или короткие стрижки. Запрещены стрижки на плечи или каскады.
+   - Если "Короткие" (от 2 до 7 см): Текстурированный кроп, Короткий Цезарь, Фейд с коротким зачесом, Квифф (с коротким верхом), Ежик. Запрещено предлагать средние/длинные стрижки.
+   - Если "Средние" (от 7 до 15 см): любые средние или короткие стрижки. Запрещены стрижки на плечи.
    - Если "Длинные" (более 15 см): допустима любая длина.
 
-2. ТРЕБОВАНИЕ К ГУСТОТЕ И ЗАЛЫСИНАМ (МАКСИМАЛЬНОЕ РАЗНООБРАЗИЕ):
+2. ТРЕБОВАНИЕ К ГУСТОТЕ И ЗАЛЫСИНАМ (МАКСИМАЛЬНОЕ РАЗНООБРАЗИЕ БЕЗ ОБЪЕМА):
    Если у клиента редкие/тонкие волосы ("Редкие/Тонкие") или указаны залысины (receding hairline, M-shape, temporal thinning, bald spots):
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО зацикливаться на банальном или уродливом Кропе / Челке вперед! Предлагай благородные, разнообразные и современные стрижки, подходящие под стиль жизни!
-   - Для ТОНКИХ волос и ЗАЛЫСИН существует великолепный арсенал:
-     - Для делового стиля: предложи аккуратный "Executive Side Part" (аккуратный пробор с низкой растушевкой по бокам, визуально отвлекающий от залысин), "Smart Ivy League" (интеллигентный Айви-Лиг с зачесом челки набоко-вперед), или "Tapered Low Fade Crew Cut" (элегантный классический полубокс).
-     - Для кэжуал/будничного стиля: предложи "Short Textured Quiff" (текстурный квифф, где пряди укладываются хаотично набок/вверх и прекрасно маскируют височные пробелы), "Caesar Fade" (элегантный Цезарь с легкой текстурой).
-     - Для спортивного стиля: "Sporty Tapered Buzz Cut" (классический спортивный ультракороткий базз-кат с мягким переходом), "High and Tight".
+   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО предлагать пышные прически, Помпадур, Густой Квифф, Маллет! Тонкие волосы не держат объем!
+   - Предлагайте плоские, аккуратные или ультракороткие стрижки.
+   - Для делового стиля: "Executive Side Part" (пробор с зачесом набок, без объема), "Smart Ivy League" (короткий Айви-Лиг).
+   - Для кэжуал/будничного стиля: "Short Textured Quiff" (короткий квифф с хаотичной текстурой), "Caesar Fade" (элегантный Цезарь).
+   - Для спортивного стиля: "Sporty Tapered Buzz Cut" (классический спортивный ультракороткий базз-кат), "High and Tight".
    - Стрижки должны выглядеть естественно, премиально, солидно и стильно с учетом текстуры клиента!
 
 3. ТРЕБОВАНИЕ К ПОЛУ И ВОЗРАСТУ:

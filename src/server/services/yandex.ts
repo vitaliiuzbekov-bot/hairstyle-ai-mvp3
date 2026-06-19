@@ -78,99 +78,141 @@ export function extractFolderId(rawFolderId: string): string {
   return cleaned.trim();
 }
 
+export async function callYandexART({
+  prompt,
+  negativePrompt,
+  folderId,
+  saKey,
+  aspectRatio = { widthRatio: "3", heightRatio: "4" }
+}: {
+  prompt: string;
+  negativePrompt?: string;
+  folderId?: string;
+  saKey?: string;
+  aspectRatio?: { widthRatio: string; heightRatio: string };
+}): Promise<string> {
+  const yandexFolderId = folderId || process.env.YANDEX_FOLDER_ID;
+  const yandexKey = saKey || process.env.YANDEX_SERVICE_ACCOUNT_KEY;
+
+  if (!yandexFolderId || !yandexKey) {
+    throw new Error("Yandex Cloud не настроено (отсутствует YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY).");
+  }
+
+  const cleanFolderId = extractFolderId(yandexFolderId);
+  const iamToken = await getYandexIamToken(yandexKey);
+
+  const messages: any[] = [
+    { weight: 1, text: prompt }
+  ];
+  if (negativePrompt) {
+    messages.push({ weight: -1, text: negativePrompt });
+  }
+
+  const reqBody = {
+    modelUri: `art://${cleanFolderId}/yandex-art/latest`,
+    generationOptions: {
+      seed: Math.floor(Math.random() * 10000000).toString(),
+      aspectRatio
+    },
+    messages
+  };
+
+  const initRes = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${iamToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(reqBody)
+  });
+
+  if (!initRes.ok) {
+    const errText = await initRes.text();
+    throw new Error(`YandexART Init Error: ${errText}`);
+  }
+
+  const initData = await initRes.json();
+  const operationId = initData.id;
+
+  if (!operationId) {
+    throw new Error('No operation ID returned by YandexART');
+  }
+
+  const pollUrl = `https://operation.api.cloud.yandex.net/operations/${operationId}`;
+  let attempts = 0;
+  const maxAttempts = 15; // 15 * 2500ms = 37.5 seconds
+  let finalImageUrl = "";
+
+  while (attempts < maxAttempts && !finalImageUrl) {
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    const pollRes = await fetch(pollUrl, {
+      headers: { 'Authorization': `Bearer ${iamToken}` }
+    });
+
+    if (!pollRes.ok) {
+      console.error(`Polling Error HTTP ${pollRes.status}`);
+      attempts++;
+      continue;
+    }
+
+    const pollData = await pollRes.json();
+    if (pollData.done) {
+      if (pollData.response && pollData.response.image) {
+        finalImageUrl = `data:image/jpeg;base64,${pollData.response.image}`;
+      } else if (pollData.error) {
+        throw new Error(`YandexART Gen Error: ${pollData.error.message || JSON.stringify(pollData.error)}`);
+      }
+    }
+    attempts++;
+  }
+
+  if (!finalImageUrl) {
+    throw new Error('YandexART generation timed out after 37.5 seconds');
+  }
+
+  return finalImageUrl;
+}
+
 export async function callYandexGPTChat(systemText: string, messages: {role: string, text: string}[]): Promise<string> {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-
-    let useGemini = false;
-    let fallbackError = "";
 
     if (!folderId || !saKey || extractFolderId(folderId) === "MY_FOLDER_ID" || folderId.toLowerCase().includes("folder_id") || folderId.length < 5) {
-        if (!geminiApiKey) {
-            throw new Error("Не установлены ни Yandex ключи, ни GEMINI_API_KEY");
-        }
-        useGemini = true;
+        throw new Error("Не установлены Yandex ключи YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY");
     }
 
-    if (!useGemini) {
-        try {
-            const cleanFolderId = extractFolderId(folderId!);
-            const iamToken = await getYandexIamToken(saKey!);
-            
-            const payload = {
-              modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
-              completionOptions: {
-                stream: false,
-                temperature: 0.85,
-                maxTokens: 2000
-              },
-              messages: [
-                { role: "system", text: systemText },
-                ...messages
-              ]
-            };
-
-            const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${iamToken}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) {
-                const err = await res.text();
-                throw new Error(`Ответ YandexGPT: ${err}`);
-            }
-
-            const data = await res.json();
-            return data.result.alternatives[0].message.text;
-        } catch (err: any) {
-             console.warn("YandexGPTChat failed, trying Gemini API... Error:", err.message);
-             fallbackError = err.message;
-             if (!geminiApiKey) throw err;
-             useGemini = true;
-        }
-    }
-
-    if (useGemini && geminiApiKey) {
-        const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-        let combinedText = systemText + "\n\n";
-        for (const msg of messages) {
-           combinedText += `\n${msg.role}: ${msg.text}`;
-        }
-        
-        let retries = 5;
-        let attempt = 0;
-        let lastErr = null;
-        while(retries > 0) {
-            try {
-                const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
-                    contents: combinedText
-                });
-                return response.text || "";
-            } catch (err: any) {
-                retries--;
-                attempt++;
-                lastErr = err;
-                let errMsg = err.message || "";
-                if (retries === 0) {
-                     if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand") || errMsg.includes("429")) {
-                        throw new Error("Нейросеть сейчас испытывает высокую нагрузку (503). Пожалуйста, подождите минуту и попробуйте снова.");
-                     }
-                     throw err;
-                }
-                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-            }
-        }
-        throw lastErr;
-    }
+    const cleanFolderId = extractFolderId(folderId!);
+    const iamToken = await getYandexIamToken(saKey!);
     
-    throw new Error(fallbackError || "Unknown error in callYandexGPTChat");
+    const payload = {
+      modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
+      completionOptions: {
+        stream: false,
+        temperature: 0.85,
+        maxTokens: 2000
+      },
+      messages: [
+        { role: "system", text: systemText },
+        ...messages
+      ]
+    };
+
+    const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${iamToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Ответ YandexGPT: ${err}`);
+    }
+
+    const data = await res.json();
+    return data.result.alternatives[0].message.text;
 }
 
 export async function callYandexVision(systemText: string, userText: string, imageBase64: string, customModelUri?: string): Promise<string> {
@@ -187,21 +229,29 @@ export async function callYandexVision(systemText: string, userText: string, ima
 
     const iamToken = await getYandexIamToken(saKey);
     
+    const messages: any[] = [];
+    if (systemText) {
+        messages.push({ role: "system", text: systemText });
+    }
+    if (userText) {
+        messages.push({ role: "user", text: userText });
+    } else {
+        // If user text is empty but system text is present, we still need at least one user message
+        // However, we are adding the image right after this as a user message
+    }
+    messages.push({ 
+        role: "user", 
+        text: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+    });
+
     const payload = {
-      modelUri: customModelUri || `vision://${cleanFolderId}/yandexvision/latest`,
+      modelUri: customModelUri || `gpt://${cleanFolderId}/yandexgpt/latest`,
       completionOptions: {
         stream: false,
         temperature: 0.1,
         maxTokens: 500
       },
-      messages: [
-        { role: "system", text: systemText },
-        { role: "user", text: userText },
-        { 
-          role: "user", 
-          text: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
-        }
-      ]
+      messages: messages
     };
 
     const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
@@ -225,91 +275,41 @@ export async function callYandexVision(systemText: string, userText: string, ima
 export async function callYandexGPT(systemText: string, userText: string): Promise<string> {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-
-    let useGemini = false;
-    let fallbackError = "";
 
     if (!folderId || !saKey || extractFolderId(folderId) === "MY_FOLDER_ID" || folderId.toLowerCase().includes("folder_id") || folderId.length < 5) {
-        if (!geminiApiKey) {
-            throw new Error("Не установлены ни Yandex ключи, ни GEMINI_API_KEY");
-        }
-        useGemini = true;
+        throw new Error("Не установлены Yandex ключи YANDEX_FOLDER_ID или YANDEX_SERVICE_ACCOUNT_KEY");
     }
 
-    if (!useGemini) {
-        try {
-            const cleanFolderId = extractFolderId(folderId!);
-            const iamToken = await getYandexIamToken(saKey!);
-            
-            const payload = {
-              modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
-              completionOptions: {
-                stream: false,
-                temperature: 0.85,
-                maxTokens: 2000
-              },
-              messages: [
-                { role: "system", text: systemText },
-                { role: "user", text: userText }
-              ]
-            };
+    const cleanFolderId = extractFolderId(folderId!);
+    const iamToken = await getYandexIamToken(saKey!);
+    
+    const payload = {
+      modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
+      completionOptions: {
+        stream: false,
+        temperature: 0.85,
+        maxTokens: 2000
+      },
+      messages: [
+        { role: "system", text: systemText },
+        { role: "user", text: userText }
+      ]
+    };
 
-            const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${iamToken}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(payload)
-            });
+    const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${iamToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
 
-            if (!res.ok) {
-                const err = await res.text();
-                throw new Error(`Ответ YandexGPT: ${err}`);
-            }
-            
-            const data = await res.json();
-            return data.result.alternatives[0].message.text;
-        } catch (err: any) {
-             console.warn("callYandexGPT failed, trying Gemini API... Error:", err.message);
-             fallbackError = err.message;
-             if (!geminiApiKey) throw err;
-             useGemini = true;
-        }
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Ответ YandexGPT: ${err}`);
     }
-
-    if (useGemini && geminiApiKey) {
-        const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-        let combinedText = systemText + "\n\n" + userText;
-        
-        let retries = 5;
-        let attempt = 0;
-        let lastErr = null;
-        while(retries > 0) {
-            try {
-                const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
-                    contents: combinedText
-                });
-                return response.text || "";
-            } catch (err: any) {
-                retries--;
-                attempt++;
-                lastErr = err;
-                let errMsg = err.message || "";
-                if (retries === 0) {
-                     if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand") || errMsg.includes("429")) {
-                        throw new Error("Нейросеть сейчас испытывает высокую нагрузку (503). Пожалуйста, подождите минуту и попробуйте снова.");
-                     }
-                     throw err;
-                }
-                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-            }
-        }
-        throw lastErr;
-    }
-
-    throw new Error(fallbackError || "Unknown error in callYandexGPT");
+    
+    const data = await res.json();
+    return data.result.alternatives[0].message.text;
 }

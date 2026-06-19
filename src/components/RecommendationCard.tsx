@@ -16,7 +16,7 @@ interface RecommendationCardProps {
   isLightMode: boolean;
 }
 
-export const RecommendationCard: React.FC<RecommendationCardProps> = ({
+export const RecommendationCard = React.memo(({
   rec,
   idx,
   results,
@@ -26,7 +26,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   setShowBuyModal,
   setTryOnStyle,
   isLightMode,
-}) => {
+}: RecommendationCardProps) => {
   return (
     <div
       className={`opacity-0 animate-fade-in-up rounded-2xl overflow-hidden transition-all duration-500 group flex flex-col sm:flex-row items-stretch border ${isLightMode ? 'bg-white shadow-md border-gray-200 hover:shadow-lg' : 'glass-panel hover:border-white/20 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] border-white/10'}`}
@@ -153,4 +153,4 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
       </div>
     </div>
   );
-};
+});

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Zap } from "lucide-react";
+import { Zap, Loader2 } from "lucide-react";
 
 import { Header } from "./components/Header";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -27,6 +27,12 @@ import { useUI } from "./context/UIContext";
 import { useHistoryHandlers } from "./hooks/useHistoryHandlers";
 import { useAnalysisContext } from "./context/AnalysisContext";
 
+const LoadingFallback = ({ isLightMode }: { isLightMode: boolean }) => (
+  <div className={`flex items-center justify-center p-8 ${isLightMode ? 'text-blue-500' : 'text-blue-400'}`}>
+    <Loader2 className="animate-spin w-8 h-8" />
+  </div>
+);
+
 function App() {
   const [showTutorial, setShowTutorial] = React.useState(() => {
     return localStorage.getItem('hasSeenTutorial') !== 'true';
@@ -40,24 +46,7 @@ function App() {
   useTelegramBackButton();
 
   useEffect(() => {
-    // Предзагрузка тяжелых ML моделей face-api.js сразу при старте приложения (Шаг 1)
-    const preloadModels = async () => {
-      try {
-        const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
-        const _faceapi = (window as any).faceapi;
-        if (!_faceapi) return;
-        await Promise.all([
-          _faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl),
-          _faceapi.nets.faceLandmark68Net.loadFromUri(modelsUrl),
-          _faceapi.nets.faceExpressionNet.loadFromUri(modelsUrl),
-          _faceapi.nets.ageGenderNet.loadFromUri(modelsUrl),
-        ]);
-        console.log("[ML] FaceAPI models preloaded successfully in background.");
-      } catch (e) {
-        console.warn("[ML] Could not preload faceAPI models", e);
-      }
-    };
-    preloadModels();
+    // FaceAPI load deferred to component usage
   }, []);
 
   const isOffline = useOfflineStatus();
@@ -167,7 +156,7 @@ function App() {
           />
         } />
         <Route path="/faq" element={
-          <React.Suspense fallback={null}>
+          <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
             <FaqPage faqData={faqData} isLightMode={isLightMode} />
           </React.Suspense>
         } />
@@ -182,7 +171,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-        <React.Suspense fallback={null}>
+        <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
           {showTutorial && (
             <QuickTutorial isLightMode={isLightMode} onComplete={handleTutorialComplete} />
           )}
@@ -226,7 +215,7 @@ function App() {
         </React.Suspense>
 
       {isChatOpen && (
-        <React.Suspense fallback={null}>
+        <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
           <StylistChat 
              onClose={() => setIsChatOpen(false)}
              features={null}

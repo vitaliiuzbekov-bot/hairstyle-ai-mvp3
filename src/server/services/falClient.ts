@@ -36,6 +36,21 @@ export async function generateWithInpainting(input: GenerateImageInput): Promise
   return (result as any).images[0].url;
 }
 
+export async function uploadImageToFal(base64DataUri: string): Promise<string> {
+  if (!API_KEY || API_KEY === 'mock-key') {
+    return base64DataUri; // Cannot upload, fallback to base64
+  }
+  try {
+    const response = await fetch(base64DataUri);
+    const blob = await response.blob();
+    const uploadedUrl = await fal.storage.upload(blob);
+    return uploadedUrl;
+  } catch (err) {
+    console.warn("Failed to upload to FAL storage, returning base64", err);
+    return base64DataUri;
+  }
+}
+
 export async function generateReference(prompt: string): Promise<string> {
   if (!API_KEY || API_KEY === 'mock-key') {
     console.warn("FAL_KEY is missing, returning a fallback image for reference.");

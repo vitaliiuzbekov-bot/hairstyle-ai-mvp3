@@ -66,11 +66,11 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
         handleMove(e.touches[0].clientX);
       }}
     >
-      {/* After Image (Background) - dictating aspect ratio */}
+      {/* After Image (Background) */}
       <CachedImage
         src={afterImage}
         alt="После"
-        className="w-full h-auto object-contain pointer-events-none block"
+        className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
       />
       
       {/* Before Image (Foreground/Clipped) */}
@@ -81,7 +81,7 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
         <CachedImage
           src={beforeImage}
           alt="До"
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
         />
       </div>
 
