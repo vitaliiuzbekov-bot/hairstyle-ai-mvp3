@@ -104,12 +104,7 @@ export const exportToPDF = async (
     clone.style.fontSize = "16px";
     clone.style.lineHeight = "1.6";
     clone.style.fontFamily = "system-ui, -apple-system, sans-serif";
-
-    // Append to body temporarily so html2canvas can compute styles correctly
-    clone.style.position = "absolute";
-    clone.style.left = "-9999px";
-    clone.style.top = "-9999px";
-    document.body.appendChild(clone);
+    clone.style.width = "800px";
 
     const html2pdf = (await import("html2pdf.js")).default;
 
@@ -126,9 +121,6 @@ export const exportToPDF = async (
     let shared = false;
     let sentToBot = false;
     const pdfBlob = await worker.output('blob');
-    
-    // Clean up
-    document.body.removeChild(clone);
 
     const file = new File([pdfBlob], filename, { type: "application/pdf" });
 

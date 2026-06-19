@@ -211,23 +211,23 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           tintCanvas.height = canvas.height;
           const ttx = tintCanvas.getContext("2d")!;
           
-          const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, needsLighten?: boolean }> = {
-            "Блонд": { hex: "#DEB878", mode: "soft-light", opacity: 1.0, needsLighten: true },
-            "Рыжий": { hex: "#C64600", mode: "overlay", opacity: 0.85 },
-            "Шоколадный": { hex: "#2C1405", mode: "multiply", opacity: 0.6 },
-            "Русый": { hex: "#6D5337", mode: "overlay", opacity: 0.75 },
-            "Пепельный": { hex: "#9BA3A9", mode: "color", opacity: 0.9, needsLighten: true },
-            "Черный": { hex: "#080808", mode: "multiply", opacity: 0.9 },
-            "Красный": { hex: "#AF1111", mode: "overlay", opacity: 0.85 },
-            "Розовый": { hex: "#DB2777", mode: "soft-light", opacity: 0.9, needsLighten: true },
-            "Синий": { hex: "#1D4ED8", mode: "overlay", opacity: 0.85, needsLighten: true },
-            "Каштан": { hex: "#3B2211", mode: "multiply", opacity: 0.65 },
-            "Светло-каштановый": { hex: "#6B442B", mode: "overlay", opacity: 0.65 },
-            "Седой": { hex: "#B8B8B8", mode: "color", opacity: 1.0, needsLighten: true },
-            "Мелирование": { hex: "#E9CD6F", mode: "overlay", opacity: 0.7, needsLighten: true }
+          const colorsCfg: Record<string, { hex: string, mode: GlobalCompositeOperation, opacity: number, lightness?: number }> = {
+            "Блонд": { hex: "#ebdcb6", mode: "overlay", opacity: 0.95, lightness: 0.6 }, 
+            "Рыжий": { hex: "#a62c00", mode: "overlay", opacity: 0.85, lightness: 0.1 },
+            "Шоколадный": { hex: "#3a1d0d", mode: "overlay", opacity: 0.6 },
+            "Русый": { hex: "#7a624f", mode: "overlay", opacity: 0.7, lightness: 0.15 },
+            "Пепельный": { hex: "#a3abb3", mode: "color", opacity: 0.9, lightness: 0.4 },
+            "Черный": { hex: "#080808", mode: "multiply", opacity: 0.85 },
+            "Красный": { hex: "#990e0e", mode: "overlay", opacity: 0.85 },
+            "Розовый": { hex: "#cf3a75", mode: "soft-light", opacity: 0.9, lightness: 0.3 },
+            "Синий": { hex: "#1c40a6", mode: "overlay", opacity: 0.85, lightness: 0.2 },
+            "Каштан": { hex: "#45220c", mode: "overlay", opacity: 0.75 },
+            "Светло-каштановый": { hex: "#75462b", mode: "overlay", opacity: 0.7 },
+            "Седой": { hex: "#c7c7c7", mode: "color", opacity: 0.9, lightness: 0.5 },
+            "Мелирование": { hex: "#dbbf74", mode: "overlay", opacity: 0.7, lightness: 0.3 }
           };
 
-          const cfg = colorsCfg[colorName] || { hex: "#F5D061", mode: "color", opacity: 0.8 };
+          const cfg = colorsCfg[colorName] || { hex: "#dfc785", mode: "overlay", opacity: 0.8 };
 
           ttx.fillStyle = cfg.hex;
           ttx.fillRect(0, 0, canvas.width, canvas.height);
@@ -241,11 +241,19 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           
           shtx.drawImage(hairLayerCanvas, 0, 0);
 
-          if (cfg.needsLighten) {
-             shtx.globalAlpha = 0.45;
-             shtx.globalCompositeOperation = "screen";
-             shtx.drawImage(hairLayerCanvas, 0, 0);
-             shtx.drawImage(hairLayerCanvas, 0, 0); 
+          if (cfg.lightness && cfg.lightness > 0) {
+             const lightenCanvas = document.createElement("canvas");
+             lightenCanvas.width = canvas.width;
+             lightenCanvas.height = canvas.height;
+             const lxt = lightenCanvas.getContext("2d")!;
+             lxt.fillStyle = "white";
+             lxt.fillRect(0, 0, canvas.width, canvas.height);
+             lxt.globalCompositeOperation = "destination-in";
+             lxt.drawImage(hairLayerCanvas, 0, 0);
+
+             shtx.globalAlpha = cfg.lightness;
+             shtx.globalCompositeOperation = "color-dodge";
+             shtx.drawImage(lightenCanvas, 0, 0);
           }
 
           shtx.globalAlpha = cfg.opacity;

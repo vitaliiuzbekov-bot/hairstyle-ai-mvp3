@@ -217,15 +217,14 @@ generateRouter.post("/generate-reference", async (req, res) => {
               console.error(`Gemini Fallback Failed:`, e);
           }
           if (!finalImageUrl) {
-             finalImageUrl = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80';
+             throw new Error('К сожалению, не удалось сгенерировать референс прически. Сервера перегружены, попробуйте еще раз.');
           }
       } else {
           // Save to cache for 30 days (30 * 24 * 60 * 60 seconds)
           await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
       }
       
-      // If Gemini fallback generated it, cache it here so it doesn't run again for identical prompts.
-      if (finalImageUrl && finalImageUrl !== 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80') {
+      if (finalImageUrl) {
            await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
       }
 
@@ -353,17 +352,6 @@ generateRouter.post("/generate-full", async (req, res) => {
       
       // We process the reference image (targetImageUrl), which comes from either catalog, uploaded reference, or YandexART.
       if (finalTargetImageUrl) {
-          if (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/')) {
-              // Convert local public path to base64
-              const normalizePath = finalTargetImageUrl.startsWith('/') ? finalTargetImageUrl : '/' + finalTargetImageUrl;
-              const localPath = path.join(process.cwd(), 'public', normalizePath);
-              if (fs.existsSync(localPath)) {
-                  const localBytes = fs.readFileSync(localPath);
-                  let ext = path.extname(localPath).slice(1) || 'jpeg';
-                  if (ext === 'jpg') ext = 'jpeg';
-                  finalTargetImageUrl = `data:image/${ext};base64,${localBytes.toString('base64')}`;
-              }
-          }
           baseImageForFlux = finalTargetImageUrl.startsWith('http') || finalTargetImageUrl.startsWith('data:') 
               ? finalTargetImageUrl 
               : `data:image/jpeg;base64,${finalTargetImageUrl}`;
