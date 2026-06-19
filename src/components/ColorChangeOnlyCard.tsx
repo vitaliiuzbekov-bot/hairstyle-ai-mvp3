@@ -87,19 +87,28 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
     const segmenter = await getMulticlassSegmenter();
     return new Promise((resolve, reject) => {
         try {
-            // Need to pass the canvas or resized image to segmenter. 
-            // We pass the canvas so it processes the smaller version.
             segmenter.segment(canvas, (result) => {
                 const maskObj = result.categoryMask;
                 if (!maskObj) throw new Error("No mask returned");
                 
                 const maskArray = maskObj.getAsUint8Array();
+                
+                let hairConfArray: Float32Array | null = null;
+                let bgConfArray: Float32Array | null = null;
+                
+                if (result.confidenceMasks && result.confidenceMasks.length > 1) {
+                  hairConfArray = new Float32Array(result.confidenceMasks[1].getAsFloat32Array());
+                  bgConfArray = new Float32Array(result.confidenceMasks[0].getAsFloat32Array());
+                }
+
                 maskCacheRef.current = {
-                    array: new Uint8Array(maskArray), // Clone 
+                    array: new Uint8Array(maskArray), 
+                    hairConfArray,
+                    bgConfArray,
                     width: maskObj.width,
                     height: maskObj.height,
                     origData,
-                    origImg: canvas // use the resized canvas as the source image
+                    origImg: canvas 
                 };
                 resolve(maskCacheRef.current);
             });
@@ -119,38 +128,6 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
       canvas.height = origImg.height;
       const ctx = canvas.getContext("2d")!;
       
-      // Fast manual box blur for alpha/red channel to avoid cross-browser Canvas filter issues
-      const applyManualBlur = (imgData: ImageData, radius: number) => {
-        const w = imgData.width;
-        const h = imgData.height;
-        const tempAlpha = new Float32Array(w * h);
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            let sum = 0, count = 0;
-            for (let k = -radius; k <= radius; k++) {
-              const px = x + k;
-              if (px >= 0 && px < w) { sum += imgData.data[(y * w + px) * 4]; count++; }
-            }
-            tempAlpha[y * w + x] = sum / count;
-          }
-        }
-        for (let x = 0; x < w; x++) {
-          for (let y = 0; y < h; y++) {
-            let sum = 0, count = 0;
-            for (let k = -radius; k <= radius; k++) {
-              const py = y + k;
-              if (py >= 0 && py < h) { sum += tempAlpha[py * w + x]; count++; }
-            }
-            const val = sum / count;
-            const px = (y * w + x) * 4;
-            imgData.data[px] = val;
-            imgData.data[px+1] = val;
-            imgData.data[px+2] = val;
-            imgData.data[px+3] = 255;
-          }
-        }
-      };
-
       // 1. Возвращаем оригинальный фон или закрашиваем
       if (bgMode === "Студийный") {
          const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -170,39 +147,33 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
 
       // 2. Вырезаем передний план если фон изменен
       if (bgMode && bgMode !== "Оригинал") {
-          const fgCanvas = document.createElement("canvas");
-          fgCanvas.width = canvas.width;
-          fgCanvas.height = canvas.height;
-          const ftx = fgCanvas.getContext("2d", { willReadFrequently: true })!;
-          const fgMaskData = ftx.createImageData(canvas.width, canvas.height);
+          const personCanvas = document.createElement("canvas");
+          personCanvas.width = canvas.width;
+          personCanvas.height = canvas.height;
+          const pctx = personCanvas.getContext("2d", { willReadFrequently: true })!;
+          pctx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
+          
+          const pData = pctx.getImageData(0, 0, canvas.width, canvas.height);
           for (let y = 0; y < canvas.height; y++) {
             for (let x = 0; x < canvas.width; x++) {
               const mX = Math.floor((x / canvas.width) * maskWidth);
               const mY = Math.floor((y / canvas.height) * maskHeight);
               const maskIdx = mY * maskWidth + mX;
               
-              const isFg = maskArray[maskIdx] !== 0; // 0 - это фон
-              const val = isFg ? 255 : 0;
+              let alpha = 255;
+              if (maskCache.bgConfArray) {
+                  // bgConfArray has 1.0 for bg, 0.0 for fg. We want fg opacity.
+                  alpha = Math.round((1.0 - maskCache.bgConfArray[maskIdx]) * 255);
+              } else {
+                  const isFg = maskArray[maskIdx] !== 0; // 0 - это фон
+                  alpha = isFg ? 255 : 0;
+              }
               
               const px = (y * canvas.width + x) * 4;
-              fgMaskData.data[px] = val;
-              fgMaskData.data[px+1] = val;
-              fgMaskData.data[px+2] = val;
-              fgMaskData.data[px+3] = 255;
+              pData.data[px+3] = alpha;
             }
           }
-          
-          applyManualBlur(fgMaskData, 4);
-          ftx.putImageData(fgMaskData, 0, 0);
-
-          const personCanvas = document.createElement("canvas");
-          personCanvas.width = canvas.width;
-          personCanvas.height = canvas.height;
-          const pctx = personCanvas.getContext("2d")!;
-          pctx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
-          
-          pctx.globalCompositeOperation = "destination-in";
-          pctx.drawImage(fgCanvas, 0, 0);
+          pctx.putImageData(pData, 0, 0);
 
           ctx.globalCompositeOperation = "source-over"; 
           ctx.drawImage(personCanvas, 0, 0);
@@ -210,45 +181,28 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
 
       // 3. Окрашивание волос
       if (colorName) {
-          const hairMaskCanvas = document.createElement("canvas");
-          hairMaskCanvas.width = canvas.width;
-          hairMaskCanvas.height = canvas.height;
-          const hmtx = hairMaskCanvas.getContext("2d", { willReadFrequently: true })!;
-          const hData = hmtx.createImageData(canvas.width, canvas.height);
+          const hairLayerCanvas = document.createElement("canvas");
+          hairLayerCanvas.width = canvas.width;
+          hairLayerCanvas.height = canvas.height;
+          const ahctx = hairLayerCanvas.getContext("2d", { willReadFrequently: true })!;
+          ahctx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
+          
+          const hDataActual = ahctx.getImageData(0, 0, canvas.width, canvas.height);
           for (let y = 0; y < canvas.height; y++) {
             for (let x = 0; x < canvas.width; x++) {
               const mX = Math.floor((x / canvas.width) * maskWidth);
               const mY = Math.floor((y / canvas.height) * maskHeight);
               const maskIdx = mY * maskWidth + mX;
               
-              const isHair = maskArray[maskIdx] === 1 || maskArray[maskIdx] === 2; // Sometimes 2 can be part of hair/head depending on segmenter, but let's stick to 1 (Hair)
-              // Actually selfie_multiclass: 0=bg, 1=hair, 2=body, 3=face, 4=clothes
-              const isHairStrict = maskArray[maskIdx] === 1;
-              const val = isHairStrict ? 255 : 0;
-              
+              let alpha = 0;
+              if (maskCache.hairConfArray) {
+                  alpha = Math.round(maskCache.hairConfArray[maskIdx] * 255);
+              } else {
+                  alpha = maskArray[maskIdx] === 1 ? 255 : 0;
+              }
               const px = (y * canvas.width + x) * 4;
-              hData.data[px] = val;
-              hData.data[px+1] = val;
-              hData.data[px+2] = val;
-              hData.data[px+3] = 255;
+              hDataActual.data[px+3] = alpha;
             }
-          }
-          
-          applyManualBlur(hData, 5);
-          hmtx.putImageData(hData, 0, 0);
-
-          const blurredHairData = hmtx.getImageData(0, 0, canvas.width, canvas.height).data;
-
-          const hairLayerCanvas = document.createElement("canvas");
-          hairLayerCanvas.width = canvas.width;
-          hairLayerCanvas.height = canvas.height;
-          const ahctx = hairLayerCanvas.getContext("2d", { willReadFrequently: true })!;
-          ahctx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
-          const hDataActual = ahctx.getImageData(0, 0, canvas.width, canvas.height);
-          for (let i = 0; i < hDataActual.data.length; i += 4) {
-              // Set pixel transparency based on the blurred mask we computed
-              // R channel holds the blurred intensity, so we map it to alpha
-              hDataActual.data[i + 3] = blurredHairData[i];
           }
           ahctx.putImageData(hDataActual, 0, 0);
 

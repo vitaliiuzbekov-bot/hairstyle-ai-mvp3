@@ -8,37 +8,37 @@ const FEMALE_LIBRARY = [
   {
     name: "Пикси (Pixie)",
     description: "Короткая элегантная женская стрижка.",
-    customImageUrl: "golden_base/f_pixie.jpg",
+    customImageUrl: "/golden_base/f_pixie.jpg",
     stylingTips: "Используйте текстурирующий спрей или легкую пасту."
   },
   {
     name: "Классический Боб",
     description: "Элегантное каре, прямые волосы.",
-    customImageUrl: "golden_base/f_bob.jpg",
+    customImageUrl: "/golden_base/f_bob.jpg",
     stylingTips: "Гладкая укладка феном и утюжком."
   },
   {
     name: "Удлиненный боб",
     description: "Универсальный боб до ключиц (Lob).",
-    customImageUrl: "golden_base/f_long_bob.jpg",
+    customImageUrl: "/golden_base/f_long_bob.jpg",
     stylingTips: "Легкие волны спреем с морской солью."
   },
   {
     name: "Длинные прямые",
     description: "Длинные идеально прямые волосы.",
-    customImageUrl: "golden_base/f_long_straight.jpg",
+    customImageUrl: "/golden_base/f_long_straight.jpg",
     stylingTips: "Термозащита и сыворотка для блеска."
   },
   {
     name: "Длинные волнистые",
     description: "Роскошные объемные волны.",
-    customImageUrl: "golden_base/f_long_wavy.jpg",
+    customImageUrl: "/golden_base/f_long_wavy.jpg",
     stylingTips: "Нанесите мусс для объема и накрутите на брашинг."
   },
   {
     name: "Длинные с челкой",
     description: "Прямые волосы с классической челкой.",
-    customImageUrl: "golden_base/f_bangs.jpg",
+    customImageUrl: "/golden_base/f_bangs.jpg",
     stylingTips: "Уложите челку круглой щеткой и феном."
   }
 ];
@@ -47,19 +47,19 @@ const MALE_LIBRARY = [
   {
     name: "Buzz Cut",
     description: "Очень короткая мужская стрижка под машинку.",
-    customImageUrl: "golden_base/m_buzz.jpg",
+    customImageUrl: "/golden_base/m_buzz.jpg",
     stylingTips: "Не требует укладки, идеальна для спорта."
   },
   {
     name: "Текстурный Кроп",
     description: "Короткая стрижка с текстурированной челкой.",
-    customImageUrl: "golden_base/m_crop.jpg",
+    customImageUrl: "/golden_base/m_crop.jpg",
     stylingTips: "Используйте матовую пасту для подчеркивания текстуры."
   },
   {
     name: "Помпадур",
     description: "Классическая мужская объемная укладка назад.",
-    customImageUrl: "golden_base/m_pompadour.jpg",
+    customImageUrl: "/golden_base/m_pompadour.jpg",
     stylingTips: "Потребуется помада сильной фиксации и сушка феном."
   }
 ];

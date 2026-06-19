@@ -32,7 +32,7 @@ export const getMulticlassSegmenter = async () => {
     },
     runningMode: "IMAGE",
     outputCategoryMask: true,
-    outputConfidenceMasks: false
+    outputConfidenceMasks: true
   });
   return multiclassSegmenterInstance;
 };
