@@ -213,7 +213,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
            </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-6">
            {faceDetected === false && (
              <div className="p-4 rounded-xl bg-orange-50 text-orange-700 border border-orange-200 text-sm font-medium">
                Мы не смогли чётко распознать лицо. Вы можете продолжить, но если на фото действительно нет лица, ИИ может выдать ошибку.

@@ -9,6 +9,9 @@ export const useTelegram = () => {
     if (tg) {
       tg.ready?.();
       tg.expand?.();
+      if (tg.disableVerticalSwipes) {
+         tg.disableVerticalSwipes();
+      }
       setTelegramInitData(tg.initData);
 
       const updateTheme = () => {

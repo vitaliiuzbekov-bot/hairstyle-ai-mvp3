@@ -178,7 +178,7 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
           </div>
 
           {/* Chat area */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 font-sans relative">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-6 font-sans relative">
              <div className="absolute inset-0 z-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
              <div className="relative z-10 space-y-6">
                {messages.map((m, i) => (

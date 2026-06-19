@@ -144,7 +144,7 @@ export const HaircutList: React.FC<HaircutListProps> = ({
               </button>
             </div>
             
-            <div className="overflow-y-auto p-5 custom-scrollbar">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 custom-scrollbar">
               <label
                 className={`cursor-pointer w-full p-4 mb-6 rounded-2xl flex items-center justify-center gap-3 border-2 border-dashed transition-all group ${isLightMode ? 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 text-gray-700' : 'border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white/90'}`}
               >
