@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { useImageProcessor } from './useImageProcessor';
 import { AnalysisResult } from '../types';
 import { useUI } from '../context/UIContext';
+import { storage } from '../firebase';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 export const useImageUpload = () => {
     const { processImage, isProcessing: isCompressing, error: compressError } = useImageProcessor();
@@ -27,7 +29,25 @@ export const useImageUpload = () => {
         });
     };
 
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [imageUrl, setImageUrlState] = useState<string | null>(() => {
+        try {
+            return localStorage.getItem("persistent_imageUrl") || null;
+        } catch {
+            return null;
+        }
+    });
+
+    const setImageUrl = (val: React.SetStateAction<string | null>) => {
+        setImageUrlState((prev) => {
+            const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
+            try {
+                if (nextVal) localStorage.setItem("persistent_imageUrl", nextVal);
+                else localStorage.removeItem("persistent_imageUrl");
+            } catch {}
+            return nextVal;
+        });
+    };
+
     const [mimeType, setMimeTypeState] = useState<string>(() => {
         try {
             return localStorage.getItem("persistent_mimeType") || "image/jpeg";
@@ -89,7 +109,6 @@ export const useImageUpload = () => {
 
         try {
             const b64 = await processImage(file);
-            // We set it as raw image base64, so ImageEditorModal can pick it up.
             setRawImageBase64(b64);
         } catch (err: any) {
             const msg = compressError || err.message || "Ошибка обработки";
@@ -101,29 +120,49 @@ export const useImageUpload = () => {
         }
     };
 
+    const uploadToFirebase = async (base64Str: string) => {
+        try {
+            const tg = (window as any).Telegram?.WebApp as any;
+            const uid = tg?.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : "anonymous";
+            const filename = `upload_${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`;
+            const storageRef = ref(storage, `uploads/${uid}/${filename}`);
+            
+            await uploadString(storageRef, base64Str, 'base64', { contentType: 'image/jpeg' });
+            const downloadUrl = await getDownloadURL(storageRef);
+            return downloadUrl;
+        } catch (e) {
+            console.error("Failed to upload to Firebase:", e);
+            return null; // Fallback to base64 if Firebase fails
+        }
+    };
+
     const processFinalImage = async (finalBase64: string) => {
         setIsUploadingImage(true);
         try {
             const { smartCropFace } = await import('../services/fallbackAnalysis');
             const cropResult = await smartCropFace(finalBase64, "image/jpeg");
                
-            // If it failed to crop (e.g. because of the grey background after bg removal),
-            // it still returns the original image. But we shouldn't show an angry red error
-            // to the user since the face was already verified in ImageEditorModal.
             if (cropResult.warning) {
                 console.warn("Smart crop warning:", cropResult.warning);
             }
                
-            if (cropResult.base64) {
-                setImageBase64(cropResult.base64);
-                if (!cropResult.warning) {
-                    addToast("Фото идеально кадрировано ИИ ✨", "success");
-                }
+            let targetBase64 = cropResult.base64 ? cropResult.base64 : finalBase64;
+            
+            // Try uploading to Firebase Storage for much faster backend requests over slow network
+            const uploadedUrl = await uploadToFirebase(targetBase64);
+            
+            if (uploadedUrl) {
+                setImageUrl(uploadedUrl);
+                setImageBase64(null); // Clear base64 since we have a URL now
             } else {
-                setImageBase64(finalBase64);
+                setImageBase64(targetBase64);
+            }
+
+            if (cropResult.base64 && !cropResult.warning) {
+                addToast("Фото кадрировано и готово к загрузке ИИ ✨", "success");
             }
         } catch(cropErr) {
-            console.warn("Crop failed, using original", cropErr);
+            console.warn("Crop failed or Upload failed, using original", cropErr);
             setImageBase64(finalBase64);
         } finally {
             setIsUploadingImage(false);

@@ -13,20 +13,29 @@ export const exportToPDF = async (
   try {
     // Create a clone of the element to style it correctly for PDF
     const clone = guideElement.cloneNode(true) as HTMLElement;
+    
+    // Base setup for the clone to ensure clean rendering
+    clone.style.width = "800px";
+    clone.style.minHeight = "100%";
     clone.style.background = "#ffffff";
-    clone.style.color = "#000000";
-    clone.style.padding = "20px";
+    clone.style.color = "#111827"; // Tailwind gray-900
+    clone.style.padding = "50px";
+    clone.style.fontSize = "16px";
+    clone.style.lineHeight = "1.6";
+    clone.style.fontFamily = "'Inter', system-ui, -apple-system, sans-serif";
 
     // Try to find the images in the DOM to include them in the PDF
     const beforeImageElement = document.querySelector('img[alt="Ваша база"], img[alt="До"]') as HTMLImageElement;
     const refImageElement = document.querySelector('img[alt="Свой референс"], img[alt="Референс"]') as HTMLImageElement;
     const afterImageElement = document.querySelector('img[alt="После"]') as HTMLImageElement;
 
+    // Create a dedicated top gallery for the photos
     const imagesContainer = document.createElement("div");
     imagesContainer.style.display = "flex";
-    imagesContainer.style.gap = "15px";
-    imagesContainer.style.marginBottom = "30px";
+    imagesContainer.style.gap = "24px";
+    imagesContainer.style.marginBottom = "40px";
     imagesContainer.style.justifyContent = "center";
+    imagesContainer.style.alignItems = "flex-start"; // Ensure images scale naturally
 
     const addImageToPdf = (imgEl: HTMLImageElement | null, label: string) => {
         if (!imgEl || !imgEl.src) return;
@@ -38,73 +47,121 @@ export const exportToPDF = async (
         
         const labelEl = document.createElement("div");
         labelEl.innerText = label;
-        labelEl.style.fontWeight = "bold";
-        labelEl.style.marginBottom = "8px";
-        labelEl.style.fontSize = "14px";
+        labelEl.style.fontWeight = "700";
+        labelEl.style.marginBottom = "14px";
+        labelEl.style.fontSize = "16px";
+        labelEl.style.color = "#374151"; // gray-700
+        labelEl.style.letterSpacing = "0.05em"; // Tracking wide
         
+        const imgContainer = document.createElement("div");
+        imgContainer.style.width = "100%";
+        imgContainer.style.borderRadius = "16px";
+        imgContainer.style.overflow = "hidden";
+        imgContainer.style.boxShadow = "0 10px 15px -3px rgba(0, 0, 0, 0.1)"; // shadow-lg
+
         const img = document.createElement("img");
         img.src = imgEl.src;
+        img.style.display = "block";
         img.style.width = "100%";
-        img.style.maxHeight = "300px";
-        img.style.objectFit = "cover";
-        img.style.borderRadius = "8px";
-        img.style.border = "1px solid #ddd";
+        img.style.height = "auto"; // Prevents flattening/squishing
         
+        imgContainer.appendChild(img);
         col.appendChild(labelEl);
-        col.appendChild(img);
+        col.appendChild(imgContainer);
         imagesContainer.appendChild(col);
     };
 
     addImageToPdf(beforeImageElement, "ДО (Ваша база)");
     addImageToPdf(refImageElement, "РЕФЕРЕНС (Стиль)");
-    // Try to find VTON result if available
+    
+    // Find VTON result
     const vtonResultEl = document.querySelector('.ReactCompareSliderImage, img[alt="Результат"]') as HTMLImageElement;
     if (afterImageElement) {
        addImageToPdf(afterImageElement, "ПОСЛЕ (Результат)");
     } else if (vtonResultEl && vtonResultEl !== beforeImageElement && vtonResultEl !== refImageElement) {
-       // Just a fallback
+       addImageToPdf(vtonResultEl, "ОЖИДАЕМЫЙ РЕЗУЛЬТАТ");
     }
 
     if (imagesContainer.children.length > 0) {
         clone.insertBefore(imagesContainer, clone.firstChild);
     }
 
-    // We must change text colors inside the clone since they are white in the UI
-    const textElements = clone.querySelectorAll("*");
+    // Add general text colors inside the clone since they might be white/translucent in dark mode
+    const textElements = clone.querySelectorAll("span, p, li, div, h1, h2, h3, h4");
     textElements.forEach((el) => {
-      (el as HTMLElement).style.color = "#000000";
-
-      // Add basic inline styles for markdown elements that lose Tailwind class support in iframe
-      if (el.tagName.toLowerCase() === "ul") {
-        (el as HTMLElement).style.listStyleType = "disc";
-        (el as HTMLElement).style.paddingLeft = "20px";
-        (el as HTMLElement).style.marginBottom = "10px";
+      const hel = el as HTMLElement;
+      hel.style.color = "#1f2937"; // gray-800
+      
+      if (hel.tagName.toLowerCase() === "ul") {
+        hel.style.listStyleType = "disc";
+        hel.style.paddingLeft = "24px";
+        hel.style.marginBottom = "16px";
+        hel.style.color = "#4b5563"; // gray-600
       }
-      if (el.tagName.toLowerCase() === "li") {
-        (el as HTMLElement).style.marginBottom = "4px";
+      if (hel.tagName.toLowerCase() === "li") {
+        hel.style.marginBottom = "8px";
+        hel.style.lineHeight = "1.5";
       }
-      if (el.tagName.toLowerCase() === "strong") {
-        (el as HTMLElement).style.fontWeight = "600";
-      }
-      if (el.tagName.toLowerCase() === "p") {
-        (el as HTMLElement).style.marginBottom = "10px";
+      if (hel.tagName.toLowerCase() === "p") {
+        hel.style.marginBottom = "16px";
+        hel.style.lineHeight = "1.6";
+        hel.style.color = "#374151";
       }
     });
 
-    // Remove the export button from the clone to avoid showing it in the PDF
-    const buttonToRemove = clone.querySelector("button");
-    if (buttonToRemove) buttonToRemove.remove();
+    // Remove buttons, inputs from the clone to avoid showing it in PDF
+    const interactiveElements = clone.querySelectorAll("button, input, textarea, svg");
+    interactiveElements.forEach(el => el.remove());
+    
+    // Add Neurostylist Header
+    const headerEl = document.createElement("div");
+    headerEl.style.borderBottom = "2px solid #f3f4f6";
+    headerEl.style.paddingBottom = "24px";
+    headerEl.style.marginBottom = "32px";
+    headerEl.style.display = "flex";
+    headerEl.style.alignItems = "flex-end";
+    headerEl.style.justifyContent = "space-between";
+    headerEl.innerHTML = `
+      <div>
+        <h1 style="font-size: 32px; font-weight: 800; color: #111827; margin: 0; letter-spacing: -0.02em;">НейроСтилист <span style="color: #3b82f6;">AI</span></h1>
+        <p style="font-size: 15px; color: #6b7280; margin: 6px 0 0 0; font-weight: 500;">Персональный гайд по стилю и стрижке</p>
+      </div>
+      <div style="font-size: 14px; color: #9ca3af; text-align: right; font-weight: 500;">
+        ${new Date().toLocaleDateString('ru-RU')}
+      </div>
+    `;
+    clone.insertBefore(headerEl, clone.firstChild);
 
-    // Ensure the clone has proper base styling
-    clone.style.width = "800px";
-    clone.style.maxWidth = "100%";
-    clone.style.background = "#ffffff";
-    clone.style.color = "#000000";
-    clone.style.padding = "40px";
-    clone.style.fontSize = "16px";
-    clone.style.lineHeight = "1.6";
-    clone.style.fontFamily = "system-ui, -apple-system, sans-serif";
-    clone.style.width = "800px";
+    // Format H tags properly for documents
+    const headings = clone.querySelectorAll("h1, h2, h3, h4");
+    headings.forEach((el) => {
+        const hel = el as HTMLElement;
+        hel.style.color = "#111827";
+        hel.style.fontWeight = "700";
+        hel.style.marginTop = "32px";
+        hel.style.marginBottom = "16px";
+        
+        if (hel.tagName === "H3" || hel.tagName === "H2") {
+            hel.style.fontSize = "20px";
+            hel.style.borderLeft = "4px solid #3b82f6"; // Blue brand accent
+            hel.style.paddingLeft = "12px";
+            // Remove bottom border as left border looks more professional
+            hel.style.borderBottom = "none";
+        }
+    });
+
+    // Structure cards nicely for document print format
+    const cards = clone.querySelectorAll(".rounded-2xl, .rounded-3xl, .bg-white\\/5, .glass-panel");
+    cards.forEach((el) => {
+        const cel = el as HTMLElement;
+        cel.style.background = "#f9fafb"; // Light gray bg
+        cel.style.border = "1px solid #e5e7eb";
+        cel.style.boxShadow = "none";
+        cel.style.color = "#1f2937";
+        cel.style.padding = "28px";
+        cel.style.marginBottom = "24px";
+        cel.style.borderRadius = "16px";
+    });
 
     const html2pdf = (await import("html2pdf.js")).default;
 

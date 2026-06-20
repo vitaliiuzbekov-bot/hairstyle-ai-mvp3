@@ -387,10 +387,10 @@ export function getSafeRussianPrompt(gender: string, ageRange: string, haircutNa
       else if (kwLower.includes("bob") || kwLower.includes("боб")) styleName = "Боб";
       else if (kwLower.includes("crop") || kwLower.includes("кроп")) styleName = "Кроп";
       else if (kwLower.includes("undercut") || kwLower.includes("андеркат")) styleName = "Андеркат";
-      else if (kwLower.includes("buzz") || kwLower.includes("ежик") || kwLower.includes("бокс")) styleName = "Бокс/Ежик";
+      else if (kwLower.includes("buzz") || kwLower.includes("ежик") || kwLower.includes("бокс")) styleName = "стрижка под ноль машинкой (ежик)";
       else if (kwLower.includes("fade") || kwLower.includes("полубокс")) styleName = "Полубокс";
       else if (kwLower.includes("mullet") || kwLower.includes("маллет")) styleName = "Маллет";
-      else if (kwLower.includes("shave") || kwLower.includes("лыс") || kwLower.includes("bald")) styleName = "налысо";
+      else if (kwLower.includes("shave") || kwLower.includes("лыс") || kwLower.includes("bald")) styleName = "ПОЛНОСТЬЮ БРИТАЯ ГОЛОВА НАЛЫСО (БЕЗ ВОЛОС)";
       else styleName = "повседневная прическа";
     }
   }
@@ -439,10 +439,10 @@ export function getDetailedRussianPrompt(params: any): string {
       else if (kwLower.includes("bob") || kwLower.includes("боб")) styleName = "Боб";
       else if (kwLower.includes("crop") || kwLower.includes("кроп")) styleName = "Кроп";
       else if (kwLower.includes("undercut") || kwLower.includes("андеркат")) styleName = "Андеркат";
-      else if (kwLower.includes("buzz") || kwLower.includes("ежик") || kwLower.includes("бокс")) styleName = "Бокс/Ежик";
+      else if (kwLower.includes("buzz") || kwLower.includes("ежик") || kwLower.includes("бокс")) styleName = "стрижка под ноль машинкой (ежик)";
       else if (kwLower.includes("fade") || kwLower.includes("полубокс")) styleName = "Полубокс";
       else if (kwLower.includes("mullet") || kwLower.includes("маллет")) styleName = "Маллет";
-      else if (kwLower.includes("shave") || kwLower.includes("лыс") || kwLower.includes("bald")) styleName = "налысо";
+      else if (kwLower.includes("shave") || kwLower.includes("лыс") || kwLower.includes("bald")) styleName = "ПОЛНОСТЬЮ БРИТАЯ ГОЛОВА НАЛЫСО (БЕЗ ВОЛОС)";
       else styleName = "повседневная прическа";
     }
   }
@@ -454,8 +454,10 @@ export function getDetailedRussianPrompt(params: any): string {
   promptBuilder += `На фото НЕ модель, а обычный, реальный ${demographic}. ${ageFeatures} Фотореалистичность 100%, камера телефона, без фильтров и ретуши. Кожа с естественными порами и неровностями. Строго запрещено делать пышную или высокую укладку. Никакого гипер-объема или "гнезда" сверху. Волосы должны прилегать к голове реалистично. `;
 
   const kwLowerForStyle = styleName.toLowerCase();
-  if (kwLowerForStyle.includes("кроп") || kwLowerForStyle.includes("бокс") || kwLowerForStyle.includes("андеркат") || kwLowerForStyle.includes("полубокс") || kwLowerForStyle.includes("fade") || kwLowerForStyle.includes("crew") || kwLowerForStyle.includes("buzz")) {
-       promptBuilder += `Это короткая стрижка! Волосы сверху ДОЛЖНЫ ЛЕЖАТЬ МАКСИМАЛЬНО ПЛОСКО, абсолютно НОЛЬ объема! Никаких торчащих пушистых кудрей, никаких челок вверх, никакой шапки. Этом строгий запрет на любой объем! `;
+  if (kwLowerForStyle.includes("лыс") || kwLowerForStyle.includes("голов") || kwLowerForStyle.includes("череп")) {
+       promptBuilder += `ЧЕЛОВЕК АБСОЛЮТНО ЛЫСЫЙ, У НЕГО ГОЛЫЙ БРИТЫЙ ЧЕРЕП. СТРОГИЙ ЗАПРЕТ НА ЛЮБЫЕ ВОЛОСЫ. НОЛЬ ВОЛОС. `;
+  } else if (kwLowerForStyle.includes("кроп") || kwLowerForStyle.includes("бокс") || kwLowerForStyle.includes("андеркат") || kwLowerForStyle.includes("полубокс") || kwLowerForStyle.includes("fade") || kwLowerForStyle.includes("crew") || kwLowerForStyle.includes("buzz") || kwLowerForStyle.includes("ежик")) {
+       promptBuilder += `Это ОЧЕНЬ короткая стрижка машинкой! Волосы ДОЛЖНЫ БЫТЬ МАКСИМАЛЬНО КОРОТКИМИ, почти под ноль, абсолютно НОЛЬ объема! Никаких торчащих пушистых кудрей, никаких челок вверх, никакой шапки. СТРОГИЙ ЗАПРЕТ на любой объем и длинные волосы! Идеально повторяет форму черепа. `;
   } else {
        promptBuilder += `Волосы должны выглядеть естественно, лежать плоско, с минимальным базовым объемом. Запрещен салонный пышный объем. `;
   }

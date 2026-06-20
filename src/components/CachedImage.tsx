@@ -10,29 +10,9 @@ interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, className, style, ...props }) => {
   const [imgSrc, setImgSrc] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isVisible, setIsVisible] = useState<boolean>(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px' } 
-    );
-    
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!isVisible) return;
-    
     let objectUrl = '';
     let isMounted = true;
 
@@ -81,7 +61,7 @@ export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, c
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [src, isVisible]);
+  }, [src]);
 
   return (
     <div ref={containerRef} className={`relative ${className || ''}`} style={style}>

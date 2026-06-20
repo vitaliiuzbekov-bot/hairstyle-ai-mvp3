@@ -55,7 +55,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
 
   useEffect(() => {
     if (tg?.MainButton) {
-      if (!results && !error && imageBase64 && !isAnalyzing && !isUploadingImage) {
+      if (!results && !error && (imageBase64 || imageUrl) && !isAnalyzing && !isUploadingImage) {
         tg.MainButton.text = "Запустить ИИ-Анализ 🚀";
         tg.MainButton.show();
         tg.MainButton.onClick(analyzeImage);
@@ -79,7 +79,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
         tg.MainButton.offClick(analyzeImage);
       }
     }
-  }, [tg, results, error, imageBase64, isAnalyzing, isUploadingImage, analyzeImage]);
+  }, [tg, results, error, imageBase64, imageUrl, isAnalyzing, isUploadingImage, analyzeImage]);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -124,7 +124,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
 
   return (
     <div
-      className={`col-span-1 lg:col-span-5 transition-all duration-700 ${imageBase64 ? "" : "lg:col-span-8 lg:col-start-3"}`}
+      className={`col-span-1 lg:col-span-5 transition-all duration-700 ${(imageBase64 || imageUrl) ? "" : "lg:col-span-8 lg:col-start-3"}`}
     >
       <div className="relative group">
         <div className={`relative rounded-[1.5rem] border overflow-hidden transition-all duration-500 flex flex-col ${isLightMode ? 'bg-white text-gray-900 border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'bg-[#0a0a0a]/80 backdrop-blur-xl text-white/90 border-white/5 shadow-2xl'}`}>
@@ -133,7 +133,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
             <h3 className={`font-medium text-sm tracking-widest uppercase flex items-center gap-2 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
               <Camera size={14} /> ФОТО ПРОФИЛЯ
             </h3>
-            {imageBase64 && !isAnalyzing && (
+            {(imageBase64 || imageUrl) && !isAnalyzing && (
               <button
                 onClick={resetApp}
                 aria-label="Удалить фото и начать заново"
@@ -145,7 +145,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
           </div>
 
           <div className="p-2 sm:p-4 pb-6">
-            {!imageBase64 ? (
+            {(!imageBase64 && !imageUrl) ? (
               <div className="flex flex-col items-center w-full">
                 
                 {/* User Guide Block */}

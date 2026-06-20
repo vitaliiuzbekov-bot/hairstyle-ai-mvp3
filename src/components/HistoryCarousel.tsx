@@ -36,17 +36,37 @@ const HistoryCarouselComponent: React.FC<HistoryCarouselProps> = ({
             className={`flex-none snap-center relative rounded-xl overflow-hidden border group cursor-pointer w-[120px] h-[160px] sm:w-[150px] sm:h-[200px] ${isLightMode ? 'border-gray-200 shadow-sm' : 'border-white/10'}`}
             onClick={() => {
               const tg = window.Telegram?.WebApp;
-              if (tg?.openLink) {
-                tg.openLink(item.url);
+              if (!item.url) return;
+              
+              const isHttp = item.url.startsWith('http://') || item.url.startsWith('https://');
+              
+              if (tg?.openLink && isHttp) {
+                try {
+                  tg.openLink(item.url);
+                } catch(e) {
+                  window.open(item.url, "_blank");
+                }
               } else {
-                window.open(item.url, "_blank");
+                // If it's a blob/data URL, try normal window.open
+                const newWindow = window.open();
+                if (newWindow) {
+                  newWindow.document.write(`<img src="${item.url}" style="width:100%;height:auto;" />`);
+                  newWindow.document.title = "Фото";
+                } else {
+                  // Fallback: download it
+                  const a = document.createElement("a");
+                  a.href = item.url;
+                  a.download = "history_image.jpg";
+                  a.click();
+                }
               }
             }}
           >
-            <CachedImage
-              src={item.url || undefined as any}
+            <img
+              src={item.url || undefined}
               alt={item.keyword}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
             />
 
             <button

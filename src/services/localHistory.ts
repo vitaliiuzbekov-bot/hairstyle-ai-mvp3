@@ -29,8 +29,41 @@ const syncToTelegramCloud = async (history: HistoryItem[]) => {
 export const getHistory = async (): Promise<HistoryItem[]> => {
   try {
     const history = await get<HistoryItem[]>(HISTORY_KEY);
-    if (!history) return [];
     
+    // If no history in IndexedDB, try to restore from Telegram CloudStorage
+    if (!history || history.length === 0) {
+        return await new Promise<HistoryItem[]>((resolve) => {
+            const tg = (window as any).Telegram?.WebApp as any;
+            if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
+                tg.CloudStorage.getItem('tga_history', (err: any, value: string) => {
+                    if (value) {
+                         try { 
+                           const parsed = JSON.parse(value);
+                           // Save it back to local IDB
+                           set(HISTORY_KEY, parsed).catch(console.error);
+                           resolve(parsed); 
+                         } catch(e) { resolve([]); }
+                    } else {
+                         // Fallback to localStorage
+                         try {
+                           const localData = JSON.parse(localStorage.getItem('localHistory') || '[]');
+                           resolve(localData);
+                         } catch {
+                           resolve([]);
+                         }
+                    }
+                });
+            } else {
+                try {
+                  const localData = JSON.parse(localStorage.getItem('localHistory') || '[]');
+                  resolve(localData);
+                } catch {
+                  resolve([]);
+                }
+            }
+        });
+    }
+
     // Revive blob URLs
     return history.map(item => {
       let finalUrl = item.url;

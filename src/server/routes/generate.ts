@@ -47,7 +47,7 @@ generateRouter.post("/generate-reference", async (req, res) => {
 
       // Check cache first (Cache for 30 days)
       const cacheKey = getCacheKey({ 
-        route: "generate-reference-v11-flat-fix", 
+        route: "generate-reference-v12-bald-fix", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
         hairDensity, hairType, hairLength, hairlineStatus, hairQuality
       });
@@ -444,7 +444,7 @@ generateRouter.post("/generate-full", async (req, res) => {
 
       let agePromptEng = getDetailedAgePromptEng(ageRange || "");
       
-      promptEng = `A photorealistic portrait of a ${descriptorEng}. This person is a ${agePromptEng}. [CRITICAL HAIRSTYLE REPLICATION: YOU MUST EXACTLY AND PERFECTLY REPLICATE THE HAIRSTYLE, VOLUME, SHAPE, AND TEXTURE PORTRAYED IN THE IMAGE. DO NOT CHANGE THE HAIRSTYLE STRUCTURE OR TYPE. THIS IS STRICTLY REQUIRED. STYLE OVERVIEW: ${englishKeyword} - ${englishDescription || ""}]. ${fluxHairDetails} ${extraColorPrompt} CRITICAL FACIAL CLARITY REQUIREMENT: The person must look directly at the camera with a clear, unobstructed face. The face must be in perfect sharp focus, crystal clear. No face warping, no distortions. Look directly at the camera. CRITICAL INSTRUCTION: DO NOT ALTER THE PERSON'S ORIGINAL FACE STRUCTURE, JAWLINE, CHIN, EYES, NOSE, SHOULDERS, OR BODY SHAPE. PRESERVE THE IDENTITY EXACTLY. Only change the hair. CRITICAL INSTRUCTION: NO HYPER-VOLUME. HAIR MUST LIE FLAT AND NATURAL unless explicitly requested.`;
+      promptEng = `A photorealistic portrait of a ${descriptorEng}. This person is a ${agePromptEng}. [CRITICAL HAIRSTYLE TRANSFORMATION: YOU MUST COMPLETELY CHANGE THE PERSON'S HAIR TO EXACTLY MATCH THIS NEW STYLE: "${englishKeyword}" - ${englishDescription || ""}]. ${fluxHairDetails} ${extraColorPrompt} CRITICAL FACIAL CLARITY REQUIREMENT: The person must look directly at the camera with a clear, unobstructed face. The face must be in perfect sharp focus. CRITICAL INSTRUCTION: DO NOT ALTER THE PERSON'S ORIGINAL FACE STRUCTURE, JAWLINE, CHIN, EYES, NOSE, SHOULDERS, CLOTHING, OR BODY SHAPE. PRESERVE THE BASE IMAGE IDENTITY EXACTLY. ONLY CHANGE THE HAIR. IF THE ORIGINAL PERSON IS BALD, YOU MUST GENERATE THE NEW HAIRSTYLE ON THEIR HEAD. NO HYPER-VOLUME. HAIR MUST LAY FLAT AND NATURAL unless explicitly requested.`;
       
       const translateFaceShape = (val: string) => {
         val = val.toLowerCase();
