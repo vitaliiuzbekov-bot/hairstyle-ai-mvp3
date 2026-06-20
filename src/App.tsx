@@ -117,7 +117,7 @@ function App() {
 
   return (
     <div
-      className={`min-h-screen w-full overflow-x-hidden bg-[#050508] text-white/90 font-sans selection:bg-blue-500/30 ${isLightMode ? "light-mode" : ""}`}
+      className={`min-h-screen w-full overflow-x-clip bg-[#050508] text-white/90 font-sans selection:bg-blue-500/30 ${isLightMode ? "light-mode" : ""}`}
     >
       {/* Header */}
       <Header
