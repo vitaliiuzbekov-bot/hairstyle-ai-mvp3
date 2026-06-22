@@ -53,7 +53,15 @@ export const applyWatermark = (imageUrl: string, text: string = "@neirostilist_b
             ctx.textBaseline = "middle";
             ctx.fillText(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2);
 
-            resolve(canvas.toDataURL("image/jpeg", 0.95));
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+              } else {
+                resolve(imageUrl);
+              }
+            }, "image/jpeg", 0.95);
         };
         img.onerror = () => {
             console.warn("Could not load image for watermarking, failing back to original", imageUrl);

@@ -9,7 +9,7 @@ import { adminApp, adminStorage } from "../firebase";
 import crypto from "crypto";
 import { sendPhotoToTelegramUser } from "../services/telegramBot";
 import { safeParseJSON } from "../utils/json";
-import { geminiQueue, imageGenQueue } from "../utils/queues";
+import { geminiQueue, imageGenQueue, withRetry } from "../utils/queues";
 import { createRateLimiter } from "../utils/rateLimiter";
 
 import {
@@ -103,22 +103,22 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
 Категорически запрещено генерировать нереалистично пышные, густые или длинные волосы, если база тонкая или с залысинами. Референс должен отражать, как эта прическа будет выглядеть на РЕАЛЬНЫХ волосах пользователя. Сохраняй реалистичность!
 
 Инструкции:
-1. Создай промпт для портрета студийного качества (лицо смотрит в камеру).
-2. Опиши внешность человека так, чтобы она строго соответствовала возрасту (морщины, если есть) и типу лица пользователя.
+1. Создай промпт для обычного любительского селфи на телефон (лицо смотрит в камеру). Избегай эффекта "идеального студийного фото". Фото должно выглядеть максимально естественно, "сыро", как будто сделано дома при обычном освещении.
+2. Опиши внешность человека, включая естественные текстуры кожи, возрастные изменения, неидеальности (если есть), чтобы избежать эффекта "пластикового ИИ-лица".
 3. Опиши волосы: цвет, текстуру и самое главное — ОБЪЕМ и ГУСТОТУ (четко укажи, что они соответствуют данным пользователя, например: "редкие волосы", "тонкие волосы", "высокий лоб", если это так).
 4. Опиши конечную укладку и стрижку с учетом этих ограничений.
 5. Верни ТОЛЬКО готовый текст промпта на русском языке. Максимум 600 символов.`;
 
-        const refPromptRes = await geminiQueue.add(() => ai.models.generateContent({
+        const refPromptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
              model: 'gemini-2.5-pro', // Using pro for better logic constraints
              contents: systemInstructionRef,
              config: { temperature: 0.7, maxOutputTokens: 250 }
-        }));
+        })));
         prompt = refPromptRes?.text?.trim() || "";
       } catch (err) {
         console.error("Gemini failed to generate ref prompt, using simple fallback:", err);
         const gLabel = (gender === "male" || gender === "Мужчина") ? "мужчина" : "женщина";
-        prompt = `Фотореалистичный портрет, ${gLabel}, возраст: ${ageRange}. Новая идеальная прическа: ${haircutName || keyword}. Цвет волос: ${customHairColor || hairColor || "естественный"}. Студийный свет, 8к разборчивое лицо, без ретуши.`;
+        prompt = `Обычное селфи на телефон, ${gLabel}, возраст: ${ageRange}. Естественная текстура кожи, без фильтров и ретуши, домашнее освещение. Новая прическа: ${haircutName || keyword}. Цвет волос: ${customHairColor || hairColor || "естественный"}. Никакого глянца, избегать эффекта "пластикового лица" и студийного света.`;
       }
       
       prompt = prompt.substring(0, 1000).trim();
@@ -495,14 +495,14 @@ Instructions:
             contentsPayload.parts[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The user provided a reference image showing the target hairstyle (attached). You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
         }
 
-        const promptRes = await geminiQueue.add(() => ai.models.generateContent({
+        const promptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
              model: 'gemini-2.5-pro', // Pro to properly analyze image
              contents: contentsPayload,
              config: {
                  temperature: 0.7,
                  maxOutputTokens: 500
              }
-        }));
+        })));
         promptEng = promptRes?.text?.trim() || "";
       } catch (err) {
         console.error("Gemini failed to generate prompt, falling back to basic prompt:", err);
@@ -921,33 +921,48 @@ generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
                   apiKey: geminiApiKey,
                   httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
                 });
-                const response = await geminiQueue.add(() => ai.models.generateContent({
-                    model: "gemini-2.5-flash",
-                    contents: prompt,
-                    config: {
-                        systemInstruction: systemInstruction,
-                        temperature: 0.85,
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: Type.OBJECT,
-                            properties: {
-                                recommendations: {
-                                    type: Type.ARRAY,
-                                    items: {
+                const response = await geminiQueue.add(() => withRetry(async () => {
+                    let lastError;
+                    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+                    for (const modelName of modelsToTry) {
+                        try {
+                            return await ai.models.generateContent({
+                                model: modelName,
+                                contents: prompt,
+                                config: {
+                                    systemInstruction: systemInstruction,
+                                    temperature: 0.85,
+                                    responseMimeType: "application/json",
+                                    responseSchema: {
                                         type: Type.OBJECT,
                                         properties: {
-                                            name: { type: Type.STRING },
-                                            imageKeyword: { type: Type.STRING },
-                                            description: { type: Type.STRING },
-                                            stylingTips: { type: Type.STRING }
+                                            recommendations: {
+                                                type: Type.ARRAY,
+                                                items: {
+                                                    type: Type.OBJECT,
+                                                    properties: {
+                                                        name: { type: Type.STRING },
+                                                        imageKeyword: { type: Type.STRING },
+                                                        description: { type: Type.STRING },
+                                                        stylingTips: { type: Type.STRING }
+                                                    },
+                                                    required: ["name", "imageKeyword", "description", "stylingTips"]
+                                                }
+                                            }
                                         },
-                                        required: ["name", "imageKeyword", "description", "stylingTips"]
+                                        required: ["recommendations"]
                                     }
                                 }
-                            },
-                            required: ["recommendations"]
+                            });
+                        } catch (err: any) {
+                           lastError = err;
+                           const msg = err.message || String(err);
+                           if (!msg.includes("503") && !msg.includes("429") && !msg.includes("high demand") && !msg.includes("UNAVAILABLE")) {
+                               throw err;
+                           }
                         }
                     }
+                    throw lastError;
                 }));
                 if (response.text) {
                     data = safeParseJSON(response.text);

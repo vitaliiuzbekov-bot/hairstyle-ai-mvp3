@@ -98,26 +98,41 @@ function App() {
 
   if (!isTelegramEnv && !isDeveloper) {
     return (
-      <div className="min-h-screen bg-[#050508] text-white/90 flex flex-col items-center justify-center p-6 text-center font-sans tracking-wide">
-        <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mb-6 text-blue-400">
-          <Zap size={32} strokeWidth={1.5} />
+      <div className="relative min-h-screen bg-[#050508] text-white/90 flex flex-col items-center justify-center p-6 sm:p-10 text-center font-sans tracking-wide overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-500/20 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/20 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="relative z-10 max-w-lg mx-auto bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 sm:p-12 flex flex-col items-center shadow-2xl">
+          <div className="w-20 h-20 bg-gradient-to-tr from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-2xl flex items-center justify-center mb-8 rotate-3">
+            <Zap size={36} strokeWidth={1.5} className="text-white" />
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold mb-4 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+            НейроСтилист
+          </h1>
+          <p className="text-white/60 mb-8 leading-relaxed font-light text-sm sm:text-base">
+            Мощная платформа на базе искусственного интеллекта для подбора идеальной прически. Доступно эксклюзивно в Telegram для обеспечения безопасности и вашего комфорта. 
+          </p>
+          <a
+            href="https://t.me/neirostilist_bot"
+            target="_blank"
+            rel="noreferrer"
+            className="w-full relative group overflow-hidden px-8 py-4 bg-white text-black rounded-2xl font-bold transition-all sm:text-lg hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              Открыть в Telegram
+            </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-100 to-blue-100 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
+          <p className="mt-6 text-xs text-white/40 uppercase tracking-widest">
+            Надежно. Быстро. Безопасно.
+          </p>
         </div>
-        <h1 className="text-2xl font-semibold mb-4 tracking-tight">
-          Откройте через Telegram
-        </h1>
-        <p className="text-white/60 mb-8 max-w-sm leading-relaxed font-light">
-          Бот Нейростилиста теперь доступен эксклюзивно внутри Telegram. Это
-          необходимо для обеспечения безопасности данных и доступа к функциям
-          оплаты.
-        </p>
-        <a
-          href="https://t.me/neirostilist_bot"
-          target="_blank"
-          rel="noreferrer"
-          className="px-8 py-4 bg-white text-black hover:bg-white/90 rounded-full font-medium transition-colors text-sm uppercase tracking-wider"
-        >
-          Перейти в Telegram
-        </a>
+
+        {/* Footer / Credits */}
+        <div className="absolute bottom-8 text-white/30 text-xs">
+          © {new Date().getFullYear()} НейроСтилист AI
+        </div>
       </div>
     );
   }

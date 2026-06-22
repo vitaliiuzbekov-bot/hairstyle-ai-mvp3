@@ -68,10 +68,10 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     const max_size = 1024;
 
     if (finalWidth > finalHeight && finalWidth > max_size) {
-      finalHeight *= max_size / finalWidth;
+      finalHeight = Math.round(finalHeight * (max_size / finalWidth));
       finalWidth = max_size;
     } else if (finalHeight > max_size) {
-      finalWidth *= max_size / finalHeight;
+      finalWidth = Math.round(finalWidth * (max_size / finalHeight));
       finalHeight = max_size;
     }
 
@@ -81,10 +81,30 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     const resizedCtx = resizedCanvas.getContext("2d");
     if (resizedCtx) {
       resizedCtx.drawImage(canvas, 0, 0, finalWidth, finalHeight);
-      return resizedCanvas.toDataURL("image/jpeg", 0.85);
+      return new Promise<string>((resolve) => {
+        resizedCanvas.toBlob((blob) => {
+          if (blob) {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          } else {
+            resolve(imageSrc);
+          }
+        }, "image/jpeg", 0.85);
+      });
     }
 
-    return canvas.toDataURL("image/jpeg", 0.85);
+    return new Promise<string>((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        } else {
+          resolve(imageSrc);
+        }
+      }, "image/jpeg", 0.85);
+    });
   };
 
   const handleConfirm = async () => {

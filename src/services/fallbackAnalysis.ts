@@ -1,5 +1,4 @@
 import { AnalysisResult } from '../types';
-import * as faceapi from '@vladmandic/face-api';
 
 export interface SmartCropResult {
   base64: string | null;
@@ -8,10 +7,19 @@ export interface SmartCropResult {
 
 // Global flag to track preload status
 let isFaceApiPreloaded = false;
+let faceapiModule: any = null;
+
+const getFaceApi = async () => {
+    if (!faceapiModule) {
+        faceapiModule = await import('@vladmandic/face-api');
+    }
+    return faceapiModule;
+};
 
 export const preloadFaceApiModels = async () => {
     if (isFaceApiPreloaded) return;
     try {
+        const faceapi = await getFaceApi();
         const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
         await Promise.all([
             faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl),
@@ -36,6 +44,7 @@ export const smartCropFace = async (imageBase64: string, mimeType: string): Prom
   };
 
   try {
+    const faceapi = await getFaceApi();
     const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
     await withTimeout(Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl),
@@ -94,41 +103,38 @@ export const smartCropFace = async (imageBase64: string, mimeType: string): Prom
     
     // Target dimensions
     // Let's pad by a factor of 2.5 of the face size.
-    const cropWidth = faceSize * 2.5;
-    const cropHeight = cropWidth * (4/3); // 3:4 portrait
+    let cropWidth = faceSize * 2.5;
+    let cropHeight = cropWidth * (4/3); // 3:4 portrait
     
     // Calculate center
     const faceCenterX = box.x + box.width / 2;
     const faceCenterY = box.y + box.height / 2;
     
+    // If the crop area is larger than the image, scale it down proportionally
+    if (cropWidth > img.width || cropHeight > img.height) {
+        const scale = Math.min(img.width / cropWidth, img.height / cropHeight);
+        cropWidth *= scale;
+        cropHeight *= scale;
+    }
+
     // Upper half face bias (face should be at ~40% of height)
     let startX = faceCenterX - cropWidth / 2;
     let startY = faceCenterY - cropHeight * 0.4;
     
-    // Boundaries check
+    // Boundaries check - shift crop to stay inside image
     if (startX < 0) startX = 0;
     if (startY < 0) startY = 0;
-    if (startX + cropWidth > img.width) startX = Math.max(0, img.width - cropWidth);
-    if (startY + cropHeight > img.height) startY = Math.max(0, img.height - cropHeight);
+    if (startX + cropWidth > img.width) startX = img.width - cropWidth;
+    if (startY + cropHeight > img.height) startY = img.height - cropHeight;
     
-    // If image is smaller than requested crop, we might just use the original image bounded
-    const finalWidth = Math.min(cropWidth, img.width - startX);
-    const finalHeight = Math.min(cropHeight, img.height - startY);
-
-    // Limit maximum dimensions of the cropped target image to 850 to avoid huge request sizes
+    // Maintain maximum target dimensions to avoid huge payloads, while preserving 3:4
     const MAX_DIM = 850;
-    let targetWidth = finalWidth;
-    let targetHeight = finalHeight;
-    if (targetWidth > targetHeight) {
-      if (targetWidth > MAX_DIM) {
-        targetHeight = Math.round((targetHeight * MAX_DIM) / targetWidth);
-        targetWidth = MAX_DIM;
-      }
-    } else {
-      if (targetHeight > MAX_DIM) {
-        targetWidth = Math.round((targetWidth * MAX_DIM) / targetHeight);
+    let targetWidth = cropWidth;
+    let targetHeight = cropHeight;
+    
+    if (targetHeight > MAX_DIM) {
         targetHeight = MAX_DIM;
-      }
+        targetWidth = Math.round(targetHeight * (3/4));
     }
 
     const canvas = document.createElement("canvas");
@@ -137,11 +143,22 @@ export const smartCropFace = async (imageBase64: string, mimeType: string): Prom
     const ctx = canvas.getContext("2d");
     if (!ctx) return { base64: null };
 
-    ctx.drawImage(img, startX, startY, finalWidth, finalHeight, 0, 0, targetWidth, targetHeight);
+    ctx.drawImage(img, startX, startY, cropWidth, cropHeight, 0, 0, targetWidth, targetHeight);
     
-    // Return base64 string without data uris with optimized compression quality (0.75 is perfect balance)
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
-    return { base64: dataUrl.split(",")[1] };
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve({ base64: null });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          resolve({ base64: dataUrl.split(",")[1] });
+        };
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.75);
+    });
   } catch (e) {
     console.warn("Smart crop failed", e);
     return { base64: null };
@@ -155,6 +172,7 @@ export const fallbackFaceApi = async (
 ): Promise<AnalysisResult | null> => {
   try {
     if (!imageBase64) return null;
+    const faceapi = await getFaceApi();
     const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
     
     const withTimeout = (promise: Promise<any>, ms: number) => {
@@ -186,11 +204,14 @@ export const fallbackFaceApi = async (
     // Yield to allow browser to render loading states before heavy sync ML task
     await new Promise(r => setTimeout(r, 10));
 
-    const detections = await faceapi
-      .detectSingleFace(img)
-      .withFaceLandmarks()
-      .withFaceExpressions()
-      .withAgeAndGender();
+    const detections = await withTimeout(
+      faceapi
+        .detectSingleFace(img)
+        .withFaceLandmarks()
+        .withFaceExpressions()
+        .withAgeAndGender(),
+      15000 // 15s timeout
+    );
 
     if (!detections) {
       throw new Error("Лицо не найдено локальным алгоритмом");

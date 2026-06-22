@@ -1,6 +1,8 @@
-import React from "react";
-import { X, Star, Gift, Share2 } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { X, Star, Gift, Share2, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
+import f_bob from "../../public/golden_base/f_bob.jpg";
+import f_long_straight from "../../public/golden_base/f_long_straight.jpg";
 
 interface BuyModalProps {
   showBuyModal: boolean;
@@ -11,6 +13,94 @@ interface BuyModalProps {
   processPayment: (planId: "basic" | "popular" | "premium" | "master", stars: number, tokens: number) => Promise<void>;
   isLightMode?: boolean;
 }
+
+const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
+  const [sliderPos, setSliderPos] = useState(50);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (isDragging) return;
+    let frame: number;
+    let startTime = Date.now();
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const pos = 50 + Math.sin(elapsed / 800) * 25; // Animate between 25% and 75% smoothly
+      setSliderPos(pos);
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [isDragging]);
+
+  const handleMove = (clientX: number) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    setSliderPos((x / rect.width) * 100);
+  };
+
+  useEffect(() => {
+    const handleMouseUp = () => setIsDragging(false);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchend', handleMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchend', handleMouseUp);
+    };
+  }, []);
+
+  return (
+    <div 
+      ref={containerRef}
+      className={`relative w-full aspect-[3/4] sm:aspect-[4/5] rounded-2xl overflow-hidden cursor-ew-resize select-none border ${isLightMode ? 'border-amber-200 shadow-sm' : 'border-white/10 bg-[#110e18]'}`}
+      onMouseDown={(e) => { setIsDragging(true); handleMove(e.clientX); }}
+      onMouseMove={(e) => isDragging && handleMove(e.clientX)}
+      onTouchStart={(e) => { setIsDragging(true); handleMove(e.touches[0].clientX); }}
+      onTouchMove={(e) => isDragging && handleMove(e.touches[0].clientX)}
+    >
+      {/* After Image */}
+      <img 
+         src={f_bob} 
+         alt="AI Result" 
+         className="absolute inset-0 w-full h-full object-cover pointer-events-none" 
+         draggable={false}
+      />
+      <div className="absolute bottom-2 right-2 px-2 py-1 bg-amber-500/90 backdrop-blur-md rounded text-[10px] font-bold text-white shadow-sm pointer-events-none">
+         ИИ-РЕЗУЛЬТАТ
+      </div>
+      
+      {/* Before Image */}
+      <div 
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        style={{ clipPath: `polygon(0 0, ${sliderPos}% 0, ${sliderPos}% 100%, 0 100%)` }}
+      >
+        <img 
+           src={f_long_straight} 
+           alt="Before" 
+           className="absolute inset-0 w-full h-full object-cover" 
+           draggable={false}
+        />
+        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-[10px] font-bold text-white pointer-events-none shadow-sm">
+           ОБЫЧНОЕ ФОТО
+        </div>
+      </div>
+
+      {/* Slider Line and Handle */}
+      <div 
+        className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0.3)] z-10 pointer-events-none"
+        style={{ left: `calc(${sliderPos}% - 2px)` }}
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white">
+            <div className="flex gap-1 items-center">
+              <ChevronLeft size={10} strokeWidth={4} />
+              <ChevronRight size={10} strokeWidth={4} />
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const BuyModal: React.FC<BuyModalProps> = ({
   showBuyModal,
@@ -26,8 +116,8 @@ export const BuyModal: React.FC<BuyModalProps> = ({
   if (!showBuyModal) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${isLightMode ? 'bg-gray-900/40 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
-      <div className={`w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative flex flex-col items-center animate-in zoom-in-95 fade-in duration-300 overflow-hidden ${isLightMode ? 'bg-white border border-gray-200' : 'bg-[#0f0c1b] border border-white/10'}`}>
+    <div className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${isLightMode ? 'bg-gray-900/40 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
+      <div className={`w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative flex flex-col items-center animate-in zoom-in-95 fade-in duration-300 overflow-hidden ${isLightMode ? 'bg-white border border-gray-200' : 'bg-[#0f0c1b] border border-white/10'} max-h-[95vh] overflow-y-auto custom-scrollbar`}>
         
         {/* Glow effect */}
         <div className="absolute top-[-20%] right-[-20%] w-[120%] h-[120%] bg-gradient-to-bl from-amber-500/10 via-transparent to-transparent blur-3xl pointer-events-none"></div>
@@ -38,17 +128,26 @@ export const BuyModal: React.FC<BuyModalProps> = ({
         >
           <X size={20} className="stroke-current" />
         </button>
-        <h2 className={`text-xl font-bold bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent mb-6 mt-2 flex items-center gap-2 z-10`}>
+        <h2 className={`text-xl font-bold bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent mb-4 mt-2 flex items-center gap-2 z-10`}>
            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${isLightMode ? 'bg-amber-100' : 'bg-amber-500/20'}`}>
              <Star size={18} className="text-amber-500 fill-current" />
            </div>
           Buy Generations
         </h2>
+
+        {/* Onboarding Teaser inside BuyModal */}
+        <div className={`w-full text-center relative z-10 mb-5`}>
+          <ImageSlider isLightMode={isLightMode} />
+          <p className={`text-[11px] mt-3 font-medium px-2 leading-relaxed ${isLightMode ? 'text-gray-700' : 'text-white/80'}`}>
+            С невероятной точностью и учетом ваших черт лица.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-3 w-full z-10">
           {[
-            { id: "basic", label: "1 стрижка + базовый цвет", count: 1, stars: 99 },
-            { id: "popular", label: "3 стрижки + 3 цвета", count: 3, stars: 199, isPopular: true },
-            { id: "premium", label: "3 стрижки + все цвета + PDF", count: 3, stars: 349 },
+            { id: "basic", label: "1 генерация стрижек", count: 1, stars: 99 },
+            { id: "popular", label: "3 генерации стрижек", count: 3, stars: 199, isPopular: true },
+            { id: "premium", label: "3 генерации + PDF", count: 3, stars: 349 },
             ...(userRole === 'master' || userRole === 'salon' ? [{ id: "master", label: "Пакет мастера (10 генераций для клиентов)", count: 10, stars: 500 }] : [])
           ].map(pkg => (
             <button
@@ -114,3 +213,4 @@ export const BuyModal: React.FC<BuyModalProps> = ({
     </div>
   );
 };
+

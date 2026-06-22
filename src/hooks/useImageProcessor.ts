@@ -35,16 +35,26 @@ export const useImageProcessor = () => {
              canvas.width = width;
              canvas.height = height;
              const ctx = canvas.getContext("2d");
-             let compressedDataUrl = "";
              if (ctx) {
                ctx.drawImage(img, 0, 0, width, height);
-               compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+               canvas.toBlob((blob) => {
+                 if (blob) {
+                   const readerBlob = new FileReader();
+                   readerBlob.onloadend = () => {
+                     const compressedDataUrl = readerBlob.result as string;
+                     setIsProcessing(false);
+                     resolve(compressedDataUrl.split(",")[1]);
+                   };
+                   readerBlob.readAsDataURL(blob);
+                 } else {
+                   setIsProcessing(false);
+                   resolve(dataUrl.split(",")[1]); // fallback
+                 }
+               }, "image/jpeg", 0.75);
              } else {
-               compressedDataUrl = dataUrl;
+               setIsProcessing(false);
+               resolve(dataUrl.split(",")[1]);
              }
-             
-             setIsProcessing(false);
-             resolve(compressedDataUrl.split(",")[1]);
           };
           img.onerror = () => {
             setIsProcessing(false);

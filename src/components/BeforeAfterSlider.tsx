@@ -55,7 +55,7 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
 
   return (
     <div 
-      className="relative w-full aspect-[3/4] sm:aspect-square md:aspect-[3/4] mx-auto overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
+      className="relative w-full aspect-auto h-[400px] sm:h-[500px] mx-auto overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
       ref={containerRef}
       onMouseDown={(e) => {
         setIsDragging(true);
@@ -70,7 +70,7 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
       <CachedImage
         src={afterImage}
         alt="После"
-        className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
       />
       
       {/* Before Image (Foreground/Clipped) */}
@@ -81,7 +81,7 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
         <CachedImage
           src={beforeImage}
           alt="До"
-          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
+          className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
         />
       </div>
 

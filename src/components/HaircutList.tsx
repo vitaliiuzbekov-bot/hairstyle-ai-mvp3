@@ -12,41 +12,52 @@ import {
 import { AnalysisResult } from "../types";
 import { ImageCropperModal } from "./ImageCropperModal";
 
+import f_pixie from "../../public/golden_base/f_pixie.jpg";
+import f_bob from "../../public/golden_base/f_bob.jpg";
+import f_long_bob from "../../public/golden_base/f_long_bob.jpg";
+import f_long_straight from "../../public/golden_base/f_long_straight.jpg";
+import f_long_wavy from "../../public/golden_base/f_long_wavy.jpg";
+import f_bangs from "../../public/golden_base/f_bangs.jpg";
+
+import m_buzz from "../../public/golden_base/m_buzz.jpg";
+import m_crop from "../../public/golden_base/m_crop.jpg";
+import m_pompadour from "../../public/golden_base/m_pompadour.jpg";
+
 const FEMALE_LIBRARY = [
   {
     name: "Пикси (Pixie)",
     description: "Короткая элегантная женская стрижка.",
-    customImageUrl: "/golden_base/f_pixie.jpg",
+    customImageUrl: f_pixie,
     stylingTips: "Используйте текстурирующий спрей или легкую пасту.",
   },
   {
     name: "Классический Боб",
     description: "Элегантное каре, прямые волосы.",
-    customImageUrl: "/golden_base/f_bob.jpg",
+    customImageUrl: f_bob,
     stylingTips: "Гладкая укладка феном и утюжком.",
   },
   {
     name: "Удлиненный боб",
     description: "Универсальный боб до ключиц (Lob).",
-    customImageUrl: "/golden_base/f_long_bob.jpg",
+    customImageUrl: f_long_bob,
     stylingTips: "Легкие волны спреем с морской солью.",
   },
   {
     name: "Длинные прямые",
     description: "Длинные идеально прямые волосы.",
-    customImageUrl: "/golden_base/f_long_straight.jpg",
+    customImageUrl: f_long_straight,
     stylingTips: "Термозащита и сыворотка для блеска.",
   },
   {
     name: "Длинные волнистые",
     description: "Роскошные объемные волны.",
-    customImageUrl: "/golden_base/f_long_wavy.jpg",
+    customImageUrl: f_long_wavy,
     stylingTips: "Нанесите мусс для объема и накрутите на брашинг.",
   },
   {
     name: "Длинные с челкой",
     description: "Прямые волосы с классической челкой.",
-    customImageUrl: "/golden_base/f_bangs.jpg",
+    customImageUrl: f_bangs,
     stylingTips: "Уложите челку круглой щеткой и феном.",
   },
 ];
@@ -55,19 +66,19 @@ const MALE_LIBRARY = [
   {
     name: "Buzz Cut",
     description: "Очень короткая мужская стрижка под машинку.",
-    customImageUrl: "/golden_base/m_buzz.jpg",
+    customImageUrl: m_buzz,
     stylingTips: "Не требует укладки, идеальна для спорта.",
   },
   {
     name: "Текстурный Кроп",
     description: "Короткая стрижка с текстурированной челкой.",
-    customImageUrl: "/golden_base/m_crop.jpg",
+    customImageUrl: m_crop,
     stylingTips: "Используйте матовую пасту для подчеркивания текстуры.",
   },
   {
     name: "Помпадур",
     description: "Классическая мужская объемная укладка назад.",
-    customImageUrl: "/golden_base/m_pompadour.jpg",
+    customImageUrl: m_pompadour,
     stylingTips: "Потребуется помада сильной фиксации и сушка феном.",
   },
 ];
@@ -225,6 +236,8 @@ export const HaircutList = React.memo(
                         <img
                           src={item.customImageUrl || undefined}
                           alt={item.name}
+                          loading={idx < 4 ? undefined : "lazy"}
+                          fetchPriority={idx < 4 ? "high" : "auto"}
                           className="absolute inset-0 w-full h-full object-cover rounded-xl"
                         />
                         <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 flex flex-col justify-end">

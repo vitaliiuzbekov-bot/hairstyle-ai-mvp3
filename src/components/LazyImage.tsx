@@ -17,6 +17,7 @@ export const LazyImage = memo(({
   autoLoad = false,
   results,
   onImageLoaded,
+  isPriority = false,
 }: {
   keyword: string;
   gender: string;
@@ -26,6 +27,7 @@ export const LazyImage = memo(({
   autoLoad?: boolean;
   results?: AnalysisResult;
   onImageLoaded?: (url: string) => void;
+  isPriority?: boolean;
 }) => {
   const cacheKey = `${gender}_${keyword}_v2_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
@@ -160,6 +162,7 @@ export const LazyImage = memo(({
           alt={uniqueName}
           className={`w-full h-full ${className || "object-cover"}`}
           style={{ display: "block", width: "100%", height: "100%" }}
+          isPriority={isPriority}
         />
         <button
           onClick={(e) => {

@@ -53,6 +53,34 @@ export default defineConfig(() => {
                }
              },
              {
+               urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@vladmandic\/face-api@.*\/dist\/face-api\.js/i,
+               handler: 'CacheFirst',
+               options: {
+                 cacheName: 'face-api-script-cache',
+                 expiration: {
+                   maxEntries: 5,
+                   maxAgeSeconds: 60 * 60 * 24 * 365
+                 },
+                 cacheableResponse: {
+                   statuses: [0, 200]
+                 }
+               }
+             },
+             {
+               urlPattern: /^https:\/\/telegram\.org\/js\/telegram-web-app\.js/i,
+               handler: 'NetworkFirst',
+               options: {
+                 cacheName: 'telegram-script-cache',
+                 expiration: {
+                   maxEntries: 1,
+                   maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
+                 },
+                 cacheableResponse: {
+                   statuses: [0, 200]
+                 }
+               }
+             },
+             {
                urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@mediapipe\/tasks-vision@.*\/.*/i,
                handler: 'CacheFirst',
                options: {

@@ -5,9 +5,10 @@ import 'react-lazy-load-image-component/src/effects/blur.css';
 
 interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
+  isPriority?: boolean;
 }
 
-export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, className, style, ...props }) => {
+export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, className, style, isPriority, ...props }) => {
   const [imgSrc, setImgSrc] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -25,7 +26,7 @@ export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, c
       }
 
       try {
-        const cached = await localforage.getItem<Blob>(src);
+         const cached = await localforage.getItem<Blob>(src);
         if (cached) {
           if (!isMounted) return;
           objectUrl = URL.createObjectURL(cached);
@@ -53,7 +54,13 @@ export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, c
       }
     };
 
-    loadImage();
+    if (isPriority) {
+        // don't load from localforage if priority to save time, mostly it's loaded from CDN anyway, but let's just use the direct src to avoid async overhead
+        setImgSrc(src);
+        setIsLoading(false);
+    } else {
+        loadImage();
+    }
 
     return () => {
       isMounted = false;
@@ -61,22 +68,34 @@ export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, c
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [src]);
+  }, [src, isPriority]);
 
   return (
     <div ref={containerRef} className={`relative ${className || ''}`} style={style}>
       {isLoading && (
         <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse" />
       )}
-      <LazyLoadImage 
-        src={imgSrc || undefined} 
-        alt={alt || ""}
-        effect="blur" 
-        className={`w-full h-full object-cover transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-        wrapperClassName="w-full h-full"
-        style={{ display: 'block', width: '100%', height: '100%' }}
-        {...(props as any)}
-      />
+      {isPriority ? (
+        <img 
+          src={imgSrc || undefined} 
+          alt={alt || ""}
+          className={`w-full h-full object-cover transition-opacity duration-500 opacity-100`}
+          style={{ display: 'block', width: '100%', height: '100%' }}
+          fetchPriority="high"
+          loading="eager"
+          {...(props as any)}
+        />
+      ) : (
+        <LazyLoadImage 
+          src={imgSrc || undefined} 
+          alt={alt || ""}
+          effect="blur" 
+          className={`w-full h-full object-cover transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          wrapperClassName="w-full h-full"
+          style={{ display: 'block', width: '100%', height: '100%' }}
+          {...(props as any)}
+        />
+      )}
     </div>
   );
 });

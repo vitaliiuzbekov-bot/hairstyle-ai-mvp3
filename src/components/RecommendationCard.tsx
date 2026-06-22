@@ -106,6 +106,7 @@ export const RecommendationCard = React.memo(({
                   uniqueName={rec.name}
                   description={rec.description}
                   results={results}
+                  isPriority={idx < 4}
                   className={`absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ${isLightMode ? 'opacity-100' : 'opacity-90'}`}
                 />
               )}

@@ -2,7 +2,7 @@ import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
 import { callYandexGPT } from "../services/yandex";
 import { safeParseJSON } from "../utils/json";
-import { geminiQueue } from "../utils/queues";
+import { geminiQueue, withRetry } from "../utils/queues";
 import { createRateLimiter } from "../utils/rateLimiter";
 
 export const analysisRouter = Router();
@@ -107,25 +107,47 @@ ${preDetectedFacts}
                     apiKey: geminiApiKey, 
                     httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
                 });
-                const response = await geminiQueue.add(() => ai.models.generateContent({
-                  model: 'gemini-2.5-flash',
-                  contents: [
-                    {
-                      role: "user",
-                      parts: [
-                        { text: visionPrompt },
-                        { inlineData: { mimeType: "image/jpeg", data: base64PrefixRemoved } }
-                      ]
-                    }
-                  ]
+                
+                const contentsPayload = [
+                  {
+                    role: "user",
+                    parts: [
+                      { text: visionPrompt },
+                      { inlineData: { mimeType: "image/jpeg", data: base64PrefixRemoved } }
+                    ]
+                  }
+                ] as any;
+
+                const response = await geminiQueue.add(() => withRetry(async () => {
+                   let lastError;
+                   const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+                   
+                   for (const modelName of modelsToTry) {
+                       try {
+                           console.log(`Trying Vision Analysis with model: ${modelName}...`);
+                           return await ai.models.generateContent({
+                             model: modelName,
+                             contents: contentsPayload
+                           });
+                       } catch (err: any) {
+                           lastError = err;
+                           const msg = err.message || String(err);
+                           console.warn(`Model ${modelName} failed with: ${msg}`);
+                           if (!msg.includes("503") && !msg.includes("429") && !msg.includes("high demand") && !msg.includes("UNAVAILABLE")) {
+                               throw err;
+                           }
+                       }
+                   }
+                   throw lastError;
                 }));
                 visualDescription = preDetectedFacts + "\n" + (response?.text?.trim() || "");
             } else {
                 throw new Error("GEMINI_API_KEY не установлен. Нейросеть не может проанализировать изображение.");
             }
         } catch (e: any) {
-            console.error("Gemini Vision failed:", e.message);
-            throw new Error(`Vision Analysis Error: ${e.message}`);
+            console.error("Gemini Vision failed, entering fallback mode:", e.message);
+            // DO NOT THROW EXCEPTIONS! We can still process using preDetectedFacts
+            visualDescription = preDetectedFacts + "\nВНИМАНИЕ: Детальный визуальный анализ временно недоступен из-за перегрузки серверов ИИ. Используйте только базовые параметры из описания выше для подбора подходящих причесок. По умолчанию считайте длину волос средней/короткой, густоту нормальной, текстуру прямой.";
         }
     }
     console.timeEnd("Yandex Vision (Analysis)");

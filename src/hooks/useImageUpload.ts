@@ -69,7 +69,26 @@ export const useImageUpload = () => {
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [rawImageBase64, setRawImageBase64] = useState<string | null>(null);
+    const [rawImageBase64State, setRawImageBase64State] = useState<string | null>(() => {
+        try {
+            return localStorage.getItem("persistent_rawImageBase64") || null;
+        } catch {
+            return null;
+        }
+    });
+
+    const setRawImageBase64 = (val: React.SetStateAction<string | null>) => {
+        setRawImageBase64State((prev) => {
+            const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
+            try {
+                if (nextVal) localStorage.setItem("persistent_rawImageBase64", nextVal);
+                else localStorage.removeItem("persistent_rawImageBase64");
+            } catch (e) {
+                console.error("Failed to save raw image to localStorage", e);
+            }
+            return nextVal;
+        });
+    };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -127,26 +146,44 @@ export const useImageUpload = () => {
             const filename = `upload_${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`;
             const storageRef = ref(storage, `uploads/${uid}/${filename}`);
             
-            await uploadString(storageRef, base64Str, 'base64', { contentType: 'image/jpeg' });
-            const downloadUrl = await getDownloadURL(storageRef);
-            return downloadUrl;
+            const uploadPromise = async () => {
+                await uploadString(storageRef, base64Str, 'base64', { contentType: 'image/jpeg' });
+                return await getDownloadURL(storageRef);
+            };
+
+            // 15 seconds timeout for Firebase upload
+            return await Promise.race([
+                uploadPromise(),
+                new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 15000))
+            ]);
         } catch (e) {
-            console.error("Failed to upload to Firebase:", e);
+            console.warn("Failed to upload to Firebase or timed out:", e);
             return null; // Fallback to base64 if Firebase fails
         }
     };
 
     const processFinalImage = async (finalBase64: string) => {
         setIsUploadingImage(true);
+        // Persist final base64 immediately so we don't lose it if killed
+        setImageBase64(finalBase64);
         try {
-            const { smartCropFace } = await import('../services/fallbackAnalysis');
-            const cropResult = await smartCropFace(finalBase64, "image/jpeg");
+            // Import and crop with timeout
+            const cropResult = await Promise.race([
+                (async () => {
+                    const { smartCropFace } = await import('../services/fallbackAnalysis');
+                    return await smartCropFace(finalBase64, "image/jpeg");
+                })(),
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout importing or cropping face")), 12000))
+            ]);
                
-            if (cropResult.warning) {
+            if (cropResult && cropResult.warning) {
                 console.warn("Smart crop warning:", cropResult.warning);
             }
                
-            let targetBase64 = cropResult.base64 ? cropResult.base64 : finalBase64;
+            let targetBase64 = (cropResult && cropResult.base64) ? cropResult.base64 : finalBase64;
+            
+            // Overwrite locally stored base64 with the smarter cropped one
+            setImageBase64(targetBase64);
             
             // Try uploading to Firebase Storage for much faster backend requests over slow network
             const uploadedUrl = await uploadToFirebase(targetBase64);
@@ -158,8 +195,8 @@ export const useImageUpload = () => {
                 setImageBase64(targetBase64);
             }
 
-            if (cropResult.base64 && !cropResult.warning) {
-                addToast("Фото кадрировано и готово к загрузке ИИ ✨", "success");
+            if (cropResult && cropResult.base64 && !cropResult.warning) {
+                addToast("Фото подготовлено и готово к загрузке ИИ ✨", "success");
             }
         } catch(cropErr) {
             console.warn("Crop failed or Upload failed, using original", cropErr);
@@ -191,7 +228,7 @@ export const useImageUpload = () => {
         handleFileUpload,
         resetImageState,
         isCompressing,
-        rawImageBase64,
+        rawImageBase64: rawImageBase64State,
         setRawImageBase64,
         processFinalImage
     };

@@ -271,7 +271,18 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
           ctx.drawImage(styledHairCanvas, 0, 0);
       }
 
-      return canvas.toDataURL("image/jpeg", 0.95);
+      return new Promise<string>((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          } else {
+             // Fallback if toBlob fails
+             resolve(canvas.toDataURL("image/jpeg", 0.95));
+          }
+        }, "image/jpeg", 0.95);
+      });
     } catch (e) {
       console.error("Dye/BG error: ", e);
       throw e;

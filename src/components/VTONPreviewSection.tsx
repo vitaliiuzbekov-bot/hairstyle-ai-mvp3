@@ -291,21 +291,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
         </div>
       )}
       
-      {vtonResultUrl && (customHairColor || resultsHairColor) && COLOR_BRANDS[customHairColor || resultsHairColor || ""] && !isTeaserResult && (
-        <div className={`mb-4 border rounded-2xl p-4 ${isLightMode ? 'bg-purple-50/50 border-purple-200' : 'bg-purple-500/10 border-purple-500/20'}`}>
-          <h4 className={`text-sm font-medium mb-2 flex items-center gap-2 ${isLightMode ? 'text-purple-700' : 'text-purple-200'}`}>
-            <ShoppingBag size={16} /> Формула цвета: {customHairColor || resultsHairColor}
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {COLOR_BRANDS[customHairColor || resultsHairColor || ""].map((brand, bIdx) => (
-              <div key={bIdx} className={`border rounded-xl p-3 flex justify-between items-center ${isLightMode ? 'bg-white/80 border-purple-100' : 'bg-white/5 border-white/10'}`}>
-                <span className={`text-sm ${isLightMode ? 'text-gray-700' : 'text-white/80'}`}>{brand.name}</span>
-                <span className={`text-sm font-mono px-2 py-1 rounded-md ${isLightMode ? 'bg-purple-100 text-purple-700' : 'bg-purple-500/20 text-purple-300'}`}>{brand.shade}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* COLOR_BRANDS removed as per user request */}
 
       {isMaskEditorOpen && displayResultUrl && (
         <MaskEditorModal

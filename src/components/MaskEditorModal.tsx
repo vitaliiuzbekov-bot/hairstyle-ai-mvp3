@@ -145,8 +145,16 @@ export const MaskEditorModal: React.FC<MaskEditorModalProps> = ({ beforeImage, a
 
   const handleSave = () => {
     if (!canvasRef.current) return;
-    const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.95);
-    onSave(dataUrl);
+    canvasRef.current.toBlob((blob) => {
+      if (blob) {
+        const reader = new FileReader();
+        reader.onloadend = () => onSave(reader.result as string);
+        reader.readAsDataURL(blob);
+      } else {
+        const dataUrl = canvasRef.current!.toDataURL("image/jpeg", 0.95);
+        onSave(dataUrl);
+      }
+    }, "image/jpeg", 0.95);
   };
   
   const handleReset = () => {

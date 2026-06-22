@@ -67,7 +67,15 @@ export const generateCollage = async (beforeUrl: string, afterUrl: string, salon
             ctx.textAlign = "right";
             ctx.fillText("https://t.me/neirostilist_bot", canvas.width - padding, canvas.height - padding/2);
 
-            resolve(canvas.toDataURL("image/jpeg", 0.9));
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+              } else {
+                resolve(canvas.toDataURL("image/jpeg", 0.9));
+              }
+            }, "image/jpeg", 0.9);
          };
          img2.onerror = reject;
          img2.src = afterUrl;

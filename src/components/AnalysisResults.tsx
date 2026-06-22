@@ -5,7 +5,6 @@ import { LazyImage } from "./LazyImage";
 import { CachedImage } from "./CachedImage";
 import { FaceShapeCard } from "./FaceShapeCard";
 import { TrichologyCard } from "./TrichologyCard";
-import { ColorChangeOnlyCard } from "./ColorChangeOnlyCard";
 import { HaircutList } from "./HaircutList";
 import { AnalysisResult } from "../types";
 
@@ -109,15 +108,6 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
 
           {/* Trichology Analysis Card */}
           <TrichologyCard results={results} isLightMode={isLightMode} />
-
-          {/* Color Change Only Card */}
-          <ColorChangeOnlyCard
-            isLightMode={isLightMode}
-            imageUrl={imageUrl}
-            imageBase64={imageBase64}
-            mimeType={mimeType}
-            onGenerationSuccess={onGenerationSuccess}
-          />
 
           {/* Recommendations */}
           <HaircutList
