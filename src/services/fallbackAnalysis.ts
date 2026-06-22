@@ -6,6 +6,26 @@ export interface SmartCropResult {
   warning?: string;
 }
 
+// Global flag to track preload status
+let isFaceApiPreloaded = false;
+
+export const preloadFaceApiModels = async () => {
+    if (isFaceApiPreloaded) return;
+    try {
+        const modelsUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
+        await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl),
+            faceapi.nets.faceLandmark68Net.loadFromUri(modelsUrl),
+            faceapi.nets.faceExpressionNet.loadFromUri(modelsUrl),
+            faceapi.nets.ageGenderNet.loadFromUri(modelsUrl),
+        ]);
+        isFaceApiPreloaded = true;
+        console.log("FaceAPI models preloaded in background");
+    } catch(e) {
+         console.warn("FaceAPI preload failed", e);
+    }
+};
+
 export const smartCropFace = async (imageBase64: string, mimeType: string): Promise<SmartCropResult> => {
   // Fallback timeout to prevent infinite hanging
   const withTimeout = (promise: Promise<any>, ms: number) => {
@@ -95,16 +115,32 @@ export const smartCropFace = async (imageBase64: string, mimeType: string): Prom
     const finalWidth = Math.min(cropWidth, img.width - startX);
     const finalHeight = Math.min(cropHeight, img.height - startY);
 
+    // Limit maximum dimensions of the cropped target image to 850 to avoid huge request sizes
+    const MAX_DIM = 850;
+    let targetWidth = finalWidth;
+    let targetHeight = finalHeight;
+    if (targetWidth > targetHeight) {
+      if (targetWidth > MAX_DIM) {
+        targetHeight = Math.round((targetHeight * MAX_DIM) / targetWidth);
+        targetWidth = MAX_DIM;
+      }
+    } else {
+      if (targetHeight > MAX_DIM) {
+        targetWidth = Math.round((targetWidth * MAX_DIM) / targetHeight);
+        targetHeight = MAX_DIM;
+      }
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = finalWidth;
-    canvas.height = finalHeight;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return { base64: null };
 
-    ctx.drawImage(img, startX, startY, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight);
+    ctx.drawImage(img, startX, startY, finalWidth, finalHeight, 0, 0, targetWidth, targetHeight);
     
-    // Return base64 string without data uris
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    // Return base64 string without data uris with optimized compression quality (0.75 is perfect balance)
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
     return { base64: dataUrl.split(",")[1] };
   } catch (e) {
     console.warn("Smart crop failed", e);

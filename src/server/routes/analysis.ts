@@ -1,8 +1,14 @@
 import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
 import { callYandexGPT } from "../services/yandex";
+import { safeParseJSON } from "../utils/json";
+import { geminiQueue } from "../utils/queues";
+import { createRateLimiter } from "../utils/rateLimiter";
 
 export const analysisRouter = Router();
+
+// Max 5 analysis requests per 10 minutes per user
+const analyzeLimiter = createRateLimiter(10 * 60 * 1000, 5);
 
 async function fetchImageAsBase64(url: string | null, fallbackBase64: string | null): Promise<string | null> {
   if (fallbackBase64) return fallbackBase64;
@@ -22,7 +28,7 @@ async function fetchImageAsBase64(url: string | null, fallbackBase64: string | n
   return null;
 }
 
-analysisRouter.post("/analyze", async (req: Request, res: Response): Promise<void> => {
+analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { imageUrl, mimeType, faceApiGender, faceApiShape, faceApiAge } = req.body;
     let imageBase64 = req.body.imageBase64;
@@ -97,8 +103,11 @@ ${preDetectedFacts}
             
             if (geminiApiKey) {
                 const { GoogleGenAI } = await import("@google/genai");
-                const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-                const response = await ai.models.generateContent({
+                const ai = new GoogleGenAI({ 
+                    apiKey: geminiApiKey, 
+                    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+                });
+                const response = await geminiQueue.add(() => ai.models.generateContent({
                   model: 'gemini-2.5-flash',
                   contents: [
                     {
@@ -109,8 +118,8 @@ ${preDetectedFacts}
                       ]
                     }
                   ]
-                });
-                visualDescription = preDetectedFacts + "\n" + (response.text?.trim() || "");
+                }));
+                visualDescription = preDetectedFacts + "\n" + (response?.text?.trim() || "");
             } else {
                 throw new Error("GEMINI_API_KEY не установлен. Нейросеть не может проанализировать изображение.");
             }
@@ -228,14 +237,7 @@ Return ONLY the raw JSON string matching this schema:
     let textOutput = await callYandexGPT(systemText, `Visual description: ${visualDescription}`);
     console.timeEnd("YandexGPT");
     
-    const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-       textOutput = jsonMatch[0];
-    } else {
-       textOutput = textOutput.replace(/```(json)?\s*/g, "").replace(/```\s*$/g, "").trim();
-    }
-
-    const parsedResults = JSON.parse(textOutput);
+    const parsedResults = safeParseJSON(textOutput);
     
     // Save to cache for 7 days
     await setCachedValue(cacheKey, parsedResults, 7 * 24 * 60 * 60);

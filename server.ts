@@ -94,9 +94,29 @@ async function startServer() {
   // Rate Limiter to prevent bankruptcy from GenAI usage overhead
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 150, // Limit each IP to 150 requests per windowMs
+    max: 60, // Limit each user/IP to 60 requests per windowMs
+    keyGenerator: (req) => {
+      if (req.body?.tgUserId) {
+        return `tg_${req.body.tgUserId}`;
+      }
+      if (req.body?.userId && req.body.userId !== "local-user") {
+        return `user_${req.body.userId}`;
+      }
+      const initData = req.headers['x-telegram-init-data'];
+      try {
+        if (initData && typeof initData === 'string') {
+          const params = new URLSearchParams(initData);
+          const userStr = params.get('user');
+          if (userStr) {
+            const userObj = JSON.parse(userStr);
+            if (userObj?.id) return `tg_${userObj.id}`;
+          }
+        }
+      } catch (e) {}
+      return req.ip || "unknown-ip";
+    },
     message: { 
-      error: "Слишком много запросов. Пожалуйста, подождите немного.",
+      error: "Слишком много запросов от вашего аккаунта. Пожалуйста, подождите немного.",
       fallback: true
     },
     standardHeaders: true,
@@ -128,9 +148,9 @@ async function startServer() {
     }
   });
 
-  app.use("/api/analyze", telegramValidationMiddleware, apiLimiter, upload.single("image"));
+  app.use("/api/analyze", apiLimiter, upload.single("image"), telegramValidationMiddleware);
   app.use("/api/generate-reference", telegramValidationMiddleware, apiLimiter);
-  app.use("/api/generate-full", telegramValidationMiddleware, apiLimiter, upload.single("image"));
+  app.use("/api/generate-full", apiLimiter, upload.single("image"), telegramValidationMiddleware);
   app.use("/api/generate-ar", telegramValidationMiddleware, apiLimiter);
   app.use("/api/chat-stylist", telegramValidationMiddleware, apiLimiter);
   app.use("/api/transcribe", telegramValidationMiddleware, apiLimiter);

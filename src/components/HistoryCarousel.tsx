@@ -1,7 +1,8 @@
 import React from "react";
 import { formatHistoryDate } from "../utils/historyHelper";
-import { ImageIcon, X } from "lucide-react";
+import { ImageIcon, X, Share2 } from "lucide-react";
 import { CachedImage } from "./CachedImage";
+import { useUI } from "../context/UIContext";
 
 interface HistoryItem {
   keyword: string;
@@ -22,6 +23,7 @@ const HistoryCarouselComponent: React.FC<HistoryCarouselProps> = ({
   deleteHistoryItem,
   isLightMode,
 }) => {
+  const { openShareModal } = useUI();
   if (!history || history.length === 0 || imageBase64) return null;
 
   return (
@@ -35,30 +37,8 @@ const HistoryCarouselComponent: React.FC<HistoryCarouselProps> = ({
             key={index}
             className={`flex-none snap-center relative rounded-xl overflow-hidden border group cursor-pointer w-[120px] h-[160px] sm:w-[150px] sm:h-[200px] ${isLightMode ? 'border-gray-200 shadow-sm' : 'border-white/10'}`}
             onClick={() => {
-              const tg = window.Telegram?.WebApp;
-              if (!item.url) return;
-              
-              const isHttp = item.url.startsWith('http://') || item.url.startsWith('https://');
-              
-              if (tg?.openLink && isHttp) {
-                try {
-                  tg.openLink(item.url);
-                } catch(e) {
-                  window.open(item.url, "_blank");
-                }
-              } else {
-                // If it's a blob/data URL, try normal window.open
-                const newWindow = window.open();
-                if (newWindow) {
-                  newWindow.document.write(`<img src="${item.url}" style="width:100%;height:auto;" />`);
-                  newWindow.document.title = "Фото";
-                } else {
-                  // Fallback: download it
-                  const a = document.createElement("a");
-                  a.href = item.url;
-                  a.download = "history_image.jpg";
-                  a.click();
-                }
+              if (item.url) {
+                openShareModal(item.url, `Посмотри, какую прическу "${item.keyword}" мне подобрал ИИ в НейроСтилисте!`);
               }
             }}
           >

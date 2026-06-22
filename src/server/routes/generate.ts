@@ -8,6 +8,9 @@ import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
 import { adminApp, adminStorage } from "../firebase";
 import crypto from "crypto";
 import { sendPhotoToTelegramUser } from "../services/telegramBot";
+import { safeParseJSON } from "../utils/json";
+import { geminiQueue, imageGenQueue } from "../utils/queues";
+import { createRateLimiter } from "../utils/rateLimiter";
 
 import {
   getDemographicDescriptorRu,
@@ -33,7 +36,11 @@ export const generateRouter = Router();
 
 const customBlueprintCache = new Map<string, string>();
 
-generateRouter.post("/generate-reference", async (req, res) => {
+// Stricter limits for heavy text models and logic
+const freeModelsLimiter = createRateLimiter(5 * 60 * 1000, 10); // 10 per 5 min
+const heavyImageLimiter = createRateLimiter(10 * 60 * 1000, 5); // 5 per 10 min
+
+generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) => {
     try {
       const { 
         gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
@@ -47,9 +54,9 @@ generateRouter.post("/generate-reference", async (req, res) => {
 
       // Check cache first (Cache for 30 days)
       const cacheKey = getCacheKey({ 
-        route: "generate-reference-v12-bald-fix", 
+        route: "generate-reference-v27-gemini-prompt", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
-        hairDensity, hairType, hairLength, hairlineStatus, hairQuality
+        hairDensity, hairType, hairLength, hairlineStatus, hairQuality, clothingContext
       });
       const cachedImage = await getCachedValue<string>(cacheKey);
       if (cachedImage) {
@@ -57,12 +64,64 @@ generateRouter.post("/generate-reference", async (req, res) => {
         return res.json({ imageUrl: cachedImage });
       }
 
-      // Generate a highly realistic prompt taking user base into account
-      const prompt = getDetailedRussianPrompt({
-        gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
-        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
-        hairlineStatus, hairQuality, haircutName
-      });
+      // Generate a highly realistic prompt taking user base into account via Gemini
+      let prompt = "";
+      try {
+        console.log("Generating Russian prompt for YandexART via Gemini...");
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        if (!geminiApiKey) {
+            throw new Error("GEMINI_API_KEY не установлен");
+        }
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ 
+            apiKey: geminiApiKey, 
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+        });
+        
+        const systemInstructionRef = `Ты эксперт по созданию промптов для нейросетей-генераторов изображений (YandexART).
+Задача: написать ОДИН детальный промпт на РУССКОМ языке для генерации фотореалистичного портрета.
+
+ПАРАМЕТРЫ ЦЕЛЕВОГО СТИЛЯ (Что стричь и красить):
+- Целевая прическа/стрижка: ${haircutName || keyword || ""}
+- Подробности целевого стиля: ${description || ""}
+- Цвет волос: ${customHairColor || hairColor || "естественный"}
+
+ПАРАМЕТРЫ БАЗЫ ПОЛЬЗОВАТЕЛЯ (Критически важно для совместимости и реализма):
+- Густота и объем волос оригинала: ${hairDensity || "не указано"}
+- Структура волос: ${hairType || "не указано"}
+- Состояние линии роста/залысины: ${hairlineStatus || "не указано"}
+- Качество волос: ${hairQuality || "не указано"}
+- Пол: ${gender || "не указано"}
+- Возраст: ${ageRange || "не указан"}
+- Тип лица: ${faceShape || "не указан"}
+- Тип кожи и особенности: ${skinTone || ""} ${skinDetails || ""}
+- Растительность на лице: ${facialHair || "нет"}
+- Контекст заднего плана: ${clothingContext || "нейтральный фон"}
+
+СУПЕР-ВАЖНОЕ ПРАВИЛО:
+Целевая прическа должна быть АДАПТИРОВАНА под БАЗУ пользователя (густоту, линию роста, структуру).
+Категорически запрещено генерировать нереалистично пышные, густые или длинные волосы, если база тонкая или с залысинами. Референс должен отражать, как эта прическа будет выглядеть на РЕАЛЬНЫХ волосах пользователя. Сохраняй реалистичность!
+
+Инструкции:
+1. Создай промпт для портрета студийного качества (лицо смотрит в камеру).
+2. Опиши внешность человека так, чтобы она строго соответствовала возрасту (морщины, если есть) и типу лица пользователя.
+3. Опиши волосы: цвет, текстуру и самое главное — ОБЪЕМ и ГУСТОТУ (четко укажи, что они соответствуют данным пользователя, например: "редкие волосы", "тонкие волосы", "высокий лоб", если это так).
+4. Опиши конечную укладку и стрижку с учетом этих ограничений.
+5. Верни ТОЛЬКО готовый текст промпта на русском языке. Максимум 600 символов.`;
+
+        const refPromptRes = await geminiQueue.add(() => ai.models.generateContent({
+             model: 'gemini-2.5-pro', // Using pro for better logic constraints
+             contents: systemInstructionRef,
+             config: { temperature: 0.7, maxOutputTokens: 250 }
+        }));
+        prompt = refPromptRes?.text?.trim() || "";
+      } catch (err) {
+        console.error("Gemini failed to generate ref prompt, using simple fallback:", err);
+        const gLabel = (gender === "male" || gender === "Мужчина") ? "мужчина" : "женщина";
+        prompt = `Фотореалистичный портрет, ${gLabel}, возраст: ${ageRange}. Новая идеальная прическа: ${haircutName || keyword}. Цвет волос: ${customHairColor || hairColor || "естественный"}. Студийный свет, 8к разборчивое лицо, без ретуши.`;
+      }
+      
+      prompt = prompt.substring(0, 1000).trim();
 
       let finalImageUrl = "";
       let lastError = "";
@@ -79,6 +138,22 @@ generateRouter.post("/generate-reference", async (req, res) => {
             }
             const iamToken = await getYandexIamToken(yandexServiceAccountKey);
 
+          const kwLower = (keyword || "").toLowerCase();
+          const isBaldStyle = kwLower.includes("shave") || 
+                              kwLower.includes("shaven") || 
+                              kwLower.includes("bald") || 
+                              kwLower.includes("лыс") || 
+                              kwLower.includes("налысо") || 
+                              kwLower.includes("брит") || 
+                              kwLower.includes("shorn") || 
+                              kwLower.includes("под ноль") ||
+                              kwLower.includes("без волос");
+
+          let negativeStyleText = "пышная прическа, гипер-объем, волосы торчком, растрепанные, салонная укладка, парик, пушистые волосы, шапка волос, начес, афро, кудри";
+          if (isBaldStyle) {
+            negativeStyleText = "волосы, прическа, стрижка, парик, укладка, шевелюра, кудри, локоны, челка, растительность на голове, hair, wig, hairstyle, locks, curls, hairline, fluffy, fluffy hair, voluminous hair, long hair, bangs, dreadlocks, afro";
+          }
+
           // 1. Start Async Generation
           const reqBody = {
             modelUri: `art://${cleanFolderId}/yandex-art/latest`,
@@ -88,7 +163,7 @@ generateRouter.post("/generate-reference", async (req, res) => {
             },
             messages: [
               { weight: 1, text: prompt },
-              { weight: -2, text: "пышная прическа, гипер-объем, волосы торчком, растрепанные, салонная укладка, парик, пушистые волосы, шапка волос, начес, афро, кудри" },
+              { weight: -2, text: negativeStyleText },
               { weight: -1, text: "коллаж, мультик, водяной знак, текст, до и после, 3D" }
             ]
           };
@@ -237,24 +312,51 @@ generateRouter.post("/generate-full", async (req, res) => {
       }
 
       let finalTargetImageUrl = targetImageUrl;
-      if (finalTargetImageUrl && (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/'))) {
-        const normalizePath = finalTargetImageUrl.startsWith('/') ? finalTargetImageUrl : '/' + finalTargetImageUrl;
-        // Try reading from public or dist folders
-        let localPath = path.join(process.cwd(), 'dist', normalizePath);
-        if (!fs.existsSync(localPath)) {
-            localPath = path.join(process.cwd(), 'public', normalizePath);
+      if (finalTargetImageUrl) {
+        let isLocalUrl = false;
+        let parsedPath = finalTargetImageUrl;
+        if (finalTargetImageUrl.startsWith('http')) {
+            try {
+                const urlObj = new URL(finalTargetImageUrl);
+                // If it's the current app's hostname, or localhost, or ends in run.app
+                // Actually, just extract the pathname and see if it's a known local asset
+                parsedPath = urlObj.pathname;
+                isLocalUrl = true; 
+            } catch(e) {}
+        } else if (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/')) {
+            isLocalUrl = true;
         }
-        if (fs.existsSync(localPath)) {
-            const buf = fs.readFileSync(localPath);
-            const ext = path.extname(localPath).toLowerCase();
-            const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-            finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
+
+        if (isLocalUrl && (parsedPath.startsWith('/') || parsedPath.startsWith('golden_base/'))) {
+            let normalizePath = parsedPath.startsWith('/') ? parsedPath : '/' + parsedPath;
+            // Strip any query strings that Vite might append (e.g. ?import or ?v=...)
+            if (normalizePath.includes('?')) {
+                normalizePath = normalizePath.split('?')[0];
+            }
+            
+            // Try reading from public or dist folders, and also src for dev mode
+            let localPath = path.join(process.cwd(), 'dist', normalizePath);
+            if (!fs.existsSync(localPath)) {
+                localPath = path.join(process.cwd(), 'public', normalizePath);
+            }
+            if (!fs.existsSync(localPath) && normalizePath.startsWith('/src/')) {
+                localPath = path.join(process.cwd(), normalizePath);
+            }
+            if (fs.existsSync(localPath)) {
+                const buf = fs.readFileSync(localPath);
+                const ext = path.extname(localPath).toLowerCase();
+                const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+                finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
+                console.log(`[generate-full] Successfully loaded local target image ${localPath}`);
+            } else {
+                console.log(`[generate-full] WARNING: Could not find local target image for ${normalizePath}. Tried paths: dist${normalizePath}, public${normalizePath}, and ${localPath}`);
+            }
         }
       }
 
       // Check cache first (Cache for 30 days)
       const cacheKey = getCacheKey({ 
-        route: "generate-full-v8-flat-fix", 
+        route: "generate-full-v9-reference-vision", 
         userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
         // using string truncation or full string to hash the selfie.
         // String hashing is deterministic.
@@ -343,145 +445,73 @@ generateRouter.post("/generate-full", async (req, res) => {
           }
       }
 
-      // Translate description & clothing context to English if it contains Cyrillic characters
-      let englishDescription = description || "";
-      let englishClothingContext = clothingContext || "";
-      const needsDescTrans = description && /[а-яА-ЯёЁ]/.test(description);
-      const needsClothTrans = clothingContext && /[а-яА-ЯёЁ]/.test(clothingContext);
-
-      if (needsDescTrans || needsClothTrans) {
-        try {
-          console.log("Translating Russian contextual details to English via YandexGPT (batched)...");
-          const systemPrompt = `Translate the provided Russian texts to English. Return ONLY a pure valid JSON object (no markdown, no code blocks) with the exact keys "description" (use precise image generation keywords for stable diffusion) and "clothingContext" (clear English description for props). If a text is empty, leave it empty.`;
-          const userPrompt = JSON.stringify({
-            description: needsDescTrans ? description : "",
-            clothingContext: needsClothTrans ? clothingContext : ""
-          });
-          
-          let translatedResponse = await callYandexGPT(systemPrompt, userPrompt);
-          
-          // Cleanup markdown from LLM
-          const jsonMatch = translatedResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            translatedResponse = jsonMatch[0];
-          } else {
-            translatedResponse = translatedResponse.replace(/```(json)?\s*/g, "").replace(/```\s*$/g, "").trim();
-          }
-
-          const parsed = JSON.parse(translatedResponse);
-          if (needsDescTrans && parsed.description && parsed.description.trim().length > 3) {
-            englishDescription = parsed.description.trim();
-          }
-          if (needsClothTrans && parsed.clothingContext && parsed.clothingContext.trim().length > 3) {
-            englishClothingContext = parsed.clothingContext.trim();
-          }
-        } catch (e) {
-          console.warn("Failed to translate batch texts, falling back to original:", e);
-        }
-      }
-
-      const isGreyColorRequested = finalColor && (finalColor.includes("grey") || finalColor.includes("gray") || finalColor.includes("white") || finalColor.includes("silver"));
-      
-      const removeGrayAndAgingBias = (text: string) => {
-        if (!finalColor || isGreyColorRequested) return text;
-        return text
-          .replace(/\b(grey|gray|silver|white|platinum|ash|blonde-grey|grey-blonde|natural-grey|salt-and-pepper|salt\s+and\s+pepper)\b/gi, "")
-          .replace(/\b(mature|elderly|senior|old|aged|aging|aged-looking)\b/gi, "middle-aged")
-          .replace(/\s+/g, " ")
-          .trim();
-      };
-
-      if (englishDescription) {
-        englishDescription = removeGrayAndAgingBias(englishDescription);
-      }
-
-      const descriptorEng = getDemographicDescriptor(gender, ageRange);
-
-      const getKeywordEngSafe = (kw: string) => {
-        let keywordLower = kw.toLowerCase();
-        let safeKeyword = kw;
-        if (keywordLower.includes("buzz") || keywordLower.includes("бокс") || keywordLower.includes("ежик") || keywordLower.includes("кроп") || keywordLower.includes("crop") || keywordLower.includes("under") || keywordLower.includes("fade")) {
-          safeKeyword = kw + ", strictly flat lying hair, no volume";
-        } else {
-             safeKeyword = kw + ", realistic natural volume, lying flat on head, no puffiness at roots";
-        }
-        return safeKeyword;
-      }
-
-      // Extract english keyword from something like "Пляжные волны (Beach Waves)"
-      let englishKeyword = keyword;
-      const bracketMatch = keyword.match(/\(([^)]+)\)/);
-      if (bracketMatch && bracketMatch[1]) {
-         englishKeyword = bracketMatch[1];
-      }
-      if (englishKeyword) {
-          englishKeyword = getKeywordEngSafe(removeGrayAndAgingBias(englishKeyword));
-      }
-
       let promptEng = "";
-      
-      let extraColorPrompt = "";
-      if (finalColor) {
-          const colorUpper = finalColor.toUpperCase();
-          extraColorPrompt = ` [COLOR DEFINITION: HAIR MUST BE 100% UNIQUELY AND SOLIDLY COLOURED IN ${colorUpper}. Every single hair strand, segment, root, and tip must be strictly and uniformly ${colorUpper}. ABSOLUTELY NO other color shades, no gradients, no highlights, no lowlights, no dark roots, no grey hair if not specified, and no mixed tones are allowed under any circumstances. Clear, deep, and perfectly saturated ${colorUpper} hair dye coverage over the entire hairstyle].`;
+      try {
+        console.log("Generating prompt via Gemini AI...");
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        if (!geminiApiKey) {
+            throw new Error("GEMINI_API_KEY не установлен");
+        }
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ 
+            apiKey: geminiApiKey, 
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+        });
+        
+        let systemInstruction = `You are an expert AI image generation prompt engineer.
+Your task is to write a highly detailed, photorealistic prompt for a text-to-image AI (e.g., Flux) to change a person's hairstyle in an image.
+We have the following specs from the user (some may be in Russian):
+- Gender: ${gender || "not specified"}
+- Age: ${ageRange || "not specified"}
+- Target Hairstyle: ${keyword}
+- Base description of the style: ${description || "None"}
+- Desired Hair Color: ${finalColor || 'Original hair color'}
+- Original face features: Face shape: ${faceShape || "Unknown"}, Skin tone: ${skinTone || "Unknown"}, Eye color: ${eyeColor || "Unknown"}, Facial hair: ${facialHair || "None"}
+- Hair qualities requested: Length: ${hairLength || "-"}, Type: ${hairType || "-"}, Density: ${hairDensity || "-"}, Hairline: ${hairlineStatus || "-"}, Quality: ${hairQuality || "-"}
+- Clothing/Background instruction: ${clothingContext || "Do not change clothes/background"}
+
+Instructions:
+1. Translate the required hairstyle and qualities into English (if needed).
+2. Write a prompt in English for a photorealistic portrait.
+3. The prompt MUST describe the person's age/gender accurately based on the specs (e.g. "middle-aged man", "young adult woman"). Do not add unnatural smoothing if the person is old.
+4. The requested hairstyle MUST be described in critical detail and clarity based on the targeted style.
+5. If a hair color is specified, make it absolutely clear that it must be applied across the ENTIRE head without gradients/other shades. Use strict phrasing.
+6. Make sure to specify that the person's face structure (eyes, nose, mouth, chin, jawline) MUST remain completely unchanged.
+7. The clothing/background instructions should be incorporated if present.
+8. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
+9. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters.`;
+
+        let contentsPayload: any = { role: "user", parts: [{ text: systemInstruction }] };
+
+        if (finalTargetImageUrl && finalTargetImageUrl.startsWith("data:image/")) {
+            const mimeType = finalTargetImageUrl.split(';')[0].split(':')[1];
+            const base64Data = finalTargetImageUrl.split(',')[1];
+            contentsPayload.parts.push({
+               inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType
+               }
+            });
+            contentsPayload.parts[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The user provided a reference image showing the target hairstyle (attached). You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
+        }
+
+        const promptRes = await geminiQueue.add(() => ai.models.generateContent({
+             model: 'gemini-2.5-pro', // Pro to properly analyze image
+             contents: contentsPayload,
+             config: {
+                 temperature: 0.7,
+                 maxOutputTokens: 500
+             }
+        }));
+        promptEng = promptRes?.text?.trim() || "";
+      } catch (err) {
+        console.error("Gemini failed to generate prompt, falling back to basic prompt:", err);
+        promptEng = `A photorealistic portrait of a person. Age: ${ageRange || "unknown"}, Gender: ${gender || "unknown"}. New Hairstyle: ${keyword} - ${description || ""}. Desired Hair Color: ${finalColor || "original"}. The face features must remain exactly the same.`;
+        if (finalColor) {
+            promptEng = `[STRICTLY ${finalColor.toUpperCase()} HAIR COLOR] ` + promptEng;
+        }
       }
-
-      // For english translation of the russian description, we provide a structured request to flux
-      let fluxHairDetails = `Hairstyle specs: ${englishKeyword}.`;
-      if (hairType) fluxHairDetails += ` Hair Texture: ${translateHairTypeToEng(hairType)}.`;
-      if (hairLength) fluxHairDetails += ` Hair Length Constraint: ${translateHairLengthToEng(hairLength)}.`;
-      if (hairDensity) {
-          fluxHairDetails += ` Hair Density: ${translateHairDensityToEng(hairDensity)}. `;
-      }
       
-      const hairlineEng = translateHairlineStatusToEng(hairlineStatus, englishKeyword);
-      if (hairlineEng) fluxHairDetails += ` Hairline details: ${hairlineEng}`;
-      
-      const qualityEng = translateHairQualityToEng(hairQuality);
-      if (qualityEng) fluxHairDetails += ` Hair characteristics: ${qualityEng}`;
-
-      fluxHairDetails = removeGrayAndAgingBias(fluxHairDetails);
-
-      let agePromptEng = getDetailedAgePromptEng(ageRange || "");
-      
-      promptEng = `A photorealistic portrait of a ${descriptorEng}. This person is a ${agePromptEng}. [CRITICAL HAIRSTYLE TRANSFORMATION: YOU MUST COMPLETELY CHANGE THE PERSON'S HAIR TO EXACTLY MATCH THIS NEW STYLE: "${englishKeyword}" - ${englishDescription || ""}]. ${fluxHairDetails} ${extraColorPrompt} CRITICAL FACIAL CLARITY REQUIREMENT: The person must look directly at the camera with a clear, unobstructed face. The face must be in perfect sharp focus. CRITICAL INSTRUCTION: DO NOT ALTER THE PERSON'S ORIGINAL FACE STRUCTURE, JAWLINE, CHIN, EYES, NOSE, SHOULDERS, CLOTHING, OR BODY SHAPE. PRESERVE THE BASE IMAGE IDENTITY EXACTLY. ONLY CHANGE THE HAIR. IF THE ORIGINAL PERSON IS BALD, YOU MUST GENERATE THE NEW HAIRSTYLE ON THEIR HEAD. NO HYPER-VOLUME. HAIR MUST LAY FLAT AND NATURAL unless explicitly requested.`;
-      
-      const translateFaceShape = (val: string) => {
-        val = val.toLowerCase();
-        if (val.includes("овал")) return "oval";
-        if (val.includes("круг") || val.includes("round")) return "round";
-        if (val.includes("квадрат")) return "square";
-        if (val.includes("сердц")) return "heart-shaped";
-        if (val.includes("прямоуг")) return "rectangular";
-        if (val.includes("ромб") || val.includes("брилл")) return "diamond";
-        return val;
-      };
-      
-      const featuresEng = [];
-      if (faceShape && faceShape.length > 2) featuresEng.push(`face shape ${translateFaceShape(faceShape)}`);
-      if (skinTone && skinTone.length > 2) featuresEng.push(`skin tone ${skinTone}`);
-      if (eyeColor && eyeColor.length > 2) featuresEng.push(`eye color ${translateColor(eyeColor)}`);
-      
-      if (featuresEng.length > 0) {
-        promptEng += ` The person has ${featuresEng.join(', ')}.`;
-      }
-      
-      const englishFacialHair = translateFacialHairToEng(facialHair);
-      promptEng += ` Facial hair status: ${englishFacialHair}.`;
-
-      promptEng += ` CRITICAL: Create a beautiful studio portrait or matching scene. Perfect lighting.`;
-      
-      promptEng += ` Highly detailed natural skin texture, visible pores, no airbrushing, unretouched, natural skin imperfections. Amateur phone snapshot, high quality raw photography.`;
-      
-      if (finalColor) {
-          promptEng += ` CRITICAL REQUIREMENT: THIS PERSON MUST HAVE ${finalColor.toUpperCase()} HAIR. DO NOT MAKE THE HAIR ANY OTHER COLOR. ${finalColor.toUpperCase()} HAIR ONLY!`;
-      }
-
-      // Add high-priority bracketing prefix for hair color to make sure it's strictly observed
-      if (finalColor) {
-          promptEng = `[STRICTLY AND ABSOLUTELY ${finalColor.toUpperCase()} HAIR COLOR REQUIRED, NO OTHER SHADES OR TONES ALLOWED, 100% COMPLETE HAIR COLOR SOLID COVERAGE] ` + promptEng;
-      }
-
       promptEng = promptEng.substring(0, 1500).trim();
 
       if (fluxStrength <= 0.05) {
@@ -506,7 +536,7 @@ generateRouter.post("/generate-full", async (req, res) => {
                num_inference_steps: 15
             };
             
-            const fluxRes = await fetch(endpoint, {
+            const fluxRes = await imageGenQueue.add(() => fetch(endpoint, {
               method: "POST",
               headers: {
                 "Authorization": `Key ${falKey}`,
@@ -514,7 +544,7 @@ generateRouter.post("/generate-full", async (req, res) => {
               },
               signal: controller.signal,
               body: JSON.stringify(bodyPayload)
-            });
+            })) as globalThis.Response;
 
             if (!fluxRes.ok) {
                const errData = await fluxRes.text();
@@ -549,7 +579,7 @@ generateRouter.post("/generate-full", async (req, res) => {
          };
          console.log("FaceSwap Payload:", JSON.stringify(faceSwapPayload).substring(0, 500) + "... (truncated)");
          
-         const falRes = await fetch("https://fal.run/fal-ai/face-swap", {
+         const falRes = await imageGenQueue.add(() => fetch("https://fal.run/fal-ai/face-swap", {
            method: "POST",
            headers: {
              "Authorization": `Key ${falKey}`,
@@ -557,7 +587,7 @@ generateRouter.post("/generate-full", async (req, res) => {
            },
            signal: controller.signal,
            body: JSON.stringify(faceSwapPayload)
-         });
+         })) as globalThis.Response;
 
          if (!falRes.ok) {
            const errText = await falRes.text();
@@ -676,7 +706,7 @@ generateRouter.post("/generate-full", async (req, res) => {
   });
 
   
-generateRouter.post("/generate-ar", async (req, res) => {
+generateRouter.post("/generate-ar", freeModelsLimiter, async (req, res) => {
     try {
       const { styleKeyword, styleName, features } = req.body;
       if (!styleKeyword || !styleName) {
@@ -764,7 +794,7 @@ generateRouter.post("/generate-ar", async (req, res) => {
   });
 
   
-generateRouter.post("/chat-stylist", async (req, res) => {
+generateRouter.post("/chat-stylist", freeModelsLimiter, async (req, res) => {
     try {
       const { messages, features, styleName } = req.body;
       if (!messages || !Array.isArray(messages)) {
@@ -841,7 +871,7 @@ generateRouter.post("/transcribe", async (req, res) => {
     }
 });
 
-generateRouter.post("/load-more", async (req, res) => {
+generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
   try {
     const { userId, existingNames, features, preferredStyle } = req.body;
     
@@ -877,13 +907,62 @@ generateRouter.post("/load-more", async (req, res) => {
     let data: any = null;
     try {
         const responseText = await callYandexGPT(systemInstruction, prompt);
-        let cleanHtml = responseText.replace(/```json\s*/g, "").replace(/```\s*$/g, "").trim();
-        data = JSON.parse(cleanHtml);
+        data = safeParseJSON(responseText);
     } catch (err: any) {
-        throw new Error("Ошибка генерации новых вариантов через YandexGPT.");
+        console.warn("YandexGPT / JSON Parse failed in /load-more, trying Gemini with JSON schema fallback:", err.message);
+    }
+
+    if (!data) {
+        try {
+            const { GoogleGenAI, Type } = await import("@google/genai");
+            const geminiApiKey = process.env.GEMINI_API_KEY;
+            if (geminiApiKey) {
+                const ai = new GoogleGenAI({ 
+                  apiKey: geminiApiKey,
+                  httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+                });
+                const response = await geminiQueue.add(() => ai.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: prompt,
+                    config: {
+                        systemInstruction: systemInstruction,
+                        temperature: 0.85,
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                recommendations: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            name: { type: Type.STRING },
+                                            imageKeyword: { type: Type.STRING },
+                                            description: { type: Type.STRING },
+                                            stylingTips: { type: Type.STRING }
+                                        },
+                                        required: ["name", "imageKeyword", "description", "stylingTips"]
+                                    }
+                                }
+                            },
+                            required: ["recommendations"]
+                        }
+                    }
+                }));
+                if (response.text) {
+                    data = safeParseJSON(response.text);
+                }
+            }
+        } catch (geminiErr: any) {
+            console.error("Gemini fallback in /load-more failed:", geminiErr);
+        }
+    }
+
+    if (!data || !data.recommendations) {
+        throw new Error("Ошибка генерации новых вариантов через нейросеть.");
     }
     
-    res.json({ recommendations: data?.recommendations || [] });
+    res.json({ recommendations: data.recommendations });
   } catch (err: any) {
     console.error("Load more error:", err);
     res.status(500).json({ error: err.message || "Ошибка генерации новых вариантов." });

@@ -19,6 +19,15 @@ interface UIContextType {
   isCameraModalOpen: boolean;
   setIsCameraModalOpen: (val: boolean) => void;
 
+  // Модалка "Поделиться" (Новое)
+  isShareOpen: boolean;
+  setIsShareOpen: (val: boolean) => void;
+  shareUrl: string;
+  setShareUrl: (val: string) => void;
+  shareTitle: string;
+  setShareTitle: (val: string) => void;
+  openShareModal: (url: string, title?: string) => void;
+
   // Toasts
   toasts: ToastType[];
   addToast: (message: string, type?: "success" | "error" | "info", duration?: number) => void;
@@ -44,6 +53,17 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
   const [chatStyleName, setChatStyleName] = useState("");
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastType[]>([]);
+
+  // Состояния для шеринга (Новое)
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareTitle, setShareTitle] = useState("");
+
+  const openShareModal = (url: string, title?: string) => {
+    setShareUrl(url || "");
+    setShareTitle(title || "");
+    setIsShareOpen(true);
+  };
 
   useEffect(() => {
     const welcomeShown = localStorage.getItem("welcomeShown");
@@ -94,6 +114,13 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
         setChatStyleName,
         isCameraModalOpen,
         setIsCameraModalOpen,
+        isShareOpen,
+        setIsShareOpen,
+        shareUrl,
+        setShareUrl,
+        shareTitle,
+        setShareTitle,
+        openShareModal,
         toasts,
         addToast,
         removeToast,

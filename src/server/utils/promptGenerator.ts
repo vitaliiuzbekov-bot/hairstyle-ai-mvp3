@@ -104,10 +104,16 @@ export function translateHairlineStatusToEng(hairlineStatus: string, selectedSty
   
   // If the haircut selected is a shaved head / bald look
   const style = (selectedStyleKeyword || "").toLowerCase();
-  const isBaldStyle = style.includes("bald") || style.includes("shave") || style.includes("лыс") || style.includes("брит");
+  const isBaldStyle = style.includes("bald") || style.includes("shave") || style.includes("лыс") || style.includes("брит") || style.includes("shorn") || style.includes("shaven");
   
-  if (hl.includes("лыс") || hl.includes("лысина") || hl.includes("bald") || hl.includes("shaved head") || isBaldStyle) {
+  if (isBaldStyle) {
     return "clean shaved head, neat smooth scalp style. ";
+  }
+  
+  // If the client is bald but is trying on a haired style, we do not want to force "shaved head".
+  const isClientBald = hl.includes("лыс") || hl.includes("лысина") || hl.includes("bald") || hl.includes("shaved head");
+  if (isClientBald) {
+    return "growing natural hairline with clean hair. ";
   }
   
   // For other styles, we want to adapt naturally
@@ -454,7 +460,7 @@ export function getDetailedRussianPrompt(params: any): string {
   promptBuilder += `На фото НЕ модель, а обычный, реальный ${demographic}. ${ageFeatures} Фотореалистичность 100%, камера телефона, без фильтров и ретуши. Кожа с естественными порами и неровностями. Строго запрещено делать пышную или высокую укладку. Никакого гипер-объема или "гнезда" сверху. Волосы должны прилегать к голове реалистично. `;
 
   const kwLowerForStyle = styleName.toLowerCase();
-  if (kwLowerForStyle.includes("лыс") || kwLowerForStyle.includes("голов") || kwLowerForStyle.includes("череп")) {
+  if (kwLowerForStyle.includes("лыс") || kwLowerForStyle.includes("голов") || kwLowerForStyle.includes("череп") || kwLowerForStyle.includes("shave") || kwLowerForStyle.includes("bald") || kwLowerForStyle.includes("shorn") || kwLowerForStyle.includes("shaven") || kwLowerForStyle.includes("под ноль")) {
        promptBuilder += `ЧЕЛОВЕК АБСОЛЮТНО ЛЫСЫЙ, У НЕГО ГОЛЫЙ БРИТЫЙ ЧЕРЕП. СТРОГИЙ ЗАПРЕТ НА ЛЮБЫЕ ВОЛОСЫ. НОЛЬ ВОЛОС. `;
   } else if (kwLowerForStyle.includes("кроп") || kwLowerForStyle.includes("бокс") || kwLowerForStyle.includes("андеркат") || kwLowerForStyle.includes("полубокс") || kwLowerForStyle.includes("fade") || kwLowerForStyle.includes("crew") || kwLowerForStyle.includes("buzz") || kwLowerForStyle.includes("ежик")) {
        promptBuilder += `Это ОЧЕНЬ короткая стрижка машинкой! Волосы ДОЛЖНЫ БЫТЬ МАКСИМАЛЬНО КОРОТКИМИ, почти под ноль, абсолютно НОЛЬ объема! Никаких торчащих пушистых кудрей, никаких челок вверх, никакой шапки. СТРОГИЙ ЗАПРЕТ на любой объем и длинные волосы! Идеально повторяет форму черепа. `;

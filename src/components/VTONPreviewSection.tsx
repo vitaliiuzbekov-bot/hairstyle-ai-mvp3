@@ -1,11 +1,14 @@
-import React from "react";
-import { Sparkles, Send, Download, FileDown, ShoppingBag, Share2 } from "lucide-react";
+import React, { useState } from "react";
+import { Sparkles, Send, Download, FileDown, ShoppingBag, Share2, Eraser, Video } from "lucide-react";
 import { RotatingFactsLoader } from "./RotatingFactsLoader";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { CachedImage } from "./CachedImage";
 import { downloadImage } from "../utils/downloadImage";
 import { shareResult } from "../utils/shareResult";
 import { generateCollage } from "../utils/collage";
+import { generateBeforeAfterVideo } from "../utils/videoExport";
+import { useUI } from "../context/UIContext";
+import { MaskEditorModal } from "./MaskEditorModal";
 
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
@@ -66,6 +69,18 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
   vtonStrength,
   setVtonStrength,
 }) => {
+  const { openShareModal } = useUI();
+  const [isMaskEditorOpen, setIsMaskEditorOpen] = useState(false);
+  const [editedResultUrl, setEditedResultUrl] = useState<string | null>(null);
+  const [isExportingVideo, setIsExportingVideo] = useState(false);
+
+  // Сброс редактированного изображения при смене исходного результата
+  React.useEffect(() => {
+    setEditedResultUrl(null);
+  }, [vtonResultUrl]);
+
+  const displayResultUrl = editedResultUrl || vtonResultUrl;
+
   return (
     <div ref={resultRef} className={`flex flex-col gap-3 flex-1`}>
       {!vtonResultUrl && !loadingVTONStyles[tryOnStyle.imageKeyword || tryOnStyle.name] && (
@@ -113,13 +128,20 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
         </div>
       )}
 
-      {vtonResultUrl && !isTeaserResult && (
+      {displayResultUrl && !isTeaserResult && (
         <div className={`mb-4 border rounded-2xl p-3 sm:p-4 relative group flex flex-col items-center ${isLightMode ? 'bg-white border-gray-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
-           <div className="w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
+           <div className="w-full relative max-w-sm sm:max-w-md md:max-w-lg mx-auto">
              <BeforeAfterSlider 
                beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
-               afterImage={vtonResultUrl}
+               afterImage={displayResultUrl}
              />
+             <button
+               onClick={() => setIsMaskEditorOpen(true)}
+               className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur z-10 transition-colors"
+               title="Убрать артефакты (Ластик)"
+             >
+               <Eraser size={18} />
+             </button>
            </div>
           <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full">
              <button 
@@ -127,7 +149,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   e.stopPropagation();
                   try {
                      const beforeSrc = imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
-                     const collageDataUrl = await generateCollage(beforeSrc, vtonResultUrl, userRole === 'salon' ? salonName : undefined);
+                     const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl, userRole === 'salon' ? salonName : undefined);
                      
                      const messageText = "Привет! Смотри, какой стиль я подобрал(а) в нейросети. Хочу такую стрижку и цвет!\nСоздано в @neirostilist_bot";
 
@@ -171,7 +193,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                 <Sparkles size={16} />
                 <span>Спросить Стилиста</span>
              </button>
-             <button 
+              <button 
                onClick={async (e) => {
                   e.stopPropagation();
                   try {
@@ -182,16 +204,44 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      console.error("Collage download error", err);
                   }
                }}
-               className={`flex-1 py-3 px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100' : 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30'}`}
+               className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100' : 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30'}`}
+               title="Скачать фото коллаж"
              >
                 <FileDown size={16} />
-                <span>Коллаж</span>
+                <span className="hidden sm:inline">Коллаж</span>
+             </button>
+             <button
+               onClick={async (e) => {
+                  e.stopPropagation();
+                  if(isExportingVideo) return;
+                  setIsExportingVideo(true);
+                  try {
+                     const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+                     const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
+                     const url = URL.createObjectURL(videoBlob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     // In Telegram ios Safari, downloads might need to be explicitly opened or shared, but download attribute works for files
+                     a.download = `before_after_${Date.now()}.mp4`;
+                     a.click();
+                     setTimeout(() => URL.revokeObjectURL(url), 10000);
+                  } catch (err) {
+                     console.error("Video export failed", err);
+                     alert("К сожалению, видео не удалось сохранить на вашем устройстве.");
+                  } finally {
+                     setIsExportingVideo(false);
+                  }
+               }}
+               className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100' : 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30'}`}
+             >
+                {isExportingVideo ? <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div> : <Video size={16} />}
+                <span className="hidden sm:inline">Видео</span>
              </button>
              <div className="flex gap-2">
                  <button
                    onClick={(e) => {
                      e.stopPropagation();
-                     shareResult(vtonResultUrl);
+                     if (vtonResultUrl) { openShareModal(vtonResultUrl, "Посмотри, какую классную прическу и цвет волос мне подобрал ИИ в НейроСтилисте!"); }
                    }}
                    className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
                    title="Поделиться фото"
@@ -257,6 +307,17 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
         </div>
       )}
 
+      {isMaskEditorOpen && displayResultUrl && (
+        <MaskEditorModal
+           beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) || ''}
+           afterImage={displayResultUrl}
+           onClose={() => setIsMaskEditorOpen(false)}
+           onSave={(mergedDataUrl) => {
+              setEditedResultUrl(mergedDataUrl);
+              setIsMaskEditorOpen(false);
+           }}
+        />
+      )}
 
     </div>
   );

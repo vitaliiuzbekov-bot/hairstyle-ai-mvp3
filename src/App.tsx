@@ -11,6 +11,8 @@ const BuyModal = React.lazy(() => import("./components/BuyModal").then(m => ({ d
 const StylistChat = React.lazy(() => import("./components/StylistChat").then(m => ({ default: m.StylistChat })));
 const ProfileModal = React.lazy(() => import("./components/ProfileModal").then(m => ({ default: m.ProfileModal })));
 const QuickTutorial = React.lazy(() => import("./components/QuickTutorial").then(m => ({ default: m.QuickTutorial })));
+const ShareModal = React.lazy(() => import("./components/ShareModal").then(m => ({ default: m.ShareModal })));
+const PWAPrompt = React.lazy(() => import("./components/PWAPrompt").then(m => ({ default: m.PWAPrompt })));
 
 import { useTokenManager } from "./hooks/useTokenManager";
 import { useOfflineStatus } from "./hooks/useOfflineStatus";
@@ -46,7 +48,12 @@ function App() {
   useTelegramBackButton();
 
   useEffect(() => {
-    // FaceAPI load deferred to component usage
+    // Eagerly preload FaceAPI models in background so they are ready when user taps Find Styles
+    setTimeout(() => {
+      import("./services/fallbackAnalysis").then(m => {
+        m.preloadFaceApiModels();
+      }).catch(e => console.warn("Failed to preload FaceAPI module", e));
+    }, 3000); // Wait 3s so it doesn't block initial interactive load
   }, []);
 
   const isOffline = useOfflineStatus();
@@ -197,6 +204,9 @@ function App() {
           />
 
           <DailyRewardModal isLightMode={isLightMode} />
+
+          <ShareModal />
+          <PWAPrompt isLightMode={isLightMode} />
 
           {isProfileOpen && (
             <ProfileModal

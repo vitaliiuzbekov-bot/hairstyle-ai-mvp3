@@ -1,5 +1,5 @@
 import React from "react";
-import { X, User, Share2, Sun, Moon, LogOut } from "lucide-react";
+import { X, User, Share2, Sun, Moon, LogOut, ArrowDownToLine } from "lucide-react";
 import { useUser } from "../context/UserContext";
 
 interface ProfileModalProps {
@@ -107,6 +107,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {isLightMode ? "Тёмная тема" : "Светлая тема"}
             </button>
           )}
+
+          <button 
+            onClick={() => {
+              window.dispatchEvent(new Event('show-pwa-prompt'));
+              onClose();
+            }}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+              isLightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5'
+            }`}
+          >
+            <ArrowDownToLine size={14} className="text-emerald-500" />
+            Установить приложение (PWA)
+          </button>
 
           <button 
             onClick={handleShare}

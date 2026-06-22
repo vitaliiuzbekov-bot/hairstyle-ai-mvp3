@@ -1,8 +1,29 @@
 import jwt from "jsonwebtoken";
 import "dotenv/config";
+import { GoogleGenAI } from "@google/genai";
+import { geminiQueue, yandexQueue } from "../utils/queues";
 
 let cachedIamToken: string | null = null;
 let iamTokenExpiry: number = 0;
+let geminiClient: GoogleGenAI | null = null;
+
+// Получение или инициализация клиента Gemini
+function getGeminiClient(): GoogleGenAI | null {
+  if (!geminiClient) {
+    const key = process.env.GEMINI_API_KEY;
+    if (key) {
+      geminiClient = new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+    }
+  }
+  return geminiClient;
+}
 
 export async function getYandexIamToken(serviceAccountKeyJSON: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -174,6 +195,7 @@ export async function callYandexART({
 }
 
 export async function callYandexGPTChat(systemText: string, messages: {role: string, text: string}[]): Promise<string> {
+  try {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
 
@@ -197,14 +219,14 @@ export async function callYandexGPTChat(systemText: string, messages: {role: str
       ]
     };
 
-    const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+    const res = await yandexQueue.add(() => fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${iamToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
-    });
+    })) as Response;
 
     if (!res.ok) {
         const err = await res.text();
@@ -213,6 +235,26 @@ export async function callYandexGPTChat(systemText: string, messages: {role: str
 
     const data = await res.json();
     return data.result.alternatives[0].message.text;
+  } catch (err: any) {
+    console.warn("YandexGPTChat failed, falling back to Gemini:", err.message);
+    const client = getGeminiClient();
+    if (client) {
+      const contents = messages.map(msg => ({
+        role: msg.role === "assistant" ? "model" as const : "user" as const,
+        parts: [{ text: msg.text }]
+      }));
+      const response = await geminiQueue.add(() => client.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents,
+        config: {
+          systemInstruction: systemText,
+          temperature: 0.85
+        }
+      }));
+      return response?.text?.trim() || "";
+    }
+    throw err;
+  }
 }
 
 export async function callYandexVision(systemText: string, userText: string, imageBase64: string, customModelUri?: string): Promise<string> {
@@ -254,14 +296,14 @@ export async function callYandexVision(systemText: string, userText: string, ima
       messages: messages
     };
 
-    const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+    const res = await yandexQueue.add(() => fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${iamToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
-    });
+    })) as globalThis.Response;
 
     if (!res.ok) {
         const err = await res.text();
@@ -273,6 +315,7 @@ export async function callYandexVision(systemText: string, userText: string, ima
 }
 
 export async function callYandexGPT(systemText: string, userText: string): Promise<string> {
+  try {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
 
@@ -296,14 +339,14 @@ export async function callYandexGPT(systemText: string, userText: string): Promi
       ]
     };
 
-    const res = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+    const res = await yandexQueue.add(() => fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${iamToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
-    });
+    })) as globalThis.Response;
 
     if (!res.ok) {
         const err = await res.text();
@@ -312,4 +355,20 @@ export async function callYandexGPT(systemText: string, userText: string): Promi
     
     const data = await res.json();
     return data.result.alternatives[0].message.text;
+  } catch (err: any) {
+    console.warn("YandexGPT failed, falling back to Gemini:", err.message);
+    const client = getGeminiClient();
+    if (client) {
+      const response = await geminiQueue.add(() => client.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: userText,
+        config: {
+          systemInstruction: systemText,
+          temperature: 0.85
+        }
+      }));
+      return response?.text?.trim() || "";
+    }
+    throw err;
+  }
 }
