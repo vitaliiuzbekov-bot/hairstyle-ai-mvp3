@@ -18,6 +18,15 @@
     <title>НейроСтилист AI</title>
     <meta name="description" content="AI подбор причесок и стрижек в реальном времени" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

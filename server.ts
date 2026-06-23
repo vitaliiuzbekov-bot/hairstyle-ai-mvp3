@@ -164,6 +164,11 @@ async function startServer() {
   app.use("/api", referenceRouter);
   app.use("/api/tg", tgStorageRouter);
 
+  // Kill old service worker
+  app.get("/sw.js", (req, res) => {
+    res.setHeader("Content-Type", "application/javascript");
+    res.send("self.addEventListener('install', () => { self.skipWaiting(); }); self.addEventListener('activate', () => { self.registration.unregister(); self.clients.claim(); });");
+  });
 
   // Global API Error Handler
   app.use("/api", (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -172,13 +177,6 @@ async function startServer() {
   });
 
 if (process.env.NODE_ENV !== "production") {
-    app.use((req, res, next) => {
-      if (req.url.includes('golden_base') || req.url.includes('.jpg')) {
-        console.log(`[DEBUG] Image request: ${req.url}`);
-      }
-      next();
-    });
-
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

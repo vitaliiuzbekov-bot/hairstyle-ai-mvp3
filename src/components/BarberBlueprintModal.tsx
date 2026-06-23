@@ -53,7 +53,7 @@ interface BarberBlueprintModalProps {
   isLightMode?: boolean;
 }
 
-export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
+const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   tryOnStyle,
   setTryOnStyle,
   results,
@@ -230,3 +230,5 @@ export const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
     </div>
   );
 };
+
+export default BarberBlueprintModal;

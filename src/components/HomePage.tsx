@@ -11,6 +11,7 @@ import { usePhotoHandlers } from "../hooks/usePhotoHandlers";
 import { useAnalysisContext } from "../context/AnalysisContext";
 import { useUser } from "../context/UserContext";
 import { useUI } from "../context/UIContext";
+import { ImageSlider } from "../components/ImageSlider";
 
 const LoadingFallback = ({ isLightMode }: { isLightMode: boolean }) => (
   <div className={`flex items-center justify-center p-8 ${isLightMode ? 'text-blue-500' : 'text-blue-400'}`}>
@@ -18,7 +19,7 @@ const LoadingFallback = ({ isLightMode }: { isLightMode: boolean }) => (
   </div>
 );
 
-const BarberBlueprintModal = React.lazy(() => import("../components/BarberBlueprintModal").then(m => ({ default: m.BarberBlueprintModal })));
+const BarberBlueprintModal = React.lazy(() => import("../components/BarberBlueprintModal"));
 const CameraModal = React.lazy(() => import("../components/CameraModal").then(m => ({ default: m.CameraModal })));
 const StylistChat = React.lazy(() => import("../components/StylistChat").then(m => ({ default: m.StylistChat })));
 
@@ -193,6 +194,11 @@ export const HomePage: React.FC<HomePageProps> = ({
               Какая стрижка подойдет <br className="hidden sm:block" />{" "}
               <span className={`italic ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>именно вам?</span>
             </h2>
+            
+            <div className="flex justify-center mb-6 max-w-[280px] sm:max-w-[320px] mx-auto">
+              <ImageSlider isLightMode={isLightMode} />
+            </div>
+
             <p className={`leading-relaxed max-w-lg mx-auto font-light text-sm sm:text-base px-2 ${isLightMode ? 'text-gray-600' : 'text-white/60'}`}>
               Загрузите селфи, и наш умный эксперт определит форму вашего лица
               для подбора стрижек, которые подчеркнут ваши лучшие черты.
