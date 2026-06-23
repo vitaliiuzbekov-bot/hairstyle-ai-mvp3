@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { X, Star, Gift, Share2, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
-import f_bob from "../../public/golden_base/f_bob.jpg";
-import f_long_straight from "../../public/golden_base/f_long_straight.jpg";
+
+import f_bob from "../assets/golden_base/f_bob.jpg";
+import f_long_straight from "../assets/golden_base/f_long_straight.jpg";
 
 interface BuyModalProps {
   showBuyModal: boolean;

@@ -12,16 +12,16 @@ import {
 import { AnalysisResult } from "../types";
 import { ImageCropperModal } from "./ImageCropperModal";
 
-import f_pixie from "../../public/golden_base/f_pixie.jpg";
-import f_bob from "../../public/golden_base/f_bob.jpg";
-import f_long_bob from "../../public/golden_base/f_long_bob.jpg";
-import f_long_straight from "../../public/golden_base/f_long_straight.jpg";
-import f_long_wavy from "../../public/golden_base/f_long_wavy.jpg";
-import f_bangs from "../../public/golden_base/f_bangs.jpg";
+import f_pixie from "../assets/golden_base/f_pixie.jpg";
+import f_bob from "../assets/golden_base/f_bob.jpg";
+import f_long_bob from "../assets/golden_base/f_long_bob.jpg";
+import f_long_straight from "../assets/golden_base/f_long_straight.jpg";
+import f_long_wavy from "../assets/golden_base/f_long_wavy.jpg";
+import f_bangs from "../assets/golden_base/f_bangs.jpg";
 
-import m_buzz from "../../public/golden_base/m_buzz.jpg";
-import m_crop from "../../public/golden_base/m_crop.jpg";
-import m_pompadour from "../../public/golden_base/m_pompadour.jpg";
+import m_buzz from "../assets/golden_base/m_buzz.jpg";
+import m_crop from "../assets/golden_base/m_crop.jpg";
+import m_pompadour from "../assets/golden_base/m_pompadour.jpg";
 
 const FEMALE_LIBRARY = [
   {
