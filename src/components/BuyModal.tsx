@@ -49,8 +49,8 @@ export const BuyModal: React.FC<BuyModalProps> = ({
         {/* Onboarding Teaser inside BuyModal */}
         <div className={`w-full text-center relative z-10 mb-5`}>
           <ImageSlider isLightMode={isLightMode} />
-          <p className={`text-[11px] mt-3 font-medium px-2 leading-relaxed ${isLightMode ? 'text-gray-700' : 'text-white/80'}`}>
-            С невероятной точностью и учетом ваших черт лица.
+          <p className={`text-[12px] mt-4 font-medium px-2 leading-relaxed ${isLightMode ? 'text-gray-700' : 'text-white/80'}`}>
+            С невероятной точностью. Получите <b>детальный PDF-гайд</b> со схемами, параметрами окрашивания и подробным мудбордом для вашего мастера.
           </p>
         </div>
 

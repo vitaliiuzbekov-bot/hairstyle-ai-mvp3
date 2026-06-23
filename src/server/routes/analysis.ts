@@ -120,7 +120,7 @@ ${preDetectedFacts}
 
                 const response = await geminiQueue.add(() => withRetry(async () => {
                    let lastError;
-                   const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+                   const modelsToTry = ['gemini-2.5-flash'];
                    
                    for (const modelName of modelsToTry) {
                        try {
@@ -203,7 +203,7 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
    - Для детей предлагай стильные молодежные, детские и практичные стрижки.
 
 4. ТРЕБОВАНИЕ К ВЫБРАННОМУ СТИЛЮ (ЖЕСТКОЕ СООТВЕТСТВИЕ СТИЛЮ):
-   Ожидаемый стиль стрижки: \${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'Любой (на твое усмотрение)'}. 
+   Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'Любой (на твое усмотрение)'}. 
    Все 3 стрижки из подбора должны строго соответствовать этому стилю! КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО выдавать одни и те же стрижки (например, кроп, кроп, кроп) под разные стили жизни!
    - "Деловой" (Business) / "Элегантный": Только благородные, аккуратные, соразмерные классические стрижки. Никаких экстремальных андеркатов с выбритым затылком, растрепанного гранжа или кроп-стрижек! Подходящие варианты: Classic Executive Side Part, Ivy League Haircut, Low Pompadour Taper, Gentleman's Tapered Cut.
    - "Спортивный" (Sporty): Идеально удобные, компактные, атлетичные стрижки. Подходящие варианты: Dynamic Crew Cut, Short Textured Athletic Crop, Buzz Cut low-fade, High and Tight.

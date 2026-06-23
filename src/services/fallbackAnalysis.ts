@@ -11,7 +11,11 @@ let faceapiModule: any = null;
 
 const getFaceApi = async () => {
     if (!faceapiModule) {
-        faceapiModule = await import('@vladmandic/face-api');
+        // Race the heavy module import to prevent network hangs on slow CDNs
+        faceapiModule = await Promise.race([
+            import('@vladmandic/face-api'),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("FaceAPI module import timeout")), 5000))
+        ]);
     }
     return faceapiModule;
 };

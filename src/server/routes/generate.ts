@@ -64,207 +64,64 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         return res.json({ imageUrl: cachedImage });
       }
 
-      // Generate a highly realistic prompt taking user base into account via Gemini
-      let prompt = "";
-      try {
-        console.log("Generating Russian prompt for YandexART via Gemini...");
-        const geminiApiKey = process.env.GEMINI_API_KEY;
-        if (!geminiApiKey) {
-            throw new Error("GEMINI_API_KEY не установлен");
-        }
-        const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ 
-            apiKey: geminiApiKey, 
-            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-        });
-        
-        const systemInstructionRef = `Ты эксперт по созданию промптов для нейросетей-генераторов изображений (YandexART).
-Задача: написать ОДИН детальный промпт на РУССКОМ языке для генерации фотореалистичного портрета.
-
-ПАРАМЕТРЫ ЦЕЛЕВОГО СТИЛЯ (Что стричь и красить):
-- Целевая прическа/стрижка: ${haircutName || keyword || ""}
-- Подробности целевого стиля: ${description || ""}
-- Цвет волос: ${customHairColor || hairColor || "естественный"}
-
-ПАРАМЕТРЫ БАЗЫ ПОЛЬЗОВАТЕЛЯ (Критически важно для совместимости и реализма):
-- Густота и объем волос оригинала: ${hairDensity || "не указано"}
-- Структура волос: ${hairType || "не указано"}
-- Состояние линии роста/залысины: ${hairlineStatus || "не указано"}
-- Качество волос: ${hairQuality || "не указано"}
-- Пол: ${gender || "не указано"}
-- Возраст: ${ageRange || "не указан"}
-- Тип лица: ${faceShape || "не указан"}
-- Тип кожи и особенности: ${skinTone || ""} ${skinDetails || ""}
-- Растительность на лице: ${facialHair || "нет"}
-- Контекст заднего плана: ${clothingContext || "нейтральный фон"}
-
-СУПЕР-ВАЖНОЕ ПРАВИЛО:
-Целевая прическа должна быть АДАПТИРОВАНА под БАЗУ пользователя (густоту, линию роста, структуру).
-Категорически запрещено генерировать нереалистично пышные, густые или длинные волосы, если база тонкая или с залысинами. Референс должен отражать, как эта прическа будет выглядеть на РЕАЛЬНЫХ волосах пользователя. Сохраняй реалистичность!
-
-Инструкции:
-1. Создай промпт для обычного любительского селфи на телефон (лицо смотрит в камеру). Избегай эффекта "идеального студийного фото". Фото должно выглядеть максимально естественно, "сыро", как будто сделано дома при обычном освещении.
-2. Опиши внешность человека, включая естественные текстуры кожи, возрастные изменения, неидеальности (если есть), чтобы избежать эффекта "пластикового ИИ-лица".
-3. Опиши волосы: цвет, текстуру и самое главное — ОБЪЕМ и ГУСТОТУ (четко укажи, что они соответствуют данным пользователя, например: "редкие волосы", "тонкие волосы", "высокий лоб", если это так).
-4. Опиши конечную укладку и стрижку с учетом этих ограничений.
-5. Верни ТОЛЬКО готовый текст промпта на русском языке. Максимум 600 символов.`;
-
-        const refPromptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
-             model: 'gemini-2.5-pro', // Using pro for better logic constraints
-             contents: systemInstructionRef,
-             config: { temperature: 0.7, maxOutputTokens: 250 }
-        })));
-        prompt = refPromptRes?.text?.trim() || "";
-      } catch (err) {
-        console.error("Gemini failed to generate ref prompt, using simple fallback:", err);
-        const gLabel = (gender === "male" || gender === "Мужчина") ? "мужчина" : "женщина";
-        prompt = `Обычное селфи на телефон, ${gLabel}, возраст: ${ageRange}. Естественная текстура кожи, без фильтров и ретуши, домашнее освещение. Новая прическа: ${haircutName || keyword}. Цвет волос: ${customHairColor || hairColor || "естественный"}. Никакого глянца, избегать эффекта "пластикового лица" и студийного света.`;
-      }
-      
-      prompt = prompt.substring(0, 1000).trim();
-
       let finalImageUrl = "";
       let lastError = "";
 
-      const yandexServiceAccountKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
-      const yandexFolderId = process.env.YANDEX_FOLDER_ID;
+      const falKey = process.env.FAL_KEY;
+      if (!falKey) {
+        return res.status(500).json({ error: "FAL_KEY не установлен" });
+      }
 
-      if (yandexServiceAccountKey && yandexFolderId) {
-        console.log("Generating reference via YandexART... prompt:", prompt);
-        try {
-            const cleanFolderId = extractFolderId(yandexFolderId);
-            if (cleanFolderId === "MY_FOLDER_ID" || cleanFolderId.toLowerCase().includes("folder_id") || cleanFolderId.length < 5) {
-                throw new Error(`[ОШИБКА НАСТРОЙКИ СЕРВЕРА] В YANDEX_FOLDER_ID указан плейсхолдер "${cleanFolderId}". Пожалуйста, пропишите реальный Идентификатор каталога на Render.com.`);
-            }
-            const iamToken = await getYandexIamToken(yandexServiceAccountKey);
+      console.log("Generating reference via fal-ai/flux/schnell...");
+      try {
+        const isMale = gender === "male" || gender === "Мужчина";
+        const femalePrompt = "Professional front-facing portrait of a 25-year-old striking Caucasian woman, head and shoulders visible, perfectly symmetrical face. Neutral lighting, clean white background. Centered framing, entire hairstyle is fully visible in frame. ";
+        const malePrompt = "Professional front-facing portrait of a 28-year-old striking Caucasian man, head and shoulders visible, perfectly symmetrical face, strong square jaw, sparse stubble. Neutral lighting, clean white background. Centered framing, entire hairstyle is fully visible in frame. ";
+        
+        const base = isMale ? malePrompt : femalePrompt;
+        const seedValue = isMale ? 99999 : 55555;
+        
+        // Pass original hair structure info if provided, otherwise default to natural straight to avoid unexpected curls
+        const safeHairType = hairType && hairType.toLowerCase() !== "не указано" ? hairType : "straight/natural";
+        const hairDesc = (haircutName || keyword) + (description ? ", " + description : "") + ". Hair texture: " + safeHairType;
+        const colorDesc = customHairColor && customHairColor !== "Любой" ? " Color: " + customHairColor : "";
+        
+        const finalPrompt = base + "Hair is " + hairDesc + "." + colorDesc;
 
-          const kwLower = (keyword || "").toLowerCase();
-          const isBaldStyle = kwLower.includes("shave") || 
-                              kwLower.includes("shaven") || 
-                              kwLower.includes("bald") || 
-                              kwLower.includes("лыс") || 
-                              kwLower.includes("налысо") || 
-                              kwLower.includes("брит") || 
-                              kwLower.includes("shorn") || 
-                              kwLower.includes("под ноль") ||
-                              kwLower.includes("без волос");
-
-          let negativeStyleText = "пышная прическа, гипер-объем, волосы торчком, растрепанные, салонная укладка, парик, пушистые волосы, шапка волос, начес, афро, кудри";
-          if (isBaldStyle) {
-            negativeStyleText = "волосы, прическа, стрижка, парик, укладка, шевелюра, кудри, локоны, челка, растительность на голове, hair, wig, hairstyle, locks, curls, hairline, fluffy, fluffy hair, voluminous hair, long hair, bangs, dreadlocks, afro";
-          }
-
-          // 1. Start Async Generation
-          const reqBody = {
-            modelUri: `art://${cleanFolderId}/yandex-art/latest`,
-            generationOptions: {
-              seed: Math.floor(Math.random() * 10000000).toString(),
-              aspectRatio: { widthRatio: "3", heightRatio: "4" }
-            },
-            messages: [
-              { weight: 1, text: prompt },
-              { weight: -2, text: negativeStyleText },
-              { weight: -1, text: "коллаж, мультик, водяной знак, текст, до и после, 3D" }
-            ]
-          };
-
-          let initRes = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync', {
-            method: 'POST',
+        const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+            method: "POST",
             headers: {
-              'Authorization': `Bearer ${iamToken}`,
-              'Content-Type': 'application/json'
+                "Authorization": `Key ${falKey}`,
+                "Content-Type": "application/json"
             },
-            body: JSON.stringify(reqBody)
-          });
+            body: JSON.stringify({
+                prompt: finalPrompt,
+                image_size: "portrait_4_3",
+                seed: seedValue,
+                num_inference_steps: 4
+            })
+        });
 
-          if (!initRes.ok) {
-            let errText = await initRes.text();
-            
-            // Retry with a safer, simplified prompt if we hit safety filters (often code 3)
-            if (errText.includes("не могу сгенерировать") || errText.includes("другую тему") || errText.includes("code\":3")) {
-              console.log("YandexART rejected the prompt. Retrying with a simplified, safe prompt...");
-              const safePrompt = getSafeRussianPrompt(gender, ageRange, haircutName, keyword, hairColor, clothingContext);
-              reqBody.messages[0].text = safePrompt.substring(0, 480).trim();
-              
-              initRes = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/imageGenerationAsync', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${iamToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(reqBody)
-              });
-              
-              if (!initRes.ok) {
-                errText = await initRes.text();
-              }
-            }
-            
-            if (!initRes.ok) {
-              let diagnostic = "";
-              if (errText.includes("model_uri") || errText.includes("modelUri") || initRes.status === 400) {
-                  const masked = cleanFolderId.length > 5 
-                     ? `${cleanFolderId.slice(0, 4)}...${cleanFolderId.slice(-4)}` 
-                     : cleanFolderId;
-                  diagnostic = `\n(Диагностика: YandexART отклонил запрос. Проверьте правильность YANDEX_FOLDER_ID на вашем сервере. Значение на сервере: "${masked}")`;
-              }
-              throw new Error(`YandexART Init Error: ${errText}${diagnostic}`);
-            }
-          }
-
-          const initData = await initRes.json();
-          const operationId = initData.id;
-          
-          if (!operationId) {
-            throw new Error('No operation ID returned by YandexART');
-          }
-
-          // 2. Poll for Completion using Operation Service
-          const pollUrl = `https://operation.api.cloud.yandex.net/operations/${operationId}`;
-          let attempts = 0;
-          const maxAttempts = 12; // 12 * 2500ms = 30 seconds
-          
-          while (attempts < maxAttempts && !finalImageUrl) {
-            await new Promise(resolve => setTimeout(resolve, 2500)); // Delay between polling
-            
-            const pollRes = await fetch(pollUrl, {
-              headers: {
-                'Authorization': `Bearer ${iamToken}`
-              }
-            });
-
-            if (!pollRes.ok) {
-              console.error(`Polling Error HTTP ${pollRes.status}`);
-              attempts++;
-              continue;
-            }
-
-            const pollData = await pollRes.json();
-            
-            if (pollData.done) {
-              if (pollData.response && pollData.response.image) {
-                  finalImageUrl = `data:image/jpeg;base64,${pollData.response.image}`;
-              } else if (pollData.error) {
-                  throw new Error(`YandexART Gen Error: ${pollData.error.message || JSON.stringify(pollData.error)}`);
-              }
-            }
-            attempts++;
-          }
-          
-          if (!finalImageUrl) {
-            throw new Error('YandexART generation timed out after 30 seconds');
-          }
-
-        } catch (error: any) {
-             lastError += `[YandexART: ${error.message}]`;
-             console.error("YandexART Failed:", error);
+        if (!falRes.ok) {
+            const errText = await falRes.text();
+            throw new Error(`FAL.AI Error: ${falRes.status} - ${errText}`);
         }
-      } else {
-         lastError += "[Яндекс Облако не настроено, отсутствуют YANDEX_SERVICE_ACCOUNT_KEY или YANDEX_FOLDER_ID]";
+
+        const data = await falRes.json();
+        const generatedUrl = data.images[0].url;
+
+        // Fetch image as base64 to send to client properly
+        const imageFetch = await fetch(generatedUrl);
+        const imageBuf = await imageFetch.arrayBuffer();
+        finalImageUrl = `data:image/jpeg;base64,${Buffer.from(imageBuf).toString('base64')}`;
+
+      } catch (err: any) {
+        lastError += `[FAL Flux: ${err.message}]`;
+        console.error("FAL Flux Failed:", err);
       }
 
       if (!finalImageUrl) {
-          throw new Error(`К сожалению, не удалось сгенерировать референс прически через Yandex ART. Ошибка: ${lastError}`);
+          throw new Error(`К сожалению, не удалось сгенерировать референс прически. Ошибка: ${lastError}`);
       } else {
           // Save to cache for 30 days (30 * 24 * 60 * 60 seconds)
           await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
@@ -428,11 +285,12 @@ generateRouter.post("/generate-full", async (req, res) => {
       // Map UI vtonStrength (50-100) to fluxStrength (0.3 - 0.75). 
       // Higher strength means more hair change, lower means strict adherence to original jaw/face.
       let uiStrength = Number(vtonStrength) || 45; 
-      let fluxStrength = 0.75; // Increased to ensure 100% hair replacement
+      let fluxStrength = 0.75; // Default
 
       if (uiStrength === 85 && finalTargetImageUrl) {
           // Studio Shot logic: Use catalog image as base and completely skip flux for exact 100% hair shape. 
           // Note: This results in the catalog model's body being used.
+          console.log("Visual reference provided with UI strength 85, enabling Catalog Studio Shot");
           baseImageForFlux = finalTargetImageUrl;
           fluxStrength = 0.05; 
       } else {
@@ -496,17 +354,25 @@ Instructions:
         }
 
         const promptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
-             model: 'gemini-2.5-pro', // Pro to properly analyze image
-             contents: contentsPayload,
+             model: 'gemini-2.5-flash', // Flash to prevent quota limits
+             contents: [contentsPayload],
              config: {
                  temperature: 0.7,
                  maxOutputTokens: 500
              }
         })));
         promptEng = promptRes?.text?.trim() || "";
-      } catch (err) {
-        console.error("Gemini failed to generate prompt, falling back to basic prompt:", err);
-        promptEng = `A photorealistic portrait of a person. Age: ${ageRange || "unknown"}, Gender: ${gender || "unknown"}. New Hairstyle: ${keyword} - ${description || ""}. Desired Hair Color: ${finalColor || "original"}. The face features must remain exactly the same.`;
+      } catch (err: any) {
+        console.error("Gemini failed to generate prompt, falling back to basic prompt:", err?.message || err);
+        // Better fallback prompt with basic translation for common rus words
+        let mappedKw = keyword || "";
+        if (mappedKw.includes("Пикси")) mappedKw = "Pixie haircut, very short elegant female cut";
+        if (mappedKw.includes("Классический Боб")) mappedKw = "Classic Bob haircut, elegant straight hair above shoulders";
+        if (mappedKw.includes("Удлиненный боб")) mappedKw = "Long Bob (Lob), collarbone length";
+        if (mappedKw.includes("с челкой")) mappedKw += " with bangs/fringe";
+        if (mappedKw.includes("Свой референс")) mappedKw = "Different elegant hairstyle based on reference";
+        
+        promptEng = `A photorealistic portrait of a person. Age: ${ageRange || "unknown"}, Gender: ${gender || "unknown"}. New Hairstyle: ${mappedKw} - ${description || ""}. Desired Hair Color: ${finalColor || "original"}. The face features must remain exactly the same.`;
         if (finalColor) {
             promptEng = `[STRICTLY ${finalColor.toUpperCase()} HAIR COLOR] ` + promptEng;
         }
@@ -923,7 +789,7 @@ generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
                 });
                 const response = await geminiQueue.add(() => withRetry(async () => {
                     let lastError;
-                    const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+                    const modelsToTry = ['gemini-2.5-flash'];
                     for (const modelName of modelsToTry) {
                         try {
                             return await ai.models.generateContent({

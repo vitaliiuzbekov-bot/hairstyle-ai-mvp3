@@ -12,52 +12,41 @@ import {
 import { AnalysisResult } from "../types";
 import { ImageCropperModal } from "./ImageCropperModal";
 
-import f_pixie from "../assets/golden_base/f_pixie.jpg";
-import f_bob from "../assets/golden_base/f_bob.jpg";
-import f_long_bob from "../assets/golden_base/f_long_bob.jpg";
-import f_long_straight from "../assets/golden_base/f_long_straight.jpg";
-import f_long_wavy from "../assets/golden_base/f_long_wavy.jpg";
-import f_bangs from "../assets/golden_base/f_bangs.jpg";
-
-import m_buzz from "../assets/golden_base/m_buzz.jpg";
-import m_crop from "../assets/golden_base/m_crop.jpg";
-import m_pompadour from "../assets/golden_base/m_pompadour.jpg";
-
 const FEMALE_LIBRARY = [
   {
     name: "Пикси (Pixie)",
     description: "Короткая элегантная женская стрижка.",
-    customImageUrl: f_pixie,
+    customImageUrl: "/golden_base/f_pixie.jpg",
     stylingTips: "Используйте текстурирующий спрей или легкую пасту.",
   },
   {
     name: "Классический Боб",
     description: "Элегантное каре, прямые волосы.",
-    customImageUrl: f_bob,
+    customImageUrl: "/golden_base/f_bob.jpg",
     stylingTips: "Гладкая укладка феном и утюжком.",
   },
   {
     name: "Удлиненный боб",
     description: "Универсальный боб до ключиц (Lob).",
-    customImageUrl: f_long_bob,
+    customImageUrl: "/golden_base/f_long_bob.jpg",
     stylingTips: "Легкие волны спреем с морской солью.",
   },
   {
     name: "Длинные прямые",
     description: "Длинные идеально прямые волосы.",
-    customImageUrl: f_long_straight,
+    customImageUrl: "/golden_base/f_long_straight.jpg",
     stylingTips: "Термозащита и сыворотка для блеска.",
   },
   {
     name: "Длинные волнистые",
     description: "Роскошные объемные волны.",
-    customImageUrl: f_long_wavy,
+    customImageUrl: "/golden_base/f_long_wavy.jpg",
     stylingTips: "Нанесите мусс для объема и накрутите на брашинг.",
   },
   {
     name: "Длинные с челкой",
     description: "Прямые волосы с классической челкой.",
-    customImageUrl: f_bangs,
+    customImageUrl: "/golden_base/f_bangs.jpg",
     stylingTips: "Уложите челку круглой щеткой и феном.",
   },
 ];
@@ -66,19 +55,19 @@ const MALE_LIBRARY = [
   {
     name: "Buzz Cut",
     description: "Очень короткая мужская стрижка под машинку.",
-    customImageUrl: m_buzz,
+    customImageUrl: "/golden_base/m_buzz.jpg",
     stylingTips: "Не требует укладки, идеальна для спорта.",
   },
   {
     name: "Текстурный Кроп",
     description: "Короткая стрижка с текстурированной челкой.",
-    customImageUrl: m_crop,
+    customImageUrl: "/golden_base/m_crop.jpg",
     stylingTips: "Используйте матовую пасту для подчеркивания текстуры.",
   },
   {
     name: "Помпадур",
     description: "Классическая мужская объемная укладка назад.",
-    customImageUrl: m_pompadour,
+    customImageUrl: "/golden_base/m_pompadour.jpg",
     stylingTips: "Потребуется помада сильной фиксации и сушка феном.",
   },
 ];

@@ -41,7 +41,7 @@ interface BarberBlueprintModalProps {
   vtonStrength: number;
   setVtonStrength: (val: number) => void;
   generateARPreview: (kw: string, name: string) => void;
-  exportToPDF: () => void;
+  exportToPDF: (elementIdOrEvent?: string | React.MouseEvent, filename?: string, images?: { before?: string, reference?: string, after?: string }) => void;
   isExportingPDF: boolean;
   userRole?: string | null;
   salonName?: string;
@@ -149,7 +149,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                 <img
                   src={imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) : undefined)}
                   alt="Ваша база"
-                  className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                  className="absolute inset-0 w-full h-full object-contain object-center transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-20">
                   <span className="text-[10px] sm:text-xs text-white uppercase tracking-wider font-medium drop-shadow-md">
@@ -218,7 +218,14 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               tryOnStyle={tryOnStyle}
               styleConsultations={styleConsultations}
               isLightMode={isLightMode}
-              exportToPDF={exportToPDF}
+              exportToPDF={() => {
+                const baseImage = imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) : undefined);
+                exportToPDF(undefined, "neurostylist-guide.pdf", {
+                  before: baseImage,
+                  reference: loadedReferenceUrl || undefined,
+                  after: vtonResultUrl || undefined
+                });
+              }}
               isExportingPDF={isExportingPDF}
               generateARPreview={generateARPreview}
               loadingARStyles={loadingARStyles}

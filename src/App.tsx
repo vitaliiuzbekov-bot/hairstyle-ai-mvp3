@@ -20,7 +20,7 @@ import { ToastContainer } from "./components/ToastContainer";
 
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import { HistoryPage } from "./components/HistoryPage";
+const HistoryPage = React.lazy(() => import("./components/HistoryPage").then(m => ({ default: m.HistoryPage })));
 import { useTelegramBackButton } from "./hooks/useTelegramBackButton";
 import { HomePage } from "./components/HomePage";
 import { useTelegram } from "./hooks/useTelegram";
@@ -76,6 +76,7 @@ function App() {
   } = useUI();
 
   const {
+    isInitializing,
     generationsLeft,
     setGenerationsLeft,
     history,
@@ -164,10 +165,12 @@ function App() {
       <Routes>
         <Route path="/" element={
           <HomePage 
+            isInitializing={isInitializing}
             generationsLeft={generationsLeft}
             userId={userId}
             initError={initError}
             checkLimits={checkLimits}
+            consumeToken={consumeToken}
             setShowBuyModal={setShowBuyModal}
             setHistory={setHistory}
             processPayment={processPayment}
@@ -183,12 +186,14 @@ function App() {
           </React.Suspense>
         } />
         <Route path="/history" element={
-          <HistoryPage 
-             history={history} 
-             imageBase64={null} 
-             deleteHistoryItem={deleteHistoryItem} 
-             isLightMode={isLightMode}
-          />
+          <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
+            <HistoryPage 
+               history={history} 
+               imageBase64={null} 
+               deleteHistoryItem={deleteHistoryItem} 
+               isLightMode={isLightMode}
+            />
+          </React.Suspense>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

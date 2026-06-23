@@ -16,6 +16,7 @@ interface UseAnalysisProps {
     generationsLeft: number | null;
     isDeveloper: boolean;
     checkLimits: () => Promise<boolean>;
+    consumeToken: () => Promise<boolean>;
     setShowBuyModal: (show: boolean) => void;
     setHistory: React.Dispatch<React.SetStateAction<any[]>>;
     setError: (error: string | null) => void;
@@ -34,6 +35,7 @@ export const useAnalysis = ({
     generationsLeft,
     isDeveloper,
     checkLimits,
+    consumeToken,
     setShowBuyModal,
     setHistory,
     setError,
@@ -135,7 +137,7 @@ export const useAnalysis = ({
         setError(null);
 
         // Simple client-side cache check
-        const cacheKey = imageBase64 ? `analysis_${imageBase64.length}_${imageBase64.slice(-100)}` : null;
+        const cacheKey = imageBase64 ? `analysis_${imageBase64.length}_${imageBase64.slice(-100)}_${preferredStyle}` : null;
         if (cacheKey) {
             const cached = sessionStorage.getItem(cacheKey);
             if (cached) {
@@ -171,7 +173,7 @@ export const useAnalysis = ({
             // Even if skipVision is true, we send image for server cache/VTON pipeline
             formData.append("image", blob, "upload.jpg");
           }
-          if (imageUrl) formData.append("imageUrl", imageUrl);
+          if (imageUrl && !imageUrl.startsWith('blob:')) formData.append("imageUrl", imageUrl);
           if (mimeType) formData.append("mimeType", mimeType);
           if (userId) formData.append("userId", userId);
           if (preferredStyle) formData.append("preferredStyle", encodeURIComponent(preferredStyle));
@@ -342,6 +344,7 @@ export const useAnalysis = ({
             }
 
             setVtonResultUrl(watermarkedUrl);
+            consumeToken(); // Optimistic deduction on successful UI render
             hapticNotification('success');
             
             const newItem = {

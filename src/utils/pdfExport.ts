@@ -1,6 +1,19 @@
+import html2pdf from "html2pdf.js";
+
+function getBase64Image(img: HTMLImageElement): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return img.src;
+  ctx.drawImage(img, 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
 export const exportToPDF = async (
-  elementIdOrEvent?: string | React.MouseEvent, 
-  filename: string = "neurostylist-guide.pdf"
+  elementIdOrEvent?: string | React.MouseEvent,
+  filename: string = "neurostylist-guide.pdf",
+  images?: { before?: string, reference?: string, after?: string }
 ): Promise<void> => {
   let elementId = "hairdresser-guide-content";
   if (elementIdOrEvent && typeof elementIdOrEvent === "string") {
@@ -11,169 +24,116 @@ export const exportToPDF = async (
   if (!guideElement) return;
 
   try {
-    // Create a clone of the element to style it correctly for PDF
-    const clone = guideElement.cloneNode(true) as HTMLElement;
-    
-    // Base setup for the clone to ensure clean rendering
-    clone.style.width = "800px";
-    clone.style.minHeight = "100%";
-    clone.style.background = "#ffffff";
-    clone.style.color = "#111827"; // Tailwind gray-900
-    clone.style.padding = "50px";
-    clone.style.fontSize = "16px";
-    clone.style.lineHeight = "1.6";
-    clone.style.fontFamily = "'Inter', system-ui, -apple-system, sans-serif";
-
-    // Try to find the images in the DOM to include them in the PDF
+    // 1. Fetch images from passed payload or DOM fallback
     const beforeImageElement = document.querySelector('img[alt="Ваша база"], img[alt="До"]') as HTMLImageElement;
     const refImageElement = document.querySelector('img[alt="Свой референс"], img[alt="Референс"]') as HTMLImageElement;
     const afterImageElement = document.querySelector('img[alt="После"]') as HTMLImageElement;
-
-    // Create a dedicated top gallery for the photos
-    const imagesContainer = document.createElement("div");
-    imagesContainer.style.display = "flex";
-    imagesContainer.style.gap = "24px";
-    imagesContainer.style.marginBottom = "40px";
-    imagesContainer.style.justifyContent = "center";
-    imagesContainer.style.alignItems = "flex-start"; // Ensure images scale naturally
-
-    const addImageToPdf = (imgEl: HTMLImageElement | null, label: string) => {
-        if (!imgEl || !imgEl.src) return;
-        const col = document.createElement("div");
-        col.style.flex = "1";
-        col.style.display = "flex";
-        col.style.flexDirection = "column";
-        col.style.alignItems = "center";
-        
-        const labelEl = document.createElement("div");
-        labelEl.innerText = label;
-        labelEl.style.fontWeight = "700";
-        labelEl.style.marginBottom = "14px";
-        labelEl.style.fontSize = "16px";
-        labelEl.style.color = "#374151"; // gray-700
-        labelEl.style.letterSpacing = "0.05em"; // Tracking wide
-        
-        const imgContainer = document.createElement("div");
-        imgContainer.style.width = "100%";
-        imgContainer.style.borderRadius = "16px";
-        imgContainer.style.overflow = "hidden";
-        imgContainer.style.boxShadow = "0 10px 15px -3px rgba(0, 0, 0, 0.1)"; // shadow-lg
-
-        const img = document.createElement("img");
-        img.src = imgEl.src;
-        img.style.display = "block";
-        img.style.width = "100%";
-        img.style.height = "auto"; // Prevents flattening/squishing
-        
-        imgContainer.appendChild(img);
-        col.appendChild(labelEl);
-        col.appendChild(imgContainer);
-        imagesContainer.appendChild(col);
-    };
-
-    addImageToPdf(beforeImageElement, "ДО (Ваша база)");
-    addImageToPdf(refImageElement, "РЕФЕРЕНС (Стиль)");
-    
-    // Find VTON result
     const vtonResultEl = document.querySelector('.ReactCompareSliderImage, img[alt="Результат"]') as HTMLImageElement;
-    if (afterImageElement) {
-       addImageToPdf(afterImageElement, "ПОСЛЕ (Результат)");
-    } else if (vtonResultEl && vtonResultEl !== beforeImageElement && vtonResultEl !== refImageElement) {
-       addImageToPdf(vtonResultEl, "ОЖИДАЕМЫЙ РЕЗУЛЬТАТ");
-    }
 
-    if (imagesContainer.children.length > 0) {
-        clone.insertBefore(imagesContainer, clone.firstChild);
-    }
+    const imgBeforeSrc = images?.before || (beforeImageElement ? getBase64Image(beforeImageElement) : null);
+    const imgRefSrc = images?.reference || (refImageElement ? getBase64Image(refImageElement) : null);
+    const imgAfterSrc = images?.after || (afterImageElement ? getBase64Image(afterImageElement) : 
+                        (vtonResultEl && vtonResultEl !== beforeImageElement && vtonResultEl !== refImageElement) ? getBase64Image(vtonResultEl) : null);
 
-    // Add general text colors inside the clone since they might be white/translucent in dark mode
-    const textElements = clone.querySelectorAll("span, p, li, div, h1, h2, h3, h4");
-    textElements.forEach((el) => {
-      const hel = el as HTMLElement;
-      hel.style.color = "#1f2937"; // gray-800
-      
-      if (hel.tagName.toLowerCase() === "ul") {
-        hel.style.listStyleType = "disc";
-        hel.style.paddingLeft = "24px";
-        hel.style.marginBottom = "16px";
-        hel.style.color = "#4b5563"; // gray-600
-      }
-      if (hel.tagName.toLowerCase() === "li") {
-        hel.style.marginBottom = "8px";
-        hel.style.lineHeight = "1.5";
-      }
-      if (hel.tagName.toLowerCase() === "p") {
-        hel.style.marginBottom = "16px";
-        hel.style.lineHeight = "1.6";
-        hel.style.color = "#374151";
-      }
-    });
 
-    // Remove buttons, inputs from the clone to avoid showing it in PDF
-    const interactiveElements = clone.querySelectorAll("button, input, textarea, svg");
+    // 2. Clone the content to extract textual data
+    const cloneText = guideElement.cloneNode(true) as HTMLElement;
+    const interactiveElements = cloneText.querySelectorAll("button, input, textarea, svg, img, .hide-in-pdf");
     interactiveElements.forEach(el => el.remove());
-    
-    // Add Neurostylist Header
-    const headerEl = document.createElement("div");
-    headerEl.style.borderBottom = "2px solid #f3f4f6";
-    headerEl.style.paddingBottom = "24px";
-    headerEl.style.marginBottom = "32px";
-    headerEl.style.display = "flex";
-    headerEl.style.alignItems = "flex-end";
-    headerEl.style.justifyContent = "space-between";
-    headerEl.innerHTML = `
-      <div>
-        <h1 style="font-size: 32px; font-weight: 800; color: #111827; margin: 0; letter-spacing: -0.02em;">НейроСтилист <span style="color: #3b82f6;">AI</span></h1>
-        <p style="font-size: 15px; color: #6b7280; margin: 6px 0 0 0; font-weight: 500;">Персональный гайд по стилю и стрижке</p>
-      </div>
-      <div style="font-size: 14px; color: #9ca3af; text-align: right; font-weight: 500;">
-        ${new Date().toLocaleDateString('ru-RU')}
+
+    let contentHTML = cloneText.innerHTML;
+
+    // Wrap the inner HTML in a beautifully styled container
+    const pdfContainer = document.createElement("div");
+    pdfContainer.style.width = "794px"; // A4 width at 96 DPI
+    pdfContainer.style.minHeight = "1123px"; // A4 height
+    pdfContainer.style.backgroundColor = "#ffffff";
+    pdfContainer.style.color = "#111827";
+    pdfContainer.style.fontFamily = "'Inter', system-ui, -apple-system, sans-serif";
+    pdfContainer.style.position = "relative";
+    pdfContainer.style.overflow = "hidden";
+
+    pdfContainer.innerHTML = `
+      <style>
+        .pdf-page { padding: 40px; box-sizing: border-box; }
+        .pdf-header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .pdf-header h1 { font-size: 32px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -0.03em; color: #000; }
+        .pdf-header p { font-size: 14px; color: #4b5563; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.1em; }
+        .pdf-date { font-size: 14px; font-weight: 600; color: #000; }
+        
+        .pdf-images-grid { display: grid; gap: 20px; margin-bottom: 40px; }
+        .pdf-images-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .pdf-images-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .pdf-img-col { display: flex; flex-direction: column; }
+        .pdf-img-col span { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+        .pdf-img-wrap { width: 100%; aspect-ratio: 3/4; overflow: hidden; border-radius: 8px; background: #f3f4f6; }
+        .pdf-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .pdf-content { column-count: 2; column-gap: 40px; text-align: left; }
+        .pdf-content h2, .pdf-content h3 { font-size: 16px; font-weight: 800; text-transform: uppercase; margin-top: 24px; margin-bottom: 12px; color: #000; border-bottom: 1px solid #000; padding-bottom: 4px; break-after: avoid; }
+        .pdf-content p { font-size: 13px; line-height: 1.6; color: #374151; margin-bottom: 12px; font-weight: 400; }
+        .pdf-content ul { padding-left: 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; color: #374151; }
+        .pdf-content li { margin-bottom: 6px; }
+        
+        /* Strong visual separator for brand */
+        .pdf-footer { position: absolute; bottom: 40px; left: 40px; right: 40px; border-top: 1px solid #e5e7eb; padding-top: 16px; display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; }
+        .pdf-watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 120px; font-weight: 900; color: rgba(0,0,0,0.02); pointer-events: none; white-space: nowrap; }
+      </style>
+
+      <div class="pdf-page">
+        <div class="pdf-watermark">HAIRSTYLE AI</div>
+        
+        <div class="pdf-header">
+          <div>
+            <h1>НейроСтилист</h1>
+            <p>Техническая карта / Blueprint</p>
+          </div>
+          <div class="pdf-date">
+            Дата: ${new Date().toLocaleDateString('ru-RU')}
+          </div>
+        </div>
+
+        <div class="pdf-images-grid ${imgBeforeSrc && imgRefSrc && imgAfterSrc ? 'cols-3' : (imgBeforeSrc && imgRefSrc) ? 'cols-2' : 'cols-2'}">
+          ${imgBeforeSrc ? `
+            <div class="pdf-img-col">
+              <span>До (База)</span>
+              <div class="pdf-img-wrap"><img src="${imgBeforeSrc}" /></div>
+            </div>
+          ` : ''}
+          ${imgRefSrc ? `
+            <div class="pdf-img-col">
+              <span>Стиль (Референс)</span>
+              <div class="pdf-img-wrap"><img src="${imgRefSrc}" /></div>
+            </div>
+          ` : ''}
+          ${imgAfterSrc ? `
+            <div class="pdf-img-col">
+              <span>После (Результат)</span>
+              <div class="pdf-img-wrap"><img src="${imgAfterSrc}" /></div>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="pdf-content">
+          ${contentHTML.replace(/TailwindClasses/g, '')}
+        </div>
+
+        <div class="pdf-footer">
+          <span>Сгенерировано AI Studio</span>
+          <span>HairStyle AI • Конфиденциально</span>
+        </div>
       </div>
     `;
-    clone.insertBefore(headerEl, clone.firstChild);
-
-    // Format H tags properly for documents
-    const headings = clone.querySelectorAll("h1, h2, h3, h4");
-    headings.forEach((el) => {
-        const hel = el as HTMLElement;
-        hel.style.color = "#111827";
-        hel.style.fontWeight = "700";
-        hel.style.marginTop = "32px";
-        hel.style.marginBottom = "16px";
-        
-        if (hel.tagName === "H3" || hel.tagName === "H2") {
-            hel.style.fontSize = "20px";
-            hel.style.borderLeft = "4px solid #3b82f6"; // Blue brand accent
-            hel.style.paddingLeft = "12px";
-            // Remove bottom border as left border looks more professional
-            hel.style.borderBottom = "none";
-        }
-    });
-
-    // Structure cards nicely for document print format
-    const cards = clone.querySelectorAll(".rounded-2xl, .rounded-3xl, .bg-white\\/5, .glass-panel");
-    cards.forEach((el) => {
-        const cel = el as HTMLElement;
-        cel.style.background = "#f9fafb"; // Light gray bg
-        cel.style.border = "1px solid #e5e7eb";
-        cel.style.boxShadow = "none";
-        cel.style.color = "#1f2937";
-        cel.style.padding = "28px";
-        cel.style.marginBottom = "24px";
-        cel.style.borderRadius = "16px";
-    });
-
-    const html2pdf = (await import("html2pdf.js")).default;
 
     const opt = {
-      margin: [15, 15, 15, 15],
+      margin: 0,
       filename: filename,
-      image: { type: "jpeg" as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 800, logging: false },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      image: { type: "jpeg" as const, quality: 1 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
     };
 
-    const worker = html2pdf().set(opt as any).from(clone);
+    const worker = html2pdf().set(opt).from(pdfContainer);
     
     let shared = false;
     let sentToBot = false;
@@ -210,8 +170,8 @@ export const exportToPDF = async (
       try {
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
-            title: "Анализ от НейроСтилиста",
-            text: "Мой персональный подбор стрижек и рекомендации",
+            title: "Техническая карта стрижки",
+            text: "Мой персональный гайд от стилиста",
             files: [file]
           });
           shared = true;
@@ -229,3 +189,4 @@ export const exportToPDF = async (
     alert("Ошибка при экспорте в PDF.");
   }
 };
+

@@ -8,6 +8,7 @@ import { getHistory } from "../services/localHistory";
 export const useTokenManager = () => {
   const { addToast } = useUI();
   const [generationsLeft, setGenerationsLeft] = useState<number | null>(null);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [history, setHistory] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
@@ -193,6 +194,8 @@ export const useTokenManager = () => {
         }
         setUserId(isDevUser ? "8585130589" : "local-user");
         setInitError(null);
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -255,8 +258,6 @@ export const useTokenManager = () => {
       return false;
     }
 
-    const success = await consumeToken();
-    if (!success) return false;
     return true;
   };
 
@@ -415,6 +416,7 @@ export const useTokenManager = () => {
   }, [history, userId]);
 
   return {
+    isInitializing,
     generationsLeft,
     setGenerationsLeft,
     history,

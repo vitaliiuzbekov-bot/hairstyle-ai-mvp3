@@ -123,6 +123,10 @@ export const useImageUpload = () => {
              return;
         }
 
+        // Fast path UI update with local Blob URL
+        const localPreviewUrl = URL.createObjectURL(file);
+        setImageUrl(localPreviewUrl);
+
         setMimeType("image/jpeg");
         setIsUploadingImage(true);
 
@@ -182,17 +186,26 @@ export const useImageUpload = () => {
                
             let targetBase64 = (cropResult && cropResult.base64) ? cropResult.base64 : finalBase64;
             
-            // Overwrite locally stored base64 with the smarter cropped one
             setImageBase64(targetBase64);
             
-            // Try uploading to Firebase Storage for much faster backend requests over slow network
             const uploadedUrl = await uploadToFirebase(targetBase64);
             
             if (uploadedUrl) {
                 setImageUrl(uploadedUrl);
-                setImageBase64(null); // Clear base64 since we have a URL now
+                setImageBase64(null); 
             } else {
-                setImageBase64(targetBase64);
+                // If firebase fails, generate local object URL from cropped base64 to avoid passing mega strings
+                try {
+                    const byteString = atob(targetBase64.split(',')[1] || targetBase64);
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                    const blob = new Blob([ab], {type: 'image/jpeg'});
+                    setImageUrl(URL.createObjectURL(blob));
+                    setImageBase64(targetBase64); // We MUST keep base64 to send to backend since blob URL cannot be sent
+                } catch(e) {
+                    setImageBase64(targetBase64);
+                }
             }
 
             if (cropResult && cropResult.base64 && !cropResult.warning) {

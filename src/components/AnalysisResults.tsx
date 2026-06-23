@@ -21,7 +21,7 @@ interface AnalysisResultsProps {
   loadMoreRecommendations: () => void;
   isLoadingMore: boolean;
   isLightMode: boolean;
-  exportToPDF?: (elementId: string, filename: string) => void;
+  exportToPDF?: (elementId?: string, filename?: string, images?: { before?: string, reference?: string, after?: string }) => void;
   isExportingPDF?: boolean;
   
   imageUrl: string | null;

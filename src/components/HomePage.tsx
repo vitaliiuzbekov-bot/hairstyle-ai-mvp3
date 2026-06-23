@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { UploadZone } from "../components/UploadZone";
-import { AnalysisResults } from "../components/AnalysisResults";
 import { ImageEditorModal } from "../components/ImageEditorModal";
 import { exportToPDF } from "../utils/pdfExport";
 import { useCamera } from "../hooks/useCamera";
@@ -19,15 +18,20 @@ const LoadingFallback = ({ isLightMode }: { isLightMode: boolean }) => (
   </div>
 );
 
+const AnalysisResults = React.lazy(() => import("../components/AnalysisResults").then(m => ({ default: m.AnalysisResults })));
 const BarberBlueprintModal = React.lazy(() => import("../components/BarberBlueprintModal"));
 const CameraModal = React.lazy(() => import("../components/CameraModal").then(m => ({ default: m.CameraModal })));
 const StylistChat = React.lazy(() => import("../components/StylistChat").then(m => ({ default: m.StylistChat })));
 
+import { Skeleton } from "../components/Skeleton";
+
 interface HomePageProps {
-  generationsLeft: number;
+  isInitializing?: boolean;
+  generationsLeft: number | null;
   userId: string | null;
   initError: string | null;
   checkLimits: () => Promise<boolean>;
+  consumeToken: () => Promise<boolean>;
   setShowBuyModal: (show: boolean) => void;
   setHistory: React.Dispatch<React.SetStateAction<any[]>>;
   processPayment: (packageId: string, starsAmount: number, generationsCount: number) => void;
@@ -38,10 +42,12 @@ interface HomePageProps {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
+  isInitializing,
   generationsLeft,
   userId,
   initError,
   checkLimits,
+  consumeToken,
   setShowBuyModal,
   setHistory,
   processPayment,
@@ -112,6 +118,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       generationsLeft,
       isDeveloper,
       checkLimits,
+      consumeToken,
       setShowBuyModal,
       setHistory,
       setError,
@@ -133,9 +140,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   }, [tryOnStyle, setVtonResultUrl, setVtonError, setCustomHairColor, vtonStrength]);
 
   const [isExportingPDF, setIsExportingPDF] = useState(false);
-  const handleExportPDF = async (elementIdOrEvent?: string | React.MouseEvent, filename?: string) => {
+  const handleExportPDF = async (elementIdOrEvent?: string | React.MouseEvent, filename?: string, images?: { before?: string, reference?: string, after?: string }) => {
     setIsExportingPDF(true);
-    await exportToPDF(elementIdOrEvent, filename);
+    await exportToPDF(elementIdOrEvent, filename, images);
     setIsExportingPDF(false);
   };
 
@@ -220,54 +227,64 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
           {/* Left / Top: Upload Zone */}
-          <UploadZone
-            imageBase64={imageBase64}
-            imageUrl={imageUrl}
-            mimeType={mimeType}
-            isAnalyzing={isAnalyzing}
-            isUploadingImage={isUploadingImage || isCompressing}
-            error={uploadError}
-            results={results}
-            consentGiven={consentGiven}
-            setConsentGiven={setConsentGiven}
-            consentError={consentError}
-            setConsentError={setConsentError}
-            fileInputRef={fileInputRef}
-            cameraInputRef={cameraInputRef}
-            handleFileUpload={handleFileUploadWrapper}
-            handleTelegramUploadClick={handleTelegramUploadClick}
-            resetApp={resetApp}
-            preferredStyle={preferredStyle}
-            setPreferredStyle={setPreferredStyle}
-            analyzeImage={analyzeImage}
-            isLightMode={isLightMode}
-          />
+          {isInitializing ? (
+            <div className="col-span-1 lg:col-span-8 lg:col-start-3">
+              <Skeleton className="w-full h-[500px] rounded-[1.5rem]" isLightMode={isLightMode} />
+            </div>
+          ) : (
+            <UploadZone
+              imageBase64={imageBase64}
+              imageUrl={imageUrl}
+              mimeType={mimeType}
+              isAnalyzing={isAnalyzing}
+              isUploadingImage={isUploadingImage || isCompressing}
+              error={uploadError}
+              results={results}
+              consentGiven={consentGiven}
+              setConsentGiven={setConsentGiven}
+              consentError={consentError}
+              setConsentError={setConsentError}
+              fileInputRef={fileInputRef}
+              cameraInputRef={cameraInputRef}
+              handleFileUpload={handleFileUploadWrapper}
+              handleTelegramUploadClick={handleTelegramUploadClick}
+              resetApp={resetApp}
+              preferredStyle={preferredStyle}
+              setPreferredStyle={setPreferredStyle}
+              analyzeImage={analyzeImage}
+              isLightMode={isLightMode}
+            />
+          )}
 
           {/* Right: Results */}
-          <AnalysisResults
-            isAnalyzing={isAnalyzing}
-            results={results}
-            generationsLeft={generationsLeft}
-            teaserUrl={teaserUrl}
-            isGeneratingTeaser={isGeneratingTeaser}
-            setShowBuyModal={setShowBuyModal}
-            setTryOnStyle={setTryOnStyle}
-            loadMoreRecommendations={loadMoreRecommendations}
-            isLoadingMore={isLoadingMore}
-            isLightMode={isLightMode}
-            exportToPDF={handleExportPDF}
-            isExportingPDF={isExportingPDF}
-            imageUrl={imageUrl}
-            imageBase64={imageBase64}
-            mimeType={mimeType}
-            generateVirtualTryOn={generateVirtualTryOn}
-            vtonResultUrl={vtonResultUrl}
-            loadingVTONStyles={loadingVTONStyles}
-            vtonError={vtonError}
-            onGenerationSuccess={() => {
-              checkLimits();
-            }}
-          />
+          {!isInitializing && (
+            <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
+              <AnalysisResults
+              isAnalyzing={isAnalyzing}
+              results={results}
+              generationsLeft={generationsLeft}
+              teaserUrl={teaserUrl}
+              isGeneratingTeaser={isGeneratingTeaser}
+              setShowBuyModal={setShowBuyModal}
+              setTryOnStyle={setTryOnStyle}
+              loadMoreRecommendations={loadMoreRecommendations}
+              isLoadingMore={isLoadingMore}
+              isLightMode={isLightMode}
+              exportToPDF={handleExportPDF}
+              isExportingPDF={isExportingPDF}
+              imageUrl={imageUrl}
+              imageBase64={imageBase64}
+              mimeType={mimeType}
+              generateVirtualTryOn={generateVirtualTryOn}
+              vtonResultUrl={vtonResultUrl}
+              loadingVTONStyles={loadingVTONStyles}
+              vtonError={vtonError}
+              onGenerationSuccess={() => {
+                // Token consumption is handled internally by useAnalysis on success.
+              }}
+            />
+          </React.Suspense>
+          )}
         </div>
       </main>
 

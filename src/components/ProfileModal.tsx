@@ -1,6 +1,7 @@
 import React from "react";
-import { X, User, Share2, Sun, Moon, LogOut, ArrowDownToLine } from "lucide-react";
+import { X, User, Share2, Sun, Moon, LogOut, ArrowDownToLine, Clock } from "lucide-react";
 import { useUser } from "../context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 interface ProfileModalProps {
   userId: string | null;
@@ -24,6 +25,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
 }) => {
   const { setUserRole } = useUser();
+  const navigate = useNavigate();
 
   const handleShare = () => {
     const botLink = "https://t.me/neirostilist_bot/app?startapp=ref_" + userId;
@@ -89,6 +91,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           >
             Мастер
             {userRole === 'master' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 block"></span>}
+          </button>
+        </div>
+
+        <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
+
+        {/* History Link */}
+        <div className="flex flex-col gap-0.5 mt-1">
+          <button 
+             onClick={() => {
+                onClose();
+                navigate('/history');
+             }}
+             className={`w-full flex items-center gap-2 px-2 py-2 text-xs rounded-lg transition-colors ${
+               isLightMode ? 'hover:bg-gray-50 text-gray-700' : 'hover:bg-white/5 text-gray-300'
+             }`}
+          >
+             <Clock size={14} className="opacity-70" />
+             История генераций
           </button>
         </div>
 
