@@ -172,6 +172,13 @@ async function startServer() {
   });
 
 if (process.env.NODE_ENV !== "production") {
+    app.use((req, res, next) => {
+      if (req.url.includes('golden_base') || req.url.includes('.jpg')) {
+        console.log(`[DEBUG] Image request: ${req.url}`);
+      }
+      next();
+    });
+
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
