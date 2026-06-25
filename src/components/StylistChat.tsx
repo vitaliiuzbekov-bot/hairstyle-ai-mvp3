@@ -62,8 +62,22 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
         })
       });
 
+      let replyHtml = "";
+      let textRes = "";
+      try {
+        textRes = await res.text();
+        if (textRes.includes("<!doctype html>") || textRes.includes("<!DOCTYPE html>")) {
+           throw new Error("Сервер перегружен или недоступен (HTML Proxy Error).");
+        }
+        const data = JSON.parse(textRes);
+        replyHtml = data.replyHtml;
+      } catch (e: any) {
+        if (!res.ok) throw e;
+        throw new Error("Ошибка при обработке ответа сервера: " + e.message);
+      }
+
       if (!res.ok) {
-         let err = await res.text();
+         let err = textRes;
          try {
             const data = JSON.parse(err);
             err = data.error || err;
@@ -71,7 +85,6 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
          throw new Error(err);
       }
 
-      const { replyHtml } = await res.json();
       setMessages([...newMessages, { role: 'assistant', text: replyHtml }]);
     } catch (e: any) {
       console.error(e);
@@ -126,14 +139,24 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
               body: JSON.stringify({ audioBase64: base64, mimeType: audioBlob.type || 'audio/webm' })
            });
 
+           let textRes = "";
+           let data: any = {};
+           try {
+             textRes = await res.text();
+             if (textRes.includes("<!doctype html>") || textRes.includes("<!DOCTYPE html>")) {
+                throw new Error("Сервер перегружен или недоступен (HTML Proxy Error).");
+             }
+             data = JSON.parse(textRes);
+           } catch(e: any) {
+             if (res.ok) throw new Error("Ошибка обработки аудио: " + e.message);
+           }
+
            if (res.ok) {
-              const data = await res.json();
               if (data.text) {
                 setInputVal(prev => prev + (prev ? " " : "") + data.text);
               }
            } else {
-              const errData = await res.json().catch(() => ({}));
-              throw new Error(errData.error || "Ошибка расшифровки аудио");
+              throw new Error(data.error || "Ошибка расшифровки аудио");
            }
         } catch(e: any) {
            console.error("Transcription error", e);

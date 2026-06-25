@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+// HMR trigger
 import { Skeleton } from "./Skeleton";
 import { AlertCircle, Lock, RefreshCw, Sparkles, Maximize2, Share2, Wand2, ShieldCheck } from "lucide-react";
 import { LazyImage } from "./LazyImage";
@@ -70,7 +71,7 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
     <>
       {isAnalyzing && !results && (
         <div className="col-span-1 lg:col-span-7 flex flex-col justify-center min-h-[400px] animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both">
-          <RotatingFactsLoader isLightMode={isLightMode} title="Анализ и подбор стиля (около 15-30 сек)..." />
+          <RotatingFactsLoader isLightMode={isLightMode} title="ИИ анализирует образ..." />
         </div>
       )}
 

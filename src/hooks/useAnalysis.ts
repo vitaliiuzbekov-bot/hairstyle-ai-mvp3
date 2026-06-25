@@ -68,7 +68,24 @@ export const useAnalysis = ({
     
     const [loadingARStyles, setLoadingARStyles] = useState<Record<string, boolean>>({});
     const [arGeneratedImageUrl, setArGeneratedImageUrl] = useState<Record<string, string>>({});
-    const [teaserUrl, setTeaserUrl] = useState<string | null>(null);
+    const [teaserUrlState, setTeaserUrlState] = useState<string | null>(() => {
+        try {
+            return localStorage.getItem("persistent_teaserUrl") || null;
+        } catch {
+            return null;
+        }
+    });
+
+    const setTeaserUrl = (val: React.SetStateAction<string | null>) => {
+        setTeaserUrlState((prev) => {
+            const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
+            try {
+                if (nextVal) localStorage.setItem("persistent_teaserUrl", nextVal);
+                else localStorage.removeItem("persistent_teaserUrl");
+            } catch {}
+            return nextVal;
+        });
+    };
     const [teaserRecName, setTeaserRecName] = useState<string | null>(null);
     const [isGeneratingTeaser, setIsGeneratingTeaser] = useState(false);
     const [styleConsultations, setStyleConsultations] = useState<Record<string, string>>({});
@@ -81,9 +98,9 @@ export const useAnalysis = ({
     const [vtonStrength, setVtonStrength] = useState<number>(45);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    const fallbackFaceApiWrapper = async () => {
+    const fallbackFaceApiWrapper = async (targetBase64: string | null, targetMimeType: string | null) => {
         const { fallbackFaceApi } = await import('../services/fallbackAnalysis');
-        return fallbackFaceApi(imageBase64, mimeType, preferredStyle);
+        return fallbackFaceApi(targetBase64, targetMimeType || "image/jpeg", preferredStyle);
     };
 
     const generateTeaser = async (rec: any, resultData: AnalysisResult) => {
@@ -158,30 +175,35 @@ export const useAnalysis = ({
           // Выполняем тяжелый процесс определения лица, пола и возраста на устройстве клиента
           let localStats: AnalysisResult | null = null;
           try {
-              localStats = await fallbackFaceApiWrapper();
+              localStats = await fallbackFaceApiWrapper(imageBase64, mimeType);
           } catch(e) {
               console.warn("FaceAPI failed, falling back to pure server...", e);
           }
           
           const formData = new FormData();
-          if (imageBase64) {
+          // ONLY upload image blob to server IF we don't have a Firebase URL
+          // If imageUrl starts with blob:, we must send the blob payload
+          const hasRemoteImageUrl = imageUrl && !imageUrl.startsWith('blob:');
+          if (imageBase64 && !hasRemoteImageUrl) {
             const byteString = atob(imageBase64);
             const ab = new ArrayBuffer(byteString.length);
             const ia = new Uint8Array(ab);
             for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
             const blob = new Blob([ab], { type: mimeType || "image/jpeg" });
-            // Even if skipVision is true, we send image for server cache/VTON pipeline
             formData.append("image", blob, "upload.jpg");
           }
-          if (imageUrl && !imageUrl.startsWith('blob:')) formData.append("imageUrl", imageUrl);
+          if (hasRemoteImageUrl) formData.append("imageUrl", imageUrl);
           if (mimeType) formData.append("mimeType", mimeType);
           if (userId) formData.append("userId", userId);
           if (preferredStyle) formData.append("preferredStyle", encodeURIComponent(preferredStyle));
           
           if (localStats) {
+              formData.append("skipVision", "true");
               formData.append("faceApiGender", localStats.gender);
               formData.append("faceApiShape", localStats.faceShape);
               formData.append("faceApiAge", localStats.ageRange);
+              if (localStats.skinTone) formData.append("localSkinTone", localStats.skinTone);
+              if (localStats.hairColor) formData.append("localHairColor", localStats.hairColor);
           }
 
           let parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
@@ -194,7 +216,7 @@ export const useAnalysis = ({
           
           // Auto-generate teaser if applicable
           if (parsedResults && parsedResults.recommendations && parsedResults.recommendations.length > 0) {
-            if ((generationsLeft === null || generationsLeft <= 0) && !teaserUrl) {
+            if ((generationsLeft === null || generationsLeft <= 0) && !teaserUrlState) {
               generateTeaser(parsedResults.recommendations[0], parsedResults);
             }
           }
@@ -203,11 +225,11 @@ export const useAnalysis = ({
           hapticNotification('error');
           
           const errMsg = err?.message || "";
-          if (errMsg.includes("Нейросеть сейчас испытывает")) {
-             setError(`⚠️ Сервисы перегружены\n\n${errMsg}`);
+          if (errMsg.includes("Нейросеть сейчас испытывает") || errMsg.includes("Сервер перегружен")) {
+             setError(`⚠️ Сервисы перегружены\n\nСервер временно недоступен или перезапускается. Пожалуйста, подождите 30 секунд и попробуйте загрузить фото снова.`);
           } else {
              setError(
-               "⚠️ Не удалось проанализировать фото\n\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\n\nПожалуйста, попробуй ещё раз:\n• Сделай фото при дневном свете, лицом к окну\n• Смотри прямо в камеру, не наклоняй голову\n• Убери волосы от лица и сними очки\n\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно."
+               "⚠️ Не удалось проанализировать фото\n\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\n\nПожалуйста, попробуй ещё раз:\n• Сделай фото при дневном свете, лицом к окну\n• Смотри прямо в камеру, не наклоняй голову\n• Убери волосы от лица и сними очки\n\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.\n\n(Детали: " + errMsg.slice(0, 100) + ")"
              );
           }
         } finally {
@@ -288,9 +310,11 @@ export const useAnalysis = ({
           if (tg?.initDataUnsafe?.user?.id) {
             formData.append("tgUserId", String(tg.initDataUnsafe.user.id));
           }
-          if (imageUrl) {
+          const hasRemoteImageUrl = imageUrl && !imageUrl.startsWith('blob:');
+          if (hasRemoteImageUrl) {
             formData.append("selfieImage", imageUrl);
-          } else if (imageBase64) {
+          }
+          if (imageBase64 && !hasRemoteImageUrl) {
             const byteString = atob(imageBase64);
             const ab = new ArrayBuffer(byteString.length);
             const ia = new Uint8Array(ab);
@@ -419,7 +443,7 @@ export const useAnalysis = ({
         loadingARStyles,
         arGeneratedImageUrl,
         setArGeneratedImageUrl,
-        teaserUrl,
+        teaserUrl: teaserUrlState,
         teaserRecName,
         isGeneratingTeaser,
         styleConsultations,

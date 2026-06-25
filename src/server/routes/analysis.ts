@@ -109,14 +109,9 @@ ${preDetectedFacts}
                 });
                 
                 const contentsPayload = [
-                  {
-                    role: "user",
-                    parts: [
-                      { text: visionPrompt },
-                      { inlineData: { mimeType: "image/jpeg", data: base64PrefixRemoved } }
-                    ]
-                  }
-                ] as any;
+                  { text: visionPrompt },
+                  { inlineData: { mimeType: "image/jpeg", data: base64PrefixRemoved } }
+                ];
 
                 const response = await geminiQueue.add(() => withRetry(async () => {
                    let lastError;
@@ -127,7 +122,7 @@ ${preDetectedFacts}
                            console.log(`Trying Vision Analysis with model: ${modelName}...`);
                            return await ai.models.generateContent({
                              model: modelName,
-                             contents: contentsPayload
+                             contents: { parts: contentsPayload }
                            });
                        } catch (err: any) {
                            lastError = err;

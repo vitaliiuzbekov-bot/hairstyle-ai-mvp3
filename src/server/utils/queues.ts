@@ -1,4 +1,6 @@
-import PQueue from "p-queue";
+import PQueuePkg from "p-queue";
+
+const PQueue = (PQueuePkg as any).default || PQueuePkg;
 
 // Helper function for automatic retry on 429/503 errors from external APIs
 export async function withRetry<T>(

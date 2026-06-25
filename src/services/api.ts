@@ -9,20 +9,26 @@ export const analyzeImageApi = async (formData: FormData, telegramInitData?: str
     body: formData,
   });
 
-  if (!response.ok) {
-    let errData: any = {};
-    try {
-      errData = await response.json();
-    } catch (e) {}
-    
-    if (response.status === 429 && errData.fallback) {
-      throw { isFallback: true, message: errData.error };
+  let data: any = {};
+  let textResponse = "";
+  try {
+    textResponse = await response.text();
+    data = JSON.parse(textResponse);
+  } catch (e) {
+    if (textResponse.includes("<!doctype html>") || textResponse.includes("<!DOCTYPE html>")) {
+       throw new Error(`Ошибка сети: Сервер перегружен или недоступен (HTML Proxy Error). Пожалуйста, подождите немного и повторите попытку.`);
     }
-
-    throw new Error(errData.error || "Ошибка при анализе фото. Попробуйте еще раз.");
+    throw new Error(`Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`);
   }
 
-  return response.json();
+  if (!response.ok) {
+    if (response.status === 429 && data.fallback) {
+      throw { isFallback: true, message: data.error };
+    }
+    throw new Error(data.error || "Ошибка при анализе фото. Попробуйте еще раз.");
+  }
+
+  return data;
 };
 
 export const generateArApi = async (
@@ -45,14 +51,22 @@ export const generateArApi = async (
     }),
   });
 
-  if (!response.ok) {
-    let errData: any = {};
-    try {
-      errData = await response.json();
-    } catch (e) {}
-    throw new Error(errData.error || "Ошибка от сервера при генерации примерки.");
+  let data: any = {};
+  let textResponse = "";
+  try {
+    textResponse = await response.text();
+    data = JSON.parse(textResponse);
+  } catch (e) {
+    if (textResponse.includes("<!doctype html>") || textResponse.includes("<!DOCTYPE html>")) {
+       throw new Error(`Ошибка сети: Сервер перегружен или недоступен (HTML Proxy Error). Пожалуйста, подождите немного и повторите попытку.`);
+    }
+    throw new Error(`Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`);
   }
-  return response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Ошибка от сервера при генерации примерки.");
+  }
+  return data;
 };
 
 export const loadMoreApi = async (
@@ -76,14 +90,22 @@ export const loadMoreApi = async (
     }),
   });
 
-  if (!response.ok) {
-    let errData: any = {};
-    try {
-      errData = await response.json();
-    } catch (e) {}
-    throw new Error(errData.error || "Ошибка при генерации новых вариантов от сервера.");
+  let data: any = {};
+  let textResponse = "";
+  try {
+    textResponse = await response.text();
+    data = JSON.parse(textResponse);
+  } catch (e) {
+    if (textResponse.includes("<!doctype html>") || textResponse.includes("<!DOCTYPE html>")) {
+       throw new Error(`Ошибка сети: Сервер перегружен или недоступен (HTML Proxy Error). Пожалуйста, подождите немного и повторите попытку.`);
+    }
+    throw new Error(`Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`);
   }
-  return response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Ошибка при генерации новых вариантов от сервера.");
+  }
+  return data;
 };
 
 export const generateFullApi = async (

@@ -192,12 +192,14 @@ generateRouter.post("/generate-full", async (req, res) => {
             }
             
             // Try reading from public or dist folders, and also src for dev mode
-            let localPath = path.join(process.cwd(), 'dist', normalizePath);
+            // Remove leading slash for safe join
+            const safePath = normalizePath.replace(/^\/+/, '');
+            let localPath = path.join(process.cwd(), 'dist', safePath);
             if (!fs.existsSync(localPath)) {
-                localPath = path.join(process.cwd(), 'public', normalizePath);
+                localPath = path.join(process.cwd(), 'public', safePath);
             }
             if (!fs.existsSync(localPath) && normalizePath.startsWith('/src/')) {
-                localPath = path.join(process.cwd(), normalizePath);
+                localPath = path.join(process.cwd(), safePath);
             }
             if (fs.existsSync(localPath)) {
                 const buf = fs.readFileSync(localPath);
@@ -206,7 +208,26 @@ generateRouter.post("/generate-full", async (req, res) => {
                 finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
                 console.log(`[generate-full] Successfully loaded local target image ${localPath}`);
             } else {
-                console.log(`[generate-full] WARNING: Could not find local target image for ${normalizePath}. Tried paths: dist${normalizePath}, public${normalizePath}, and ${localPath}`);
+                try {
+                    const localUrl = `http://0.0.0.0:3000${normalizePath}`;
+                    console.log(`[generate-full] Fetching target image from local dev server: ${localUrl}`);
+                    const imgRes = await fetch(localUrl);
+                    if (imgRes.ok) {
+                        const arrayBuffer = await imgRes.arrayBuffer();
+                        const buf = Buffer.from(arrayBuffer);
+                        const ext = path.extname(normalizePath).toLowerCase();
+                        const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+                        finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
+                        console.log(`[generate-full] Successfully loaded local target image from dev server: ${normalizePath}`);
+                    } else {
+                        console.log(`[generate-full] WARNING: Could not fetch local target image from dev server. Status: ${imgRes.status}`);
+                    }
+                } catch (e) {
+                    console.error(`[generate-full] Error fetching local target image from dev server:`, e);
+                }
+            }
+            if (!finalTargetImageUrl.startsWith('data:')) {
+                console.log(`[generate-full] CRITICAL WARNING: targetImageUrl could not be resolved to base64. Using original path: ${normalizePath}`);
             }
         }
       }
@@ -287,10 +308,10 @@ generateRouter.post("/generate-full", async (req, res) => {
       let uiStrength = Number(vtonStrength) || 45; 
       let fluxStrength = 0.75; // Default
 
-      if (uiStrength === 85 && finalTargetImageUrl) {
+      if (finalTargetImageUrl) {
           // Studio Shot logic: Use catalog image as base and completely skip flux for exact 100% hair shape. 
           // Note: This results in the catalog model's body being used.
-          console.log("Visual reference provided with UI strength 85, enabling Catalog Studio Shot");
+          console.log("Visual reference provided, enabling Catalog Studio Shot");
           baseImageForFlux = finalTargetImageUrl;
           fluxStrength = 0.05; 
       } else {
@@ -339,23 +360,23 @@ Instructions:
 8. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
 9. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters.`;
 
-        let contentsPayload: any = { role: "user", parts: [{ text: systemInstruction }] };
+        let contentsPayload: any = [{ text: systemInstruction }];
 
         if (finalTargetImageUrl && finalTargetImageUrl.startsWith("data:image/")) {
             const mimeType = finalTargetImageUrl.split(';')[0].split(':')[1];
             const base64Data = finalTargetImageUrl.split(',')[1];
-            contentsPayload.parts.push({
+            contentsPayload.push({
                inlineData: {
                   data: base64Data,
                   mimeType: mimeType
                }
             });
-            contentsPayload.parts[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The user provided a reference image showing the target hairstyle (attached). You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
+            contentsPayload[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The user provided a reference image showing the target hairstyle (attached). You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
         }
 
         const promptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
              model: 'gemini-2.5-flash', // Flash to prevent quota limits
-             contents: [contentsPayload],
+             contents: { parts: contentsPayload },
              config: {
                  temperature: 0.7,
                  maxOutputTokens: 500

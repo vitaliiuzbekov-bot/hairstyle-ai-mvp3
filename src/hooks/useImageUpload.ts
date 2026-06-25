@@ -192,7 +192,8 @@ export const useImageUpload = () => {
             
             if (uploadedUrl) {
                 setImageUrl(uploadedUrl);
-                setImageBase64(null); 
+                // Keep imageBase64 for local inference, we will omit it from FormData in useAnalysis if imageUrl is present
+                // setImageBase64(null); 
             } else {
                 // If firebase fails, generate local object URL from cropped base64 to avoid passing mega strings
                 try {

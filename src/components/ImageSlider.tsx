@@ -1,5 +1,8 @@
 import React, { useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import fBob from "../assets/golden_base/v2_f_bob.jpg";
+import fLongStraight from "../assets/golden_base/v2_f_long_straight.jpg";
+
 export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const beforeContainerRef = useRef<HTMLDivElement>(null);
@@ -60,12 +63,12 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
     >
       {/* After Image */}
       <img 
-         src="/golden_base/f_bob.jpg" 
+         src={fBob} 
          alt="AI Result" 
          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none" 
          draggable={false}
       />
-      <div className="absolute bottom-2 right-2 px-2 py-1 bg-amber-500/90 backdrop-blur-md rounded text-[10px] sm:text-xs font-bold text-white shadow-sm pointer-events-none z-10">
+      <div className="absolute bottom-4 right-3 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide">
          ИИ-РЕЗУЛЬТАТ
       </div>
       
@@ -76,12 +79,12 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
         style={{ clipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)` }}
       >
         <img 
-           src="/golden_base/f_long_straight.jpg" 
+           src={fLongStraight} 
            alt="Before" 
            className="absolute inset-0 w-full h-full object-cover object-center" 
            draggable={false}
         />
-        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-[10px] sm:text-xs font-bold text-white pointer-events-none shadow-sm z-10">
+        <div className="absolute bottom-4 left-3 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide">
            ОБЫЧНОЕ ФОТО
         </div>
       </div>
