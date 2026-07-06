@@ -1,18 +1,25 @@
 const fs = require('fs');
+let content = fs.readFileSync('src/hooks/useAnalysis.ts', 'utf8');
 
-let content = fs.readFileSync('src/App.tsx', 'utf-8');
-const lines = content.split('\n');
+const target = `             setError(
+               "⚠️ Не удалось проанализировать фото
 
-// The new top part is from line 0 to line 1500. Note: line index 1500 is line 1501 
-const topLines = lines.slice(0, 1500);
+Нейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.
 
-// We need to find the rest of the original file. Since content.substring(-1) appended the entire original file, 
-// the original file's marker is in the second half.
-const secondHalf = lines.slice(1500).join('\n');
-const marker = '      {/* User Support/Expert UI */}';
-const markerIndex = secondHalf.indexOf(marker);
+Пожалуйста, попробуй ещё раз:
+• Сделай фото при дневном свете, лицом к окну
+• Смотри прямо в камеру, не наклоняй голову
+• Убери волосы от лица и сними очки
 
-const bottomContent = secondHalf.substring(markerIndex);
+📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.
 
-fs.writeFileSync('src/App.tsx', topLines.join('\n') + '\n' + bottomContent);
-console.log('Fixed App.tsx');
+(Детали: " + errMsg.slice(0, 100) + ")"
+             );`;
+
+const replacement = `             setError(
+               \`⚠️ Не удалось проанализировать фото\\n\\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\\n\\nПожалуйста, попробуй ещё раз:\\n• Сделай фото при дневном свете, лицом к окну\\n• Смотри прямо в камеру, не наклоняй голову\\n• Убери волосы от лица и сними очки\\n\\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.\\n\\n(Детали: \${errMsg.slice(0, 100)})\`
+             );`;
+
+content = content.replace(target, replacement);
+
+fs.writeFileSync('src/hooks/useAnalysis.ts', content);

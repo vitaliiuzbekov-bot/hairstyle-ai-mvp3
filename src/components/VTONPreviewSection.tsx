@@ -124,7 +124,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
 
       {loadingVTONStyles[tryOnStyle.imageKeyword || tryOnStyle.name] && (
         <div className={`flex-1 min-h-[300px] rounded-2xl border flex flex-col items-center justify-center p-8 ${isLightMode ? 'bg-gray-50 border-gray-200' : 'bg-white/5 border-white/10'}`}>
-          <RotatingFactsLoader isLightMode={isLightMode} title="Примерка стиля..." />
+          <RotatingFactsLoader isLightMode={!!isLightMode} title="Примерка стиля..." />
         </div>
       )}
 
@@ -134,6 +134,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
              <BeforeAfterSlider 
                beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`)}
                afterImage={displayResultUrl}
+               isLightMode={isLightMode}
              />
              <button
                onClick={() => setIsMaskEditorOpen(true)}
@@ -297,6 +298,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
         <MaskEditorModal
            beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) || ''}
            afterImage={displayResultUrl}
+               isLightMode={isLightMode}
            onClose={() => setIsMaskEditorOpen(false)}
            onSave={(mergedDataUrl) => {
               setEditedResultUrl(mergedDataUrl);

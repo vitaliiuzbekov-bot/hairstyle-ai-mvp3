@@ -4,11 +4,12 @@ import { X, Eraser, Check, Undo } from "lucide-react";
 interface MaskEditorModalProps {
   beforeImage: string;
   afterImage: string;
+  isLightMode?: boolean;
   onClose: () => void;
   onSave: (mergedDataUrl: string) => void;
 }
 
-export const MaskEditorModal: React.FC<MaskEditorModalProps> = ({ beforeImage, afterImage, onClose, onSave }) => {
+export const MaskEditorModal: React.FC<MaskEditorModalProps> = ({ beforeImage, afterImage, onClose, onSave, isLightMode }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [brushSize, setBrushSize] = useState(30);
   const [isDrawing, setIsDrawing] = useState(false);

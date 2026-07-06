@@ -54,7 +54,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
 
       // Check cache first (Cache for 30 days)
       const cacheKey = getCacheKey({ 
-        route: "generate-reference-v27-gemini-prompt", 
+        route: "generate-reference-v28-gender-fixed", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
         hairDensity, hairType, hairLength, hairlineStatus, hairQuality, clothingContext
       });
@@ -74,7 +74,8 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
 
       console.log("Generating reference via fal-ai/flux/schnell...");
       try {
-        const isMale = gender === "male" || gender === "Мужчина";
+        const isFemale = (gender || "").toLowerCase() === "female" || (gender || "").toLowerCase().includes("жен");
+        const isMale = !isFemale && ((gender || "").toLowerCase() === "male" || (gender || "").toLowerCase().includes("муж") || (gender || "").toLowerCase().includes("man") || (gender || "").toLowerCase().includes("boy"));
         const femalePrompt = "Professional front-facing portrait of a 25-year-old striking Caucasian woman, head and shoulders visible, perfectly symmetrical face. Neutral lighting, clean white background. Centered framing, entire hairstyle is fully visible in frame. ";
         const malePrompt = "Professional front-facing portrait of a 28-year-old striking Caucasian man, head and shoulders visible, perfectly symmetrical face, strong square jaw, sparse stubble. Neutral lighting, clean white background. Centered framing, entire hairstyle is fully visible in frame. ";
         
@@ -172,35 +173,37 @@ generateRouter.post("/generate-full", async (req, res) => {
       if (finalTargetImageUrl) {
         let isLocalUrl = false;
         let parsedPath = finalTargetImageUrl;
+        
         if (finalTargetImageUrl.startsWith('http')) {
             try {
                 const urlObj = new URL(finalTargetImageUrl);
-                // If it's the current app's hostname, or localhost, or ends in run.app
-                // Actually, just extract the pathname and see if it's a known local asset
-                parsedPath = urlObj.pathname;
-                isLocalUrl = true; 
+                if (urlObj.hostname.includes('localhost') || urlObj.hostname.includes('127.0.0.1') || urlObj.hostname.includes('0.0.0.0')) {
+                    parsedPath = urlObj.pathname;
+                    isLocalUrl = true; 
+                }
             } catch(e) {}
         } else if (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/')) {
             isLocalUrl = true;
         }
 
+        let normalizePath = parsedPath;
         if (isLocalUrl && (parsedPath.startsWith('/') || parsedPath.startsWith('golden_base/'))) {
-            let normalizePath = parsedPath.startsWith('/') ? parsedPath : '/' + parsedPath;
-            // Strip any query strings that Vite might append (e.g. ?import or ?v=...)
+            normalizePath = parsedPath.startsWith('/') ? parsedPath : '/' + parsedPath;
             if (normalizePath.includes('?')) {
                 normalizePath = normalizePath.split('?')[0];
             }
             
-            // Try reading from public or dist folders, and also src for dev mode
-            // Remove leading slash for safe join
             const safePath = normalizePath.replace(/^\/+/, '');
+            const path = await import('path');
             let localPath = path.join(process.cwd(), 'dist', safePath);
+            
             if (!fs.existsSync(localPath)) {
                 localPath = path.join(process.cwd(), 'public', safePath);
             }
             if (!fs.existsSync(localPath) && normalizePath.startsWith('/src/')) {
                 localPath = path.join(process.cwd(), safePath);
             }
+
             if (fs.existsSync(localPath)) {
                 const buf = fs.readFileSync(localPath);
                 const ext = path.extname(localPath).toLowerCase();
@@ -226,9 +229,9 @@ generateRouter.post("/generate-full", async (req, res) => {
                     console.error(`[generate-full] Error fetching local target image from dev server:`, e);
                 }
             }
-            if (!finalTargetImageUrl.startsWith('data:')) {
-                console.log(`[generate-full] CRITICAL WARNING: targetImageUrl could not be resolved to base64. Using original path: ${normalizePath}`);
-            }
+        }
+        if (!finalTargetImageUrl.startsWith('data:') && !finalTargetImageUrl.startsWith('http')) {
+            console.log(`[generate-full] CRITICAL WARNING: targetImageUrl could not be resolved to base64. Using original path: ${normalizePath}`);
         }
       }
 
@@ -306,7 +309,7 @@ generateRouter.post("/generate-full", async (req, res) => {
       // Map UI vtonStrength (50-100) to fluxStrength (0.3 - 0.75). 
       // Higher strength means more hair change, lower means strict adherence to original jaw/face.
       let uiStrength = Number(vtonStrength) || 45; 
-      let fluxStrength = 0.75; // Default
+      let fluxStrength = 0.95; // Default for Schnell
 
       if (finalTargetImageUrl) {
           // Studio Shot logic: Use catalog image as base and completely skip flux for exact 100% hair shape. 
@@ -317,10 +320,10 @@ generateRouter.post("/generate-full", async (req, res) => {
       } else {
           // Map linearly: 50 -> 0.45, 100 -> 0.75
           if (uiStrength >= 50 && uiStrength <= 100) {
-              fluxStrength = 0.45 + ((uiStrength - 50) / 50) * 0.30;
+              fluxStrength = 0.70 + ((uiStrength - 50) / 50) * 0.25;
           }
           if (keyword && keyword.includes("same exact current hairstyle")) {
-              fluxStrength = 0.35; // keep original structure
+              fluxStrength = 0.60; // keep original structure
           }
       }
 
@@ -412,7 +415,7 @@ Instructions:
         } else {
           try {
             console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
-            let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
+            let endpoint = "https://fal.run/fal-ai/flux/schnell";
             
             const fluxBaseImageUrl = baseImageForFlux.startsWith('data:') ? await uploadImageToFal(baseImageForFlux) : baseImageForFlux;
 
@@ -420,7 +423,7 @@ Instructions:
                prompt: promptEng,
                image_url: fluxBaseImageUrl,
                strength: fluxStrength,
-               num_inference_steps: 15
+               num_inference_steps: 4
             };
             
             const fluxRes = await imageGenQueue.add(() => fetch(endpoint, {
@@ -455,7 +458,7 @@ Instructions:
 
       // Always run FaceSwap to ensure 100% facial feature retention
       try {
-         console.log("Starting Virtual Try-On FaceSwap via FAL.AI...");
+         console.log("Starting Virtual Try-On FaceSwap via FAL.AI... finalImageUrl:", finalImageUrl);
          
          const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
          const swapImageUrlForFal = selfieImageFull.startsWith('data:') ? await uploadImageToFal(selfieImageFull) : selfieImageFull;

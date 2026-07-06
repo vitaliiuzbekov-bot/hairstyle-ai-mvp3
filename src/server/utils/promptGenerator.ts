@@ -1,7 +1,7 @@
 export function getDemographicDescriptorRu(gender: string, ageRange: string): string {
   const g = (gender || '').toLowerCase().trim();
-  const isMale = g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy');
-  const isFemale = g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl');
+  const isFemale = g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl') || g.includes('девушк') || g.includes('девочк');
+  const isMale = !isFemale && (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy') || g.includes('пар'));
   
   const age = (ageRange || '').toLowerCase().trim();
   
@@ -54,8 +54,8 @@ export function getDemographicDescriptorRu(gender: string, ageRange: string): st
 
 export function getDemographicDescriptor(gender: string, ageRange: string): string {
   const g = (gender || '').toLowerCase().trim();
-  const isMale = g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy');
-  const isFemale = g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl');
+  const isFemale = g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl') || g.includes('девушк') || g.includes('девочк');
+  const isMale = !isFemale && (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy') || g.includes('пар'));
   
   const age = (ageRange || '').toLowerCase().trim();
   
@@ -291,8 +291,8 @@ export function getHairstyleEnglishDescription(keyword: string): string {
 
 export function getDemographicDetails(gender: string, ageRange: string) {
   const g = (gender || '').toLowerCase().trim();
-  const isMale = g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy');
-  const isFemale = g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl');
+  const isFemale = g === 'female' || g.includes('жен') || g.includes('woman') || g.includes('girl') || g.includes('девушк') || g.includes('девочк');
+  const isMale = !isFemale && (g === 'male' || g.includes('муж') || g.includes('man') || g.includes('boy') || g.includes('пар'));
   
   const age = (ageRange || '').toLowerCase().trim();
   const isChild = age.includes("child") || age.includes("kid") || age.includes("rebenok") || age.includes("ребенок") || age.includes("дет") || age.includes("мальчик") || age.includes("девочка");

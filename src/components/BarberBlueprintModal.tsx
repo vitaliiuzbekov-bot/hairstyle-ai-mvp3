@@ -12,6 +12,7 @@ import { useScrollLock } from "../hooks/useScrollLock";
 import { BlueprintTechnicalDetails } from "./BlueprintTechnicalDetails";
 import { VTONPreviewSection } from "./VTONPreviewSection";
 import { PersonalGuideSection } from "./PersonalGuideSection";
+import { useUI } from "../context/UIContext";
 
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
@@ -85,6 +86,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   const [loadedReferenceUrl, setLoadedReferenceUrl] = React.useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const [isCollageGenerating, setIsCollageGenerating] = React.useState(false);
+  const { addToast } = useUI();
 
   useEffect(() => {
     if (vtonResultUrl && resultRef.current) {
@@ -111,8 +113,8 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
           </h3>
           <button
             onClick={() => {
-              if ((window as any).currentVtonController) {
-                (window as any).currentVtonController.abort();
+              if (tryOnStyle && loadingVTONStyles[tryOnStyle.name]) {
+                addToast("Генерация продолжается в фоне. Вы можете выбрать другую стрижку.", "info");
               }
               setTryOnStyle(null);
             }}
@@ -130,8 +132,8 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
             results={results}
             isLightMode={isLightMode}
             onClose={() => {
-              if ((window as any).currentVtonController) {
-                (window as any).currentVtonController.abort();
+              if (tryOnStyle && loadingVTONStyles[tryOnStyle.name]) {
+                addToast("Генерация продолжается в фоне. Вы можете выбрать другую стрижку.", "info");
               }
               setTryOnStyle(null);
             }}
@@ -149,7 +151,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                 <img
                   src={imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) : undefined)}
                   alt="Ваша база"
-                  className="absolute inset-0 w-full h-full object-contain object-center transition-transform duration-700 group-hover:scale-105"
+                  className="absolute inset-0 w-full h-full object-contain object-center transition-transform duration-700 group-hover:scale-105 bg-black/10"
                 />
                 <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-20">
                   <span className="text-[10px] sm:text-xs text-white uppercase tracking-wider font-medium drop-shadow-md">
@@ -165,7 +167,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                     src={tryOnStyle.customImageUrl || undefined} 
                     alt="Свой референс"
                     onLoad={() => setLoadedReferenceUrl(tryOnStyle.customImageUrl)}
-                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    className="absolute inset-0 w-full h-full object-contain object-center transition-transform duration-700 group-hover:scale-105 bg-black/10"
                   />
                 ) : (
                   <LazyImage
@@ -175,7 +177,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
                     description={tryOnStyle.description}
                     autoLoad={true}
                     results={results || undefined}
-                    className={`absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105`}
+                    className={`absolute inset-0 w-full h-full object-contain object-center transition-transform duration-700 group-hover:scale-105`}
                     onImageLoaded={setLoadedReferenceUrl}
                   />
                 )}

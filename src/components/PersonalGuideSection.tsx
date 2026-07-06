@@ -29,7 +29,7 @@ export const PersonalGuideSection: React.FC<PersonalGuideSectionProps> = ({
           id="hairdresser-guide-content"
           className={`mb-4 border rounded-2xl p-5 relative ${isLightMode ? 'bg-gray-50 border-gray-200 text-gray-800' : 'bg-white/5 border-white/10 text-white/90'}`}
         >
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 hide-in-pdf">
             <h4 className={`flex items-center gap-2 font-medium text-sm uppercase tracking-widest ${isLightMode ? 'text-gray-500' : 'text-white/80'}`}>
               <Sparkles size={16} className={isLightMode ? 'text-blue-500' : ''} /> Персональный гайд (AI)
             </h4>

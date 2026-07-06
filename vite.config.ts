@@ -13,6 +13,37 @@ export default defineConfig(() => {
     plugins: [
       react(), 
       tailwindcss(),
+      VitePWA({
+        registerType: "autoUpdate",
+        injectRegister: "auto",
+        workbox: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}"],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/(cdn\.jsdelivr\.net|storage\.googleapis\.com)\/.*/i,
+              handler: "CacheFirst",
+              options: {
+                cacheName: "ml-models-cache",
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 * 30
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
+              }
+            }
+          ]
+        },
+        manifest: {
+          name: "НейроСтилист AI",
+          short_name: "Стилист",
+          description: "AI подбор причесок",
+          theme_color: "#050508",
+          background_color: "#050508",
+          display: "standalone"
+        }
+      })
     ],
     resolve: {
       alias: {

@@ -125,13 +125,13 @@ export const HomePage: React.FC<HomePageProps> = ({
       addToast
   });
 
-  const handleFileUploadWrapper = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUploadWrapper = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       originalHandleFileUpload(e, () => {
           setResults(null);
           setArGeneratedImageUrl({});
           setTryOnStyle(null);
       });
-  };
+  }, [originalHandleFileUpload, setResults, setArGeneratedImageUrl, setTryOnStyle]);
 
   useEffect(() => {
     setVtonResultUrl(null);
@@ -202,7 +202,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <span className={`italic ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>именно вам?</span>
             </h2>
             
-            <div className="flex justify-center mb-6 max-w-[280px] sm:max-w-[320px] mx-auto">
+            <div className="flex justify-center mb-6 w-full max-w-[400px] mx-auto">
               <ImageSlider isLightMode={isLightMode} />
             </div>
 

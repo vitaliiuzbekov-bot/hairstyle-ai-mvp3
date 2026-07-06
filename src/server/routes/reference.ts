@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
-import { getDemographicDetails, getDetailedAgePromptEng } from "../utils/promptGenerator";
+import { getDemographicDetails, getDetailedAgePromptEng, getHairstyleEnglishDescription } from "../utils/promptGenerator";
 
-import { callYandexART } from "../services/yandex";
+import { generateReference } from "../services/falClient";
 
 export const referenceRouter = Router();
 
@@ -10,7 +10,7 @@ referenceRouter.post("/reference", async (req: Request, res: Response): Promise<
   try {
     const { keyword, gender, faceShape, hairColor, eyeColor, skinTone, ageRange, facialHair, hairDensity, hairlineStatus, hairLength } = req.body;
     
-    const cacheKey = getCacheKey({ route: "reference-v25-bald-fixed", keyword, gender, faceShape, hairColor, eyeColor, skinTone, ageRange, facialHair, hairDensity, hairlineStatus, hairLength });
+    const cacheKey = getCacheKey({ route: "reference-v28-beard-fixed", keyword, gender, faceShape, hairColor, eyeColor, skinTone, ageRange, facialHair, hairDensity, hairlineStatus, hairLength });
     const cachedImage = await getCachedValue<string>(cacheKey);
     if (cachedImage) {
       console.log("Returned reference from cache");
@@ -19,7 +19,8 @@ referenceRouter.post("/reference", async (req: Request, res: Response): Promise<
     }
 
     const lowerGender = (gender || "person").toLowerCase();
-    const isMale = lowerGender.includes("муж") || lowerGender.includes("male") || lowerGender.includes("man") || lowerGender.includes("пар");
+    const isFemale = lowerGender === "female" || lowerGender.includes("жен") || lowerGender.includes("woman") || lowerGender.includes("girl") || lowerGender.includes("девушк") || lowerGender.includes("девочк");
+    const isMale = !isFemale && (lowerGender.includes("муж") || lowerGender.includes("male") || lowerGender.includes("man") || lowerGender.includes("пар") || lowerGender.includes("boy"));
     
     // Determine if the requested style keyword itself represents a bald or buzzed look
     const kwLower = (keyword || "").toLowerCase();
@@ -48,9 +49,9 @@ referenceRouter.post("/reference", async (req: Request, res: Response): Promise<
     const faceProps = faceShape ? `Face shape: ${faceShape.toLowerCase()}. ` : "";
     const eyeProps = eyeColor ? `Eye color: ${eyeColor.toLowerCase()}. ` : "";
     const skinProps = skinTone ? `Skin tone: ${skinTone.toLowerCase()}. ` : "";
-    const beardProps = facialHair && facialHair.length > 3 ? (isMale ? `Facial hair: ${facialHair.toLowerCase()}. ` : "") : "Clean shaven face. ";
+    const beardProps = facialHair && facialHair.length > 3 ? (isMale ? `Facial hair: ${facialHair.toLowerCase()}. ` : "") : (isMale ? "Clean shaven face. " : "");
 
-    let finalKeyword = keyword;
+    let finalKeyword = getHairstyleEnglishDescription(keyword);
     let colorProps = hairColor ? `Hair color: ${hairColor.toLowerCase()}. ` : "";
     let hairDensProps = hairDensity ? `Hair density: ${hairDensity.toLowerCase()}. ` : "";
     let hairlineProps = hairlineStatus ? `Hairline: ${hairlineStatus.toLowerCase()}. ` : "";
@@ -72,14 +73,10 @@ referenceRouter.post("/reference", async (req: Request, res: Response): Promise<
       negativePrompt = "длинные волосы, пышные волосы, прическа с объемом, кудри, парик, укладка, начес, челка, long hair, medium hair, fluffy hair, wig, curls, voluminous hair, puffy hair, bangs, hair locks, " + negativePrompt;
     }
 
-    const prompt = `Hyper-realistic, unedited, authentic amateur smartphone selfie of an ordinary ${isMale ? 'man' : 'woman'}. ${ageProps}. ${faceProps}${colorProps}${eyeProps}${skinProps}${hairDensProps}${hairlineProps}${beardProps} ${extraBaldInjunction}Hairstyle: ${finalKeyword}. Typical indoor room lighting or natural window light, asymmetric raw facial features, natural uneven skin texture with visible pores and slight blemishes. NOT a professional model, very casual daily look, no airbrushing, no studio lighting, completely raw unretouched photo. Cannot look like a GQ or Vogue model.`;
-    
-    const imageUrl = await callYandexART({
-      prompt,
-      negativePrompt,
-      aspectRatio: { widthRatio: "3", heightRatio: "4" }
-    });
-    
+        
+    let prompt = `Hyper-real selfie, ordinary ${isMale ? 'man' : 'woman'}. ${ageProps}. ${faceProps}${colorProps}${eyeProps}${skinProps}${hairDensProps}${hairlineProps}${beardProps} ${extraBaldInjunction}Style: ${finalKeyword}. Raw, unretouched, no studio light.`;
+
+    const imageUrl = await generateReference(prompt);
     await setCachedValue(cacheKey, imageUrl, 30 * 24 * 60 * 60);
     res.json({ imageUrl });
 

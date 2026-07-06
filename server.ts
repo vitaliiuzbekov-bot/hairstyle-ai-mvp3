@@ -2,7 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import jwt from "jsonwebtoken";
 import helmet from "helmet";
 import compression from "compression";
@@ -77,7 +77,7 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
 async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = 3000;
 
   // Enhance security with Helmet
   app.use(helmet({
@@ -95,7 +95,7 @@ async function startServer() {
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 60, // Limit each user/IP to 60 requests per windowMs
-    keyGenerator: (req) => {
+    keyGenerator: (req, res) => {
       if (req.body?.tgUserId) {
         return `tg_${req.body.tgUserId}`;
       }
@@ -113,7 +113,7 @@ async function startServer() {
           }
         }
       } catch (e) {}
-      return req.ip || "unknown-ip";
+      const ip = req.ip || req.socket.remoteAddress || "unknown"; return ipKeyGenerator(ip);
     },
     message: { 
       error: "Слишком много запросов от вашего аккаунта. Пожалуйста, подождите немного.",
@@ -149,7 +149,7 @@ async function startServer() {
   });
 
   app.use("/api/analyze", apiLimiter, upload.single("image"), telegramValidationMiddleware);
-  app.use("/api/generate-reference", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/reference", telegramValidationMiddleware, apiLimiter);
   app.use("/api/generate-full", apiLimiter, upload.single("image"), telegramValidationMiddleware);
   app.use("/api/generate-ar", telegramValidationMiddleware, apiLimiter);
   app.use("/api/chat-stylist", telegramValidationMiddleware, apiLimiter);
@@ -210,6 +210,19 @@ if (process.env.NODE_ENV !== "production") {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+    // Global error handler to prevent HTML proxy errors on API routes
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Global Error Handler:", err.message || err);
+    if (req.originalUrl.startsWith('/api/')) {
+      res.status(err.status || 500).json({ 
+        error: err.message || "Internal Server Error", 
+        fallback: true 
+      });
+      return;
+    }
+    next(err);
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

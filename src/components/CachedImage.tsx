@@ -6,9 +6,10 @@ import 'react-lazy-load-image-component/src/effects/blur.css';
 interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
   isPriority?: boolean;
+  imageClassName?: string;
 }
 
-export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, className, style, isPriority, ...props }) => {
+export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, className, style, imageClassName, isPriority, ...props }) => {
   const [imgSrc, setImgSrc] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -79,7 +80,7 @@ export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, c
         <img 
           src={imgSrc || undefined} 
           alt={alt || ""}
-          className={`w-full h-full object-cover transition-opacity duration-500 opacity-100`}
+          className={`${imageClassName || "w-full h-full object-cover"} transition-opacity duration-500 opacity-100`}
           style={{ display: 'block', width: '100%', height: '100%' }}
           fetchPriority="high"
           loading="eager"
@@ -90,7 +91,7 @@ export const CachedImage: React.FC<CachedImageProps> = React.memo(({ src, alt, c
           src={imgSrc || undefined} 
           alt={alt || ""}
           effect="blur" 
-          className={`w-full h-full object-cover transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          className={`${imageClassName || "w-full h-full object-cover"} transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
           wrapperClassName="w-full h-full"
           style={{ display: 'block', width: '100%', height: '100%' }}
           {...(props as any)}

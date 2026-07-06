@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { AnalysisResult } from '../types';
 import { analyzeImageApi, generateArApi, generateFullApi, loadMoreApi } from '../services/api';
 // import { fallbackFaceApi } from '../services/fallbackAnalysis';
@@ -226,10 +226,12 @@ export const useAnalysis = ({
           
           const errMsg = err?.message || "";
           if (errMsg.includes("Нейросеть сейчас испытывает") || errMsg.includes("Сервер перегружен")) {
-             setError(`⚠️ Сервисы перегружены\n\nСервер временно недоступен или перезапускается. Пожалуйста, подождите 30 секунд и попробуйте загрузить фото снова.`);
+             setError(`⚠️ Сервисы перегружены
+
+Сервер временно недоступен или перезапускается. Пожалуйста, подождите 30 секунд и попробуйте загрузить фото снова.`);
           } else {
              setError(
-               "⚠️ Не удалось проанализировать фото\n\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\n\nПожалуйста, попробуй ещё раз:\n• Сделай фото при дневном свете, лицом к окну\n• Смотри прямо в камеру, не наклоняй голову\n• Убери волосы от лица и сними очки\n\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.\n\n(Детали: " + errMsg.slice(0, 100) + ")"
+               `⚠️ Не удалось проанализировать фото\n\nНейросеть не смогла точно определить форму твоего лица. Скорее всего, проблема в освещении или ракурсе.\n\nПожалуйста, попробуй ещё раз:\n• Сделай фото при дневном свете, лицом к окну\n• Смотри прямо в камеру, не наклоняй голову\n• Убери волосы от лица и сними очки\n\n📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.\n\n(Детали: ${errMsg.slice(0, 100)})`
              );
           }
         } finally {
@@ -369,6 +371,7 @@ export const useAnalysis = ({
 
             setVtonResultUrl(watermarkedUrl);
             consumeToken(); // Optimistic deduction on successful UI render
+            addToast("Примерка завершена! Посмотрите результат в Истории.", "success");
             hapticNotification('success');
             
             const newItem = {
@@ -402,7 +405,7 @@ export const useAnalysis = ({
         }
     };
 
-    const loadMoreRecommendations = async () => {
+    const loadMoreRecommendations = useCallback(async () => {
         if ((!imageBase64 && !imageUrl) || !results) return;
 
         setIsLoadingMore(true);
@@ -434,7 +437,7 @@ export const useAnalysis = ({
         } finally {
           setIsLoadingMore(false);
         }
-    };
+        }, [imageBase64, imageUrl, results, userId, preferredStyle, telegramInitData, setError]);
     
     return {
         isAnalyzing,

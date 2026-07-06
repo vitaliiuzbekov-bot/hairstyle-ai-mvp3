@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import fBob from "../assets/golden_base/v2_f_bob.jpg";
-import fLongStraight from "../assets/golden_base/v2_f_long_straight.jpg";
+import { CachedImage } from "./CachedImage";
 
 export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -12,6 +11,7 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
   const updateSliderPosition = (percentage: number) => {
     if (beforeContainerRef.current) {
       beforeContainerRef.current.style.clipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
+      (beforeContainerRef.current.style as any).webkitClipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
     }
     if (handleRef.current) {
       handleRef.current.style.left = `calc(${percentage}% - 1px)`;
@@ -23,7 +23,6 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
     let startTime = Date.now();
     const animate = () => {
       if (isDragging.current) {
-        // Paused by user interaction, do not request next frame. The animation effectively stops after user takes control.
         return;
       }
       const elapsed = Date.now() - startTime;
@@ -55,36 +54,42 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
   return (
     <div 
       ref={containerRef}
-      className={`relative w-full shadow-lg aspect-[3/4] mx-auto rounded-2xl overflow-hidden cursor-ew-resize select-none border max-w-[320px] ${isLightMode ? 'border-amber-200 shadow-sm' : 'border-white/10 bg-[#110e18]'}`}
+      className={`relative w-full shadow-2xl aspect-[3/4] mx-auto rounded-2xl overflow-hidden cursor-ew-resize select-none border max-w-[400px] ${isLightMode ? 'border-amber-200 shadow-sm' : 'border-white/10 bg-[#110e18]'}`}
       onMouseDown={(e) => { isDragging.current = true; handleMove(e.clientX); }}
       onMouseMove={(e) => isDragging.current && handleMove(e.clientX)}
       onTouchStart={(e) => { isDragging.current = true; handleMove(e.touches[0].clientX); }}
       onTouchMove={(e) => isDragging.current && handleMove(e.touches[0].clientX)}
     >
-      {/* After Image */}
-      <img 
-         src={fBob} 
-         alt="AI Result" 
-         className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none" 
-         draggable={false}
-      />
-      <div className="absolute bottom-4 right-3 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide">
+      {/* Background Image (Shows on the Right) - Pink Hair / AI Result */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
+          <img
+            src="/split-right-blended.jpg?v=114"
+            alt="AI Result"
+             
+            draggable={false}
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+      </div>
+      <div className="absolute bottom-4 left-[75%] -translate-x-1/2 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide whitespace-nowrap">
          ИИ-РЕЗУЛЬТАТ
       </div>
-      
-      {/* Before Image */}
+            
+      {/* Foreground Image (Shows on the Left) - Messy Hair / Original */}
       <div 
         ref={beforeContainerRef}
         className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
-        style={{ clipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)` }}
+        style={{ clipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)`, WebkitClipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)` }}
       >
-        <img 
-           src={fLongStraight} 
-           alt="Before" 
-           className="absolute inset-0 w-full h-full object-cover object-center" 
-           draggable={false}
-        />
-        <div className="absolute bottom-4 left-3 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide">
+        <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
+          <img
+            src="/split-left-blended.jpg?v=114"
+            alt="Before Result"
+             
+            draggable={false}
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+        </div>
+        <div className="absolute bottom-4 left-[25%] -translate-x-1/2 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide whitespace-nowrap">
            ОБЫЧНОЕ ФОТО
         </div>
       </div>

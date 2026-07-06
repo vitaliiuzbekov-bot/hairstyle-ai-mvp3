@@ -1,105 +1,103 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { CachedImage } from './CachedImage';
+import React, { useRef, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CachedImage } from "./CachedImage";
 
 interface BeforeAfterSliderProps {
   beforeImage: string;
   afterImage: string;
+  isLightMode?: boolean;
 }
 
-const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afterImage }) => {
-  const [sliderPosition, setSliderPosition] = useState(50);
-  const [isDragging, setIsDragging] = useState(false);
+const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afterImage, isLightMode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const beforeContainerRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+
+  const updateSliderPosition = (percentage: number) => {
+    if (beforeContainerRef.current) {
+      beforeContainerRef.current.style.clipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
+      (beforeContainerRef.current.style as any).webkitClipPath = `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`;
+    }
+    if (handleRef.current) {
+      handleRef.current.style.left = `calc(${percentage}% - 1px)`;
+    }
+  };
 
   const handleMove = (clientX: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    const percent = Math.max(0, Math.min((x / rect.width) * 100, 100));
-    setSliderPosition(percent);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return;
-    handleMove(e.clientX);
-  };
-
-  const handleTouchMove = (e: TouchEvent) => {
-    if (!isDragging) return;
-    handleMove(e.touches[0].clientX);
-  };
-
-  const handleDragEnd = () => {
-    setIsDragging(false);
+    updateSliderPosition((x / rect.width) * 100);
   };
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleDragEnd);
-      window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      window.addEventListener('touchend', handleDragEnd);
-    } else {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleDragEnd);
-    }
+    const handleMouseUp = () => { isDragging.current = false; };
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchend', handleMouseUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleDragEnd);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchend', handleMouseUp);
     };
-  }, [isDragging]);
+  }, []);
 
   return (
     <div 
-      className="relative w-full aspect-auto h-[400px] sm:h-[500px] mx-auto overflow-hidden rounded-xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40"
       ref={containerRef}
-      onMouseDown={(e) => {
-        setIsDragging(true);
-        handleMove(e.clientX);
-      }}
-      onTouchStart={(e) => {
-        setIsDragging(true);
-        handleMove(e.touches[0].clientX);
-      }}
+      className={`relative w-full shadow-2xl aspect-[3/4] mx-auto rounded-2xl overflow-hidden cursor-ew-resize select-none border max-w-[400px] ${isLightMode ? 'border-gray-200 shadow-md' : 'border-white/10 bg-[#110e18]'}`}
+      onMouseDown={(e) => { isDragging.current = true; handleMove(e.clientX); }}
+      onMouseMove={(e) => isDragging.current && handleMove(e.clientX)}
+      onTouchStart={(e) => { isDragging.current = true; handleMove(e.touches[0].clientX); }}
+      onTouchMove={(e) => isDragging.current && handleMove(e.touches[0].clientX)}
     >
-      {/* After Image (Background) */}
-      <CachedImage
-        src={afterImage}
-        alt="После"
-        className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
-      />
-      
-      {/* Before Image (Foreground/Clipped) */}
-      <div 
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
-      >
+      {/* Background Image (Shows on the Right) - After Result */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none z-0 bg-black/5">
         <CachedImage
-          src={beforeImage}
-          alt="До"
-          className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
+          src={afterImage}
+          alt="ИИ-Результат" 
+          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
+          imageClassName="w-full h-full object-cover object-center"
         />
       </div>
-
-      {/* Slider Line & Handle */}
+      <div className="absolute bottom-4 left-[75%] -translate-x-1/2 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide whitespace-nowrap">
+         ИИ-РЕЗУЛЬТАТ
+      </div>
+            
+      {/* Foreground Image (Shows on the Left) - Before Result */}
       <div 
-        className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] pointer-events-none flex items-center justify-center"
-        style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
+        ref={beforeContainerRef}
+        className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
+        style={{ clipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)`, WebkitClipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)` }}
       >
-        <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.5)] pointer-events-auto">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-900 pointer-events-none opacity-80">
-            <path d="M15 18l6-6-6-6M9 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+        <div className="absolute inset-0 w-full h-full pointer-events-none z-0 bg-black/5">
+          <CachedImage
+            src={beforeImage}
+            alt="Обычное фото" 
+            className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
+            imageClassName="w-full h-full object-cover object-center"
+          />
+        </div>
+        <div className="absolute bottom-4 left-[25%] -translate-x-1/2 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide whitespace-nowrap">
+           ОБЫЧНОЕ ФОТО
         </div>
       </div>
-      
-      {/* Labels */}
-      <div className="absolute top-4 left-4 z-10 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide text-white border border-white/10 pointer-events-none whitespace-nowrap opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">ДО</div>
-      <div className="absolute top-4 right-4 z-10 bg-emerald-500/30 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide text-emerald-100 border border-emerald-500/30 pointer-events-none whitespace-nowrap opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">ПОСЛЕ</div>
+
+      {/* Watermark Hider (Retouch Stripe) */}
+      <div className="absolute bottom-0 right-0 w-32 h-8 bg-black/40 backdrop-blur-md rounded-tl-xl pointer-events-none z-10"></div>
+
+      {/* Slider Line and Handle */}
+      <div 
+        ref={handleRef}
+        className="absolute top-0 bottom-0 w-[2px] sm:w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0.3)] z-20 pointer-events-none"
+        style={{ left: `calc(50% - 1px)` }}
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-amber-500 rounded-full flex items-center justify-center border-2 sm:border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white">
+            <div className="flex gap-0 sm:gap-1 items-center">
+              <ChevronLeft size={10} strokeWidth={4} />
+              <ChevronRight size={10} strokeWidth={4} />
+            </div>
+        </div>
+      </div>
     </div>
   );
 };

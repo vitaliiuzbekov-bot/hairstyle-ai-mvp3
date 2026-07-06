@@ -1,6 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { RecommendationCard } from "./RecommendationCard";
+import { LazyImage } from "./LazyImage";
 import {
   RefreshCw,
   Wand2,
@@ -11,86 +12,15 @@ import {
 } from "lucide-react";
 import { AnalysisResult } from "../types";
 import { ImageCropperModal } from "./ImageCropperModal";
-
-// Importing images directly to let Vite handle paths and hashing properly
-import fPixie from "../assets/golden_base/v2_f_pixie.jpg";
-import fBob from "../assets/golden_base/v2_f_bob.jpg";
-import fLongBob from "../assets/golden_base/v2_f_long_bob.jpg";
-import fLongStraight from "../assets/golden_base/v2_f_long_straight.jpg";
-import fLongWavy from "../assets/golden_base/v2_f_long_wavy.jpg";
-import fBangs from "../assets/golden_base/v2_f_bangs.jpg";
-
-import mBuzz from "../assets/golden_base/v2_m_buzz.jpg";
-import mCrop from "../assets/golden_base/v2_m_crop.jpg";
-import mPompadour from "../assets/golden_base/v2_m_pompadour.jpg";
-
-const FEMALE_LIBRARY = [
-  {
-    name: "Пикси (Pixie)",
-    description: "Короткая элегантная женская стрижка.",
-    customImageUrl: fPixie,
-    stylingTips: "Используйте текстурирующий спрей или легкую пасту.",
-  },
-  {
-    name: "Классический Боб",
-    description: "Элегантное каре, прямые волосы.",
-    customImageUrl: fBob,
-    stylingTips: "Гладкая укладка феном и утюжком.",
-  },
-  {
-    name: "Удлиненный боб",
-    description: "Универсальный боб до ключиц (Lob).",
-    customImageUrl: fLongBob,
-    stylingTips: "Легкие волны спреем с морской солью.",
-  },
-  {
-    name: "Длинные прямые",
-    description: "Длинные идеально прямые волосы.",
-    customImageUrl: fLongStraight,
-    stylingTips: "Термозащита и сыворотка для блеска.",
-  },
-  {
-    name: "Длинные волнистые",
-    description: "Роскошные объемные волны.",
-    customImageUrl: fLongWavy,
-    stylingTips: "Нанесите мусс для объема и накрутите на брашинг.",
-  },
-  {
-    name: "Длинные с челкой",
-    description: "Прямые волосы с классической челкой.",
-    customImageUrl: fBangs,
-    stylingTips: "Уложите челку круглой щеткой и феном.",
-  },
-];
-
-const MALE_LIBRARY = [
-  {
-    name: "Buzz Cut",
-    description: "Очень короткая мужская стрижка под машинку.",
-    customImageUrl: mBuzz,
-    stylingTips: "Не требует укладки, идеальна для спорта.",
-  },
-  {
-    name: "Текстурный Кроп",
-    description: "Короткая стрижка с текстурированной челкой.",
-    customImageUrl: mCrop,
-    stylingTips: "Используйте матовую пасту для подчеркивания текстуры.",
-  },
-  {
-    name: "Помпадур",
-    description: "Классическая мужская объемная укладка назад.",
-    customImageUrl: mPompadour,
-    stylingTips: "Потребуется помада сильной фиксации и сушка феном.",
-  },
-];
-
+import { FEMALE_LIBRARY, MALE_LIBRARY, HaircutCategory, CATEGORY_LABELS } from "../data/haircutLibrary";
 interface HaircutListProps {
-  results: AnalysisResult;
+  results: AnalysisResult | null;
   generationsLeft: number | null;
   teaserUrl: string | null;
   isGeneratingTeaser: boolean;
-  setShowBuyModal: (val: boolean) => void;
-  setTryOnStyle: (val: any) => void;
+  setShowBuyModal: (show: boolean) => void;
+  setTryOnStyle: (style: any) => void;
+
   loadMoreRecommendations: () => void;
   isLoadingMore: boolean;
   isLightMode: boolean;
@@ -108,55 +38,51 @@ export const HaircutList = React.memo(
     isLoadingMore,
     isLightMode,
   }: HaircutListProps) => {
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-    const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+    const [cropperFileSrc, setCropperFileSrc] = useState<string | null>(null);
+    const [activeCategory, setActiveCategory] = useState<HaircutCategory>("short");
 
-    const handleCustomUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
+    const handleCustomUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64 = e.target?.result as string;
-          setCropImageSrc(base64);
+        reader.onloadend = () => {
+          setCropperFileSrc(reader.result as string);
         };
         reader.readAsDataURL(file);
-        // Reset input value so same file can be uploaded again if needed
-        event.target.value = "";
       }
     };
 
-    const handleCropComplete = (croppedBase64: string) => {
-      setTryOnStyle({
-        name: "Свой референс",
-        description: "Кастомная стрижка по вашему фото-референсу.",
-        stylingTips: "Следуйте рекомендациям вашего мастера.",
-        imageKeyword: "",
-        customImageUrl: croppedBase64,
-      });
-      setCropImageSrc(null);
-      setIsLibraryOpen(false);
-    };
-
     return (
-      <div className="mt-4">
-        {cropImageSrc && (
+      <div className="w-full">
+        {cropperFileSrc && (
           <ImageCropperModal
-            imageSrc={cropImageSrc}
-            onClose={() => setCropImageSrc(null)}
-            onCropComplete={handleCropComplete}
+            imageSrc={cropperFileSrc}
             isLightMode={isLightMode}
+            onClose={() => setCropperFileSrc(null)}
+            onCropComplete={(croppedBase64) => {
+              setTryOnStyle({
+                name: "Своя прическа (Кастомная)",
+                description: "Фото, загруженное пользователем",
+                stylingTips: "Загружено пользователем",
+                imageKeyword: "",
+                customImageUrl: croppedBase64,
+              });
+              setIsLibraryOpen(false);
+              setCropperFileSrc(null);
+            }}
           />
         )}
-
+        
         {isLibraryOpen &&
-          !cropImageSrc &&
           createPortal(
-            <div
-              className={`fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300 ${isLightMode ? "bg-black/20" : "bg-black/80"} backdrop-blur-sm`}
-            >
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div
-                className={`w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-t-3xl sm:rounded-3xl shadow-2xl relative animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-4 duration-300 ${isLightMode ? "bg-white border-gray-200" : "bg-[#1a1625] border border-white/10"}`}
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setIsLibraryOpen(false)}
+              ></div>
+              <div
+                className={`relative w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300 ${isLightMode ? "bg-white border border-gray-200" : "bg-[#1a1625] border border-white/10"}`}
               >
                 <div
                   className={`p-5 flex justify-between items-center border-b ${isLightMode ? "border-gray-200" : "border-white/10"}`}
@@ -213,40 +139,57 @@ export const HaircutList = React.memo(
                     ></div>
                   </div>
 
+                  <div className="flex overflow-x-auto gap-2 pb-4 mb-2 custom-scrollbar">
+                    {(Object.keys(CATEGORY_LABELS) as HaircutCategory[]).map(cat => (
+                       <button 
+                         key={cat}
+                         onClick={() => setActiveCategory(cat)}
+                         className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat ? (isLightMode ? "bg-indigo-600 text-white" : "bg-indigo-500 text-white") : (isLightMode ? "bg-gray-100 text-gray-700 hover:bg-gray-200" : "bg-white/10 text-white/70 hover:bg-white/20")}`}
+                       >
+                         {CATEGORY_LABELS[cat]}
+                       </button>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                    {(results?.gender?.toLowerCase()?.includes("female") ||
+                    {(results?.gender?.toLowerCase()?.includes("female") || results?.gender?.toLowerCase()?.includes("woman") || results?.gender?.toLowerCase()?.includes("girl") ||
                     results?.gender?.toLowerCase()?.includes("жен") ||
                     results?.gender?.toLowerCase()?.includes("дев")
                       ? FEMALE_LIBRARY
                       : MALE_LIBRARY
-                    ).map((item, idx) => (
-                      <button
+                    ).filter(item => item.category === activeCategory).map((item, idx) => (
+                      <div
                         key={idx}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => {
                           setTryOnStyle({
                             name: item.name,
                             description: item.description,
                             stylingTips: item.stylingTips,
                             imageKeyword: "",
-                            customImageUrl: item.customImageUrl,
+                            customImageUrl: "",
                           });
                           setIsLibraryOpen(false);
                         }}
                         className={`relative rounded-xl overflow-hidden aspect-[3/4] group text-left border transition-transform hover:scale-105 shadow-sm ${isLightMode ? "border-gray-200 bg-gray-100" : "border-white/10 bg-white/10"}`}
                       >
-                        <img
-                          src={item.customImageUrl || undefined}
-                          alt={item.name}
-                          loading={idx < 4 ? undefined : "lazy"}
-                          fetchPriority={idx < 4 ? "high" : "auto"}
-                          className="absolute inset-0 w-full h-full object-cover rounded-xl"
-                        />
+                                                <div className="absolute inset-0 w-full h-full object-cover rounded-xl overflow-hidden">
+                          <LazyImage
+                            keyword={item.name}
+                            gender={results?.gender || (results?.gender?.toLowerCase()?.includes("жен") || results?.gender?.toLowerCase()?.includes("дев") ? "woman" : "man")}
+                            uniqueName={item.name}
+                            description={item.description}
+                            results={results || undefined}
+                            autoLoad={true} isLightMode={isLightMode}
+                          />
+                        </div>
                         <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 flex flex-col justify-end">
-                          <span className="text-white text-xs font-medium leading-tight shadow-sm drop-shadow-md">
+                          <span className="text-white text-sm font-semibold leading-tight shadow-sm drop-shadow-md">
                             {item.name}
                           </span>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -294,7 +237,6 @@ export const HaircutList = React.memo(
             <ImageIcon size={16} />
             Библиотека стрижек
           </button>
-
           <button
             onClick={() => {
               if (results && results.recommendations.length > 0) {

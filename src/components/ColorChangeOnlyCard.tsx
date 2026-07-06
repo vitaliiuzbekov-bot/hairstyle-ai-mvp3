@@ -401,6 +401,7 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
            <BeforeAfterSlider 
              beforeImage={imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`}
              afterImage={localVtonResultUrl}
+             isLightMode={isLightMode}
            />
            <p className={`text-xs text-center mb-2 ${isLightMode ? 'text-gray-500' : 'text-gray-400'}`}>Скачайте это фото и загрузите его как "Вашу Базу", если хотите добавить еще и новую стрижку!</p>
            <div className="flex gap-3">

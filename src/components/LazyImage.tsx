@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useEffect, useCallback, memo, useRef } from "react";
 import localforage from "localforage";
 import { Skeleton } from "./Skeleton";
 import { Download, AlertCircle, Image as ImageIcon } from "lucide-react";
@@ -17,7 +17,7 @@ export const LazyImage = memo(({
   autoLoad = false,
   results,
   onImageLoaded,
-  isPriority = false,
+  isPriority = false, isLightMode = false,
 }: {
   keyword: string;
   gender: string;
@@ -27,9 +27,9 @@ export const LazyImage = memo(({
   autoLoad?: boolean;
   results?: AnalysisResult;
   onImageLoaded?: (url: string) => void;
-  isPriority?: boolean;
+  isPriority?: boolean; isLightMode?: boolean;
 }) => {
-  const cacheKey = `${gender}_${keyword}_v2_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`;
+  const cacheKey = `${gender}_${keyword}_v4_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
     globalImageCache[cacheKey] || null,
   );
@@ -81,7 +81,7 @@ export const LazyImage = memo(({
 
     try {
       const initData = (window as any).Telegram?.WebApp?.initData || "";
-      const response = await fetch("/api/generate-reference", {
+      const response = await fetch("/api/reference", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -147,16 +147,34 @@ export const LazyImage = memo(({
     setIsLoading(false);
   }, [cacheKey, keyword, gender, results, uniqueName]);
 
+  const [isInView, setIsInView] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (autoLoad) {
+    if (!containerRef.current || !autoLoad) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1, rootMargin: '200px' }
+    );
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [autoLoad]);
+
+  useEffect(() => {
+    if (autoLoad && isInView) {
       const t = setTimeout(() => generateImage(), Math.random() * 500);
       return () => clearTimeout(t);
     }
-  }, [keyword, gender, uniqueName, autoLoad, generateImage]);
+  }, [keyword, gender, uniqueName, autoLoad, isInView, generateImage]);
 
   if (loadedUrl) {
     return (
-      <div className="relative w-full h-full group/lazy flex">
+      <div ref={containerRef} className="relative w-full h-full group/lazy flex">
         <CachedImage
           src={loadedUrl || undefined as any}
           alt={uniqueName}
@@ -180,13 +198,14 @@ export const LazyImage = memo(({
 
   return (
     <div
-      className={`flex flex-col items-center justify-center bg-transparent text-white/90 border-r border-white/10 ${className || ""}`}
+      ref={containerRef}
+      className={`flex flex-col items-center justify-center bg-transparent ${isLightMode ? "text-gray-600 border-r border-gray-200" : "text-white/90 border-r border-white/10"} ${className || ""}`}
     >
       {isLoading ? (
         <div className="flex flex-col items-center justify-center w-full h-full p-4 gap-4">
-          <Skeleton className="w-12 h-12 rounded-full mb-2" />
-          <Skeleton className="w-2/3 h-2 rounded" />
-          <Skeleton className="w-1/2 h-2 rounded" />
+          <Skeleton isLightMode={isLightMode} className="w-12 h-12 rounded-full mb-2" />
+          <Skeleton isLightMode={isLightMode} className="w-2/3 h-2 rounded" />
+          <Skeleton isLightMode={isLightMode} className="w-1/2 h-2 rounded" />
         </div>
       ) : errorString ? (
         <div className="flex flex-col items-center gap-2 px-2 text-center">
@@ -199,7 +218,7 @@ export const LazyImage = memo(({
               e.stopPropagation();
               generateImage();
             }}
-            className="mt-1 text-[9px] bg-white/10 hover:bg-white/10 text-white/90 px-3 py-1.5 rounded uppercase tracking-wider transition-colors"
+            className={`mt-1 text-[9px] px-3 py-1.5 rounded uppercase tracking-wider transition-colors ${isLightMode ? "bg-gray-200 hover:bg-gray-300 text-gray-700" : "bg-white/10 hover:bg-white/20 text-white/90"}`}
           >
             Повторить
           </button>
@@ -212,8 +231,8 @@ export const LazyImage = memo(({
           }}
           className="flex flex-col items-center gap-2 group p-4 hover:bg-white/5 rounded-xl transition-colors"
         >
-          <ImageIcon className="w-8 h-8 text-white/40 group-hover:text-white/80 transition-colors" />
-          <span className="text-[10px] text-white/60 font-mono uppercase tracking-wider text-center leading-tight group-hover:text-white/90">
+          <ImageIcon className={`w-8 h-8 ${isLightMode ? "text-gray-400 group-hover:text-gray-600" : "text-white/40 group-hover:text-white/80"} transition-colors`} />
+          <span className={`text-[10px] ${isLightMode ? "text-gray-500 group-hover:text-gray-800" : "text-white/60 group-hover:text-white/90"} font-mono uppercase tracking-wider text-center leading-tight`}>
             Показать
             <br />
             пример

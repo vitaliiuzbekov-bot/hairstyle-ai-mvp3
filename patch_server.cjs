@@ -1,0 +1,15 @@
+const fs = require('fs');
+const path = './server.ts';
+let code = fs.readFileSync(path, 'utf8');
+
+code = code.replace(
+  'const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;',
+  'const PORT = 3000;'
+);
+
+code = code.replace(
+  'return req.ip || "unknown-ip";',
+  'const ip = req.ip || req.socket.remoteAddress || "unknown"; return ip.replace(/:/g, "_");'
+);
+
+fs.writeFileSync(path, code);
