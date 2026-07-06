@@ -1,10 +1,57 @@
 const fs = require('fs');
-const file = '/app/applet/src/utils/pdfExport.ts';
-let content = fs.readFileSync(file, 'utf8');
+const file = 'src/server/routes/generate.ts';
+let code = fs.readFileSync(file, 'utf8');
 
-content = content.replace(
-  '.pdf-images-grid { display: block; width: 100%; text-align: center; margin-bottom: 36px; white-space: nowrap; font-size: 0; }\n        .pdf-images-grid.cols-2 { }\n        .pdf-images-grid.cols-3 { }\n        \n        .pdf-img-col { display: inline-block; vertical-align: top; text-align: center; width: 31%; margin: 0 1%; white-space: normal; }\n        .pdf-img-col span { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; color: #111; width: 100%; text-align: center; }\n        .pdf-img-wrap { width: 100%; height: 240px; text-align: center; }\n        .pdf-img-wrap img { display: inline-block; max-width: 100%; max-height: 240px; width: auto !important; height: auto !important; border-radius: 8px; margin: 0 auto; }',
-  '.pdf-images-grid { display: table; width: 100%; margin-bottom: 36px; table-layout: fixed; }\n        .pdf-img-col { display: table-cell; vertical-align: top; text-align: center; padding: 0 5px; }\n        .pdf-img-col span { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; color: #111; width: 100%; text-align: center; }\n        .pdf-img-wrap { width: 100%; height: 240px; text-align: center; overflow: hidden; display: block; position: relative; }\n        .pdf-img-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }'
-);
+// Replace the full start
+const regex = /generateRouter\.post\("\/generate-full", async \(req, res\) => \{[\s\S]*?\} = req\.body;/;
+const newCode = `generateRouter.post("/generate-full", async (req, res) => {
+    try {
+      const { 
+        userId, gender, faceShape, hairLength, hairDensity, hairType, skinTone, 
+        skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
+        vtonStrength, // Number from 50 to 100
+        targetImageUrl, // Optional, generated reference image URL
+        hairlineStatus, hairQuality, idempotencyKey
+      } = req.body;
+      
+      const jobId = idempotencyKey || crypto.randomUUID();
+      
+      if (jobMap.has(jobId) && jobMap.get(jobId).status === 'processing') {
+          return res.json({ jobId, status: 'processing' });
+      }`;
 
-fs.writeFileSync(file, content);
+code = code.replace(regex, newCode);
+
+// Next we need to find `// 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨` 
+// and after it, start the jobMap logic and return `{ jobId }`.
+const regex2 = /(\/\/ 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨[\s\S]*?if \(!billingCheck\.ok\) \{[\s\S]*?return res\.status\(403\)\.json\(\{ error: billingCheck\.error \}\);\n\s*\})/;
+
+const newCode2 = `$1
+
+      // Set job processing
+      jobMap.set(jobId, { status: 'processing' });
+      res.json({ jobId, status: 'processing' });
+
+      // Run background
+      (async () => {
+        try {`;
+
+code = code.replace(regex2, newCode2);
+
+// Finally, we need to find the end of `generate-full` and set status completed or error.
+// We look for: `res.json({ \n        imageUrl: swappedImageUrl,`
+const regex3 = /(res\.json\(\{\s*imageUrl: swappedImageUrl,\s*\/\/ Final processed image[\s\S]*?debugError: lastError\s*\}\);)/;
+const newCode3 = `jobMap.set(jobId, { status: 'completed', result: { imageUrl: swappedImageUrl, referenceImage: finalImageUrl, debugError: lastError } });`;
+code = code.replace(regex3, newCode3);
+
+// Replace the catch block for generate-full
+const regex4 = /(\/\/ 🚨 REFUND THE GENERATION SINCE IT FAILED 🚨\s*await refundGeneration\(req\.body\.userId\);\s*)(res\.status\(500\)\.json\(\{ error: err\.message \|\| "Pipeline error" \}\);)/;
+const newCode4 = `$1 jobMap.set(jobId, { status: 'error', error: err.message || "Pipeline error" });`;
+code = code.replace(regex4, newCode4);
+
+// Close the async IIFE
+const regex5 = /jobMap\.set\(jobId, \{ status: 'error', error: err\.message \|\| "Pipeline error" \}\);\s*\}\s*\}\);/g;
+const newCode5 = `jobMap.set(jobId, { status: 'error', error: err.message || "Pipeline error" });\n        }\n      })();\n  });`;
+code = code.replace(regex5, newCode5);
+
+fs.writeFileSync(file, code);

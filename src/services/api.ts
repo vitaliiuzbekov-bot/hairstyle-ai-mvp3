@@ -138,12 +138,36 @@ export const generateFullApi = async (
        throw new Error(`Ошибка сети: Сервер перегружен или недоступен (HTML Proxy Error). Пожалуйста, подождите немного и повторите попытку.`);
     }
     throw new Error(
-      `Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`,
+      `Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`
     );
   }
 
   if (!response.ok) {
     throw new Error(data.error || "Ошибка от сервера при генерации детального отчета.");
+  }
+
+  if (data.jobId) {
+    // Polling mechanism
+    while (true) {
+      if (signal?.aborted) throw new Error("Aborted");
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+          const pollRes = await fetch(`/api/job/${data.jobId}`);
+          if (!pollRes.ok) {
+             throw new Error(`Polling Error HTTP ${pollRes.status}`);
+          }
+          const pollData = await pollRes.json();
+          if (pollData.status === 'completed') {
+             return pollData.result;
+          } else if (pollData.status === 'error') {
+             throw new Error(pollData.error || "Ошибка в фоновой задаче");
+          }
+      } catch (pollErr: any) {
+          if (pollErr.name === 'AbortError') throw pollErr;
+          console.warn("Poll failed, retrying...", pollErr);
+          // Just retry polling on network fail (we could add a limit)
+      }
+    }
   }
 
   return data;

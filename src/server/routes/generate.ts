@@ -34,6 +34,16 @@ import { uploadImageToFal } from "../services/falClient";
 
 export const generateRouter = Router();
 
+const jobMap = new Map<string, { status: 'processing' | 'completed' | 'error', result?: any, error?: string }>();
+
+generateRouter.get("/job/:jobId", (req, res) => {
+  const jobId = req.params.jobId;
+  if (!jobMap.has(jobId)) {
+    return res.status(404).json({ error: "Job not found" });
+  }
+  res.json(jobMap.get(jobId));
+});
+
 const customBlueprintCache = new Map<string, string>();
 
 // Stricter limits for heavy text models and logic
@@ -142,11 +152,6 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
   
 generateRouter.post("/generate-full", async (req, res) => {
     const controller = new AbortController();
-    req.on('close', () => {
-      // controller.abort(); // Removed: Let the process finish in background to send to Telegram Bot
-      console.log(`[generate-full] Client disconnected, but processing will continue in background.`);
-    });
-
     try {
       const { 
         userId, gender, faceShape, hairLength, hairDensity, hairType, skinTone, 
@@ -155,6 +160,12 @@ generateRouter.post("/generate-full", async (req, res) => {
         targetImageUrl, // Optional, generated reference image URL
         hairlineStatus, hairQuality, idempotencyKey
       } = req.body;
+      
+      const jobId = idempotencyKey || crypto.randomUUID();
+      
+      if (jobMap.has(jobId) && jobMap.get(jobId).status === 'processing') {
+          return res.json({ jobId, status: 'processing' });
+      }
       
       const keyword = decodeURIComponent(req.body.keyword || "");
       const description = decodeURIComponent(req.body.description || "");
@@ -255,6 +266,14 @@ generateRouter.post("/generate-full", async (req, res) => {
       if (!billingCheck.ok) {
         return res.status(403).json({ error: billingCheck.error });
       }
+
+      // Set job processing
+      jobMap.set(jobId, { status: 'processing' });
+      res.json({ jobId, status: 'processing' });
+
+      // Run background
+      (async () => {
+        try {
 
       const falKey = process.env.FAL_KEY;
       if (!falKey) {
@@ -574,11 +593,7 @@ Instructions:
       // Save to cache for 30 days
       await setCachedValue(cacheKey, swappedImageUrl, 30 * 24 * 60 * 60);
 
-      res.json({ 
-        imageUrl: swappedImageUrl,            // Final processed image (face swapped)
-        referenceImage: finalImageUrl,        // Original generation
-        debugError: lastError 
-      });
+      jobMap.set(jobId, { status: 'completed', result: { imageUrl: swappedImageUrl, referenceImage: finalImageUrl, debugError: lastError } });
 
     } catch (err: any) {
       console.error("Full pipeline error:", err);
@@ -591,7 +606,11 @@ Instructions:
       // 🚨 REFUND THE GENERATION SINCE IT FAILED 🚨
       await refundGeneration(req.body.userId);
       
-      res.status(500).json({ error: err.message || "Pipeline error" });
+       jobMap.set(jobId, { status: 'error', error: err.message || "Pipeline error" });
+        }
+      })();
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 
