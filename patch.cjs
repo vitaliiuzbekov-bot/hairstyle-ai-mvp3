@@ -1,22 +1,14 @@
 const fs = require('fs');
-const file = '/app/applet/src/components/BeforeAfterSlider.tsx';
-let content = fs.readFileSync(file, 'utf8');
-
-content = content.replace(
-  'className="relative w-full aspect-square mx-auto overflow-hidden rounded-2xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40 shadow-2xl"',
-  'className="relative w-full mx-auto overflow-hidden rounded-2xl border border-white/10 select-none cursor-ew-resize touch-none group bg-black/40 shadow-2xl"'
+const content = fs.readFileSync('src/components/Header.tsx', 'utf8');
+const newContent = content.replace(
+  /<button onClick={onOpenTutorial}.*?>[\s\S]*?<\/button>\s*<button onClick={onOpenLibrary}.*?>[\s\S]*?<\/button>/,
+  `<button onClick={onOpenTutorial} className={\`h-8 sm:h-9 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all font-medium text-[11px] sm:text-xs border \${isLightMode ? "bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300" : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"}\`}>
+              <Info size={14} />
+              <span className="hidden sm:inline">Как это работает</span>
+            </button>
+            <button onClick={onOpenLibrary} className={\`h-8 sm:h-9 px-3 rounded-full flex items-center justify-center gap-1.5 transition-all font-medium text-[11px] sm:text-xs border \${isLightMode ? "bg-white border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300" : "bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"}\`}>
+              <BookOpen size={14} />
+              <span className="hidden sm:inline">Каталог</span>
+            </button>`
 );
-
-// We need to add the hidden image right after the <div> opens and its props end.
-// Let's replace the After Image comment block.
-content = content.replace(
-  '{/* After Image (Background) */}\n      <CachedImage\n        src={afterImage}\n        alt="После"\n        className="absolute inset-0 pointer-events-none" imageClassName="w-full h-full object-contain object-center"\n      />',
-  '{/* Hidden image for aspect ratio */}\n      <img src={afterImage} alt="" className="w-full h-auto opacity-0 pointer-events-none block select-none" />\n\n      {/* After Image (Background) */}\n      <CachedImage\n        src={afterImage}\n        alt="После"\n        className="absolute inset-0 pointer-events-none" imageClassName="w-full h-full object-cover object-center"\n      />'
-);
-
-content = content.replace(
-  '{/* Before Image (Foreground/Clipped) */}\n      <div \n        className="absolute inset-0 pointer-events-none overflow-hidden"\n        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`, WebkitClipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}\n      >\n        <CachedImage\n          src={beforeImage}\n          alt="До"\n          className="absolute inset-0 pointer-events-none" imageClassName="w-full h-full object-contain object-center"\n        />\n      </div>',
-  '{/* Before Image (Foreground/Clipped) */}\n      <div \n        className="absolute inset-0 pointer-events-none overflow-hidden"\n        style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`, WebkitClipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}\n      >\n        <CachedImage\n          src={beforeImage}\n          alt="До"\n          className="absolute inset-0 pointer-events-none" imageClassName="w-full h-full object-cover object-center scale-[1.02]"\n        />\n      </div>'
-);
-
-fs.writeFileSync(file, content);
+fs.writeFileSync('src/components/Header.tsx', newContent);

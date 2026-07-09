@@ -1,4 +1,4 @@
-export const applyWatermark = (imageUrl: string, text: string = "@neirostilist_bot"): Promise<string> => {
+export const applyWatermark = (imageUrl: string, text: string = "t.me/neirostilist_bot"): Promise<string> => {
     return new Promise((resolve, reject) => {
         if (!imageUrl) return reject("No image URL provided");
         

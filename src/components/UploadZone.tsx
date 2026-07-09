@@ -1,5 +1,6 @@
+import { hapticImpact } from "../utils/haptics";
 import React, { useEffect } from "react";
-import { Camera, Upload, X, Sparkles, AlertCircle, RefreshCw, BookOpen, Image as ImageIcon } from "lucide-react";
+import { Camera, Upload, X, Sparkles, AlertCircle, RefreshCw, BookOpen, Image as ImageIcon, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTelegram } from "../hooks/useTelegram";
 
@@ -56,7 +57,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
   useEffect(() => {
     if (tg?.MainButton) {
       if (!results && !error && (imageBase64 || imageUrl) && !isAnalyzing && !isUploadingImage) {
-        tg.MainButton.text = "Запустить ИИ-Анализ 🚀";
+        tg.MainButton.text = "Подобрать стрижку";
         tg.MainButton.show();
         tg.MainButton.onClick(analyzeImage);
       } else {
@@ -135,7 +136,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
             </h3>
             {(imageBase64 || imageUrl) && !isAnalyzing && (
               <button
-                onClick={resetApp}
+                onClick={(e) => { hapticImpact('light'); resetApp(); }}
                 aria-label="Удалить фото и начать заново"
                 className={`p-1.5 rounded-full transition-colors ${isLightMode ? 'text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200' : 'text-white/60 hover:text-white/90 bg-white/5 hover:bg-white/10'}`}
               >
@@ -149,18 +150,12 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
               <div className="flex flex-col items-center w-full">
                 
                 {/* User Guide Block */}
-                <div className={`w-full max-w-[400px] mb-6 p-4 rounded-xl border flex items-start gap-3 text-left ${isLightMode ? 'bg-blue-50/50 border-blue-100' : 'bg-blue-500/5 border-blue-500/20'}`}>
-                  <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${isLightMode ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'}`}>
-                    <Camera size={18} />
-                  </div>
-                  <div>
-                    <h4 className={`text-sm font-semibold mb-1 ${isLightMode ? 'text-blue-900' : 'text-blue-100'}`}>Как получить лучший результат</h4>
-                    <p className={`text-xs leading-relaxed ${isLightMode ? 'text-blue-800' : 'text-blue-200/70'}`}>
-                      Для идеальной примерки стрижки, сделайте селфи <strong>днем лицом к окну</strong>. Смотрите прямо, уберите волосы с лица и снимите очки.
-                    </p>
-                  </div>
+                <div className={`w-full max-w-[500px] mb-4 px-4 py-3 rounded-xl border flex items-center gap-3 text-left transition-all ${isLightMode ? 'bg-purple-50 border-purple-100 text-purple-800' : 'bg-purple-500/10 border-purple-500/20 text-purple-300'}`}>
+                  <Info size={16} className="shrink-0" />
+                  <p className="text-xs sm:text-sm font-medium leading-tight">
+                    Сделайте селфи <span className="font-bold underline decoration-purple-400/50 underline-offset-2">днем лицом к окну</span>, смотрите прямо, уберите волосы и очки.
+                  </p>
                 </div>
-
                 <div
                   className={`w-full rounded-[1.25rem] flex flex-col items-center justify-center min-h-[360px] md:min-h-[440px] relative transition-all duration-300 ${
                     consentError 
@@ -168,7 +163,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                       : isUploadingImage
                         ? isLightMode ? "border border-gray-200 bg-gray-50 animate-pulse" : "border border-white/5 bg-white/5 animate-pulse"
                       : isDragging
-                        ? isLightMode ? "border-2 border-dashed border-blue-400 bg-blue-50/50 scale-[1.02]" : "border-2 border-dashed border-blue-500/50 bg-blue-500/10 scale-[1.02]"
+                        ? isLightMode ? "border-2 border-dashed border-purple-400 bg-purple-50/50 scale-[1.02]" : "border-2 border-dashed border-blue-500/50 bg-purple-500/10 scale-[1.02]"
                         : isLightMode ? "border border-dashed border-gray-300 hover:border-gray-400 bg-gray-50/50 hover:bg-gray-100/50" : "border border-dashed border-white/10 hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04]"
                   }`}
                   onDragEnter={handleDragEnter}
@@ -178,10 +173,10 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                 >
                   {isUploadingImage ? (
                     <div className="flex flex-col items-center justify-center">
-                       <RefreshCw size={36} className={`animate-spin mb-4 ${isLightMode ? 'text-blue-500' : 'text-white/80'}`} />
+                       <RefreshCw size={36} className={`animate-spin mb-4 ${isLightMode ? 'text-purple-500' : 'text-white/80'}`} />
                        <h4 className={`text-lg font-medium mb-2 pr-2 pl-2 ${isLightMode ? 'text-gray-800' : 'text-white/90'}`}>Подготовка фото...</h4>
                        <div className={`w-32 h-1.5 rounded-full overflow-hidden ${isLightMode ? 'bg-gray-200' : 'bg-white/10'}`}>
-                         <div className="w-full h-full bg-blue-500 origin-left animate-[scale-x_2s_ease-in-out_infinite]"></div>
+                         <div className="w-full h-full bg-purple-500 origin-left animate-[scale-x_2s_ease-in-out_infinite]"></div>
                        </div>
                     </div>
                   ) : (
@@ -233,7 +228,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                             <input
                               type="file"
                               accept="image/*"
-                              capture
+                              capture="user"
                               className="hidden"
                               ref={cameraInputRef}
                               onChange={handleFileUpload}
@@ -268,6 +263,17 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                             </button>
                           </>
                         )}
+                      </div>
+                      <div className="w-full px-6 max-w-[400px] mt-4">
+                         <button
+                            onClick={() => window.dispatchEvent(new Event('open-library'))}
+                            className={`w-full border py-3 sm:py-3.5 rounded-full text-[13px] sm:text-sm font-medium tracking-wide transition-all flex items-center justify-center gap-2 ${
+                              isLightMode ? "bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100 shadow-sm active:scale-95" : "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border-purple-500/30 shadow-[0_8px_32px_rgba(0,0,0,0.37)] active:scale-95"
+                            }`}
+                          >
+                            <BookOpen size={16} />
+                            Посмотреть каталог стрижек
+                          </button>
                       </div>
                     </>
                   )}
@@ -307,12 +313,12 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
 
                 <div className="mt-6 w-full max-w-[340px]">
                   <button 
-                    onClick={() => navigate('/faq')}
+                    onClick={() => { hapticImpact('light'); navigate('/faq'); }}
                     className={`w-full flex items-center p-4 rounded-xl border transition-all text-left group ${isLightMode ? 'bg-white/50 border-gray-200 hover:border-gray-300 hover:bg-white' : 'glass-panel border-white/10 hover:border-white/20'}`}
                   >
                     <div className="flex items-center gap-3 w-full">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isLightMode ? 'bg-blue-50 group-hover:bg-blue-100' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                        <BookOpen size={18} className={isLightMode ? 'text-blue-600' : 'text-white/70'} />
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isLightMode ? 'bg-purple-50 group-hover:bg-blue-100' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                        <BookOpen size={18} className={isLightMode ? 'text-purple-600' : 'text-white/70'} />
                       </div>
                       <div className="flex-1">
                         <h4 className={`text-sm font-medium mb-0.5 ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>Гайд по использованию</h4>
@@ -336,10 +342,10 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                   {isAnalyzing && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
                       <div className={`absolute inset-0 opacity-20 mix-blend-overlay ${isLightMode ? 'bg-black/10' : 'bg-white/10'}`}></div>
-                      <div className={`w-full h-1 opacity-50 absolute top-[-50%] animate-[scan_2.5s_ease-in-out_infinite_alternate] ${isLightMode ? 'bg-blue-400 shadow-[0_0_20px_#3b82f6]' : 'glass-button shadow-[0_0_20px_#fff]'}`}></div>
+                      <div className={`w-full h-1 opacity-50 absolute top-[-50%] animate-[scan_2.5s_ease-in-out_infinite_alternate] ${isLightMode ? 'bg-purple-400 shadow-[0_0_20px_#3b82f6]' : 'glass-button shadow-[0_0_20px_#fff]'}`}></div>
                       <div className={`relative z-20 flex flex-col items-center backdrop-blur-md p-6 rounded-2xl border ${isLightMode ? 'bg-white/80 border-gray-200 shadow-xl' : 'bg-white/5 border-white/10'}`}>
                         <Sparkles
-                          className={`animate-pulse mb-4 ${isLightMode ? 'text-blue-500' : 'text-white/90'}`}
+                          className={`animate-pulse mb-4 ${isLightMode ? 'text-purple-500' : 'text-white/90'}`}
                           size={32}
                           strokeWidth={1.5}
                         />
@@ -370,11 +376,11 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                        <p className={isLightMode ? "pt-2 text-xs font-medium text-gray-500" : "pt-2 text-xs font-medium text-white/60"}>📌 Твоя генерация не была списана — ты можешь загрузить новое фото бесплатно.</p>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2">
-                         <button onClick={resetApp} className={isLightMode ? "flex-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-900 shadow-sm py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2" : "flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-white py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"}>
+                         <button onClick={(e) => { hapticImpact('light'); resetApp(); }} className={isLightMode ? "flex-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-900 shadow-sm py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2" : "flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-white py-3 px-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"}>
                            <RefreshCw size={16} />
                            Загрузить новое фото
                          </button>
-                         <button onClick={() => navigate('/faq')} className={isLightMode ? "flex-1 bg-transparent hover:bg-gray-100 border border-transparent text-gray-700 py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2" : "flex-1 bg-transparent hover:bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"}>
+                         <button onClick={() => { hapticImpact('light'); navigate('/faq'); }} className={isLightMode ? "flex-1 bg-transparent hover:bg-gray-100 border border-transparent text-gray-700 py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2" : "flex-1 bg-transparent hover:bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"}>
                            <BookOpen size={16} />
                            Гайд по съёмке
                          </button>
@@ -413,7 +419,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                         ].map((styleOpt) => (
                           <button
                             key={styleOpt}
-                            onClick={() => setPreferredStyle(styleOpt)}
+                            onClick={() => { hapticImpact('light'); setPreferredStyle(styleOpt); }}
                             className={`px-4 py-2.5 rounded-2xl text-[13px] transition-all font-medium border ${
                               preferredStyle === styleOpt
                                 ? (isLightMode ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20" : "bg-white text-gray-900 border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]")
@@ -431,7 +437,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                 {!results && !error && (
                   <>
                   <button
-                    onClick={analyzeImage}
+                    onClick={() => { hapticImpact('medium'); analyzeImage(); }}
                     disabled={isAnalyzing || isUploadingImage || !imageBase64}
                     className={`${tg?.initDataUnsafe?.user ? 'hidden' : 'flex'} relative w-full font-bold py-4 sm:py-5 px-6 items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${
                       isAnalyzing || isUploadingImage || !imageBase64
@@ -447,7 +453,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                         ? "Обработка на устройстве..."
                         : isAnalyzing
                           ? "Нейросеть в работе..."
-                          : "Запустить ИИ-Анализ 🚀"}
+                          : "Подобрать стрижку"}
                     </span>
                   </button>
                   {/* Telegram WebApp Integration for MainButton is handled via hook, but we keep an invisible/fallback button for non-TG env */}

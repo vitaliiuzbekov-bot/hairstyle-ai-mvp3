@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Copy, Check, Download, ExternalLink, Calendar, Info, Share2, Sparkles } from "lucide-react";
@@ -42,6 +43,8 @@ const VkIcon = () => (
 );
 
 export const ShareModal: React.FC = () => {
+  useModalBackButton(true, () => {});
+
   const { isShareOpen, setIsShareOpen, shareUrl, shareTitle } = useUI();
   const [copiedApp, setCopiedApp] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
@@ -107,7 +110,7 @@ export const ShareModal: React.FC = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed-viewport z-50 flex items-center justify-center p-4">
         {/* Затемнение фона */}
         <motion.div
           initial={{ opacity: 0 }}

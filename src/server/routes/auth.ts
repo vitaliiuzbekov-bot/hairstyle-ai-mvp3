@@ -1,3 +1,4 @@
+import crypto from "crypto";
 
 import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
@@ -103,7 +104,7 @@ authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => 
     return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not configured" });
   }
   const { webAppUrl } = req.body;
-  const crypto = require("crypto");
+  
   const secretToken = crypto.createHash('sha256').update(botToken).digest('hex');
 
   try {
@@ -128,7 +129,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
   if (!botToken) {
     return res.status(500).send("No token configured.");
   }
-  const crypto = require("crypto");
+  
   const expectedToken = crypto.createHash('sha256').update(botToken).digest('hex');
   const providedToken = req.headers['x-telegram-bot-api-secret-token'];
   
@@ -167,12 +168,35 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
     
     if (userId && pkg && adminApp && adminDb) {
       try {
-        await adminDb.collection("users").doc(userId).update({
-          generationsLeft: FieldValue.increment(pkg.count),
-          fullAccess: true
-        });
+        const paymentId = payment.telegram_payment_charge_id;
+        if (paymentId) {
+           await adminDb.runTransaction(async (t) => {
+              const paymentRef = adminDb.collection("users").doc(userId).collection("payments").doc(paymentId);
+              const paymentDoc = await t.get(paymentRef);
+              if (paymentDoc.exists) {
+                  throw new Error("ALREADY_PROCESSED");
+              }
+              const userRef = adminDb.collection("users").doc(userId);
+              t.update(userRef, {
+                generationsLeft: FieldValue.increment(pkg.count),
+                fullAccess: true
+              });
+              t.set(paymentRef, {
+                packageId, amount: starsAmount, timestamp: FieldValue.serverTimestamp()
+              });
+           });
+        } else {
+           await adminDb.collection("users").doc(userId).update({
+             generationsLeft: FieldValue.increment(pkg.count),
+             fullAccess: true
+           });
+        }
         await logToTelegram(`💰 <b>Успешная оплата Stars!</b>\nПакет: <code>${packageId}</code>\nПользователь ID: <code>${userId}</code>\nСумма: ${starsAmount} Stars\nНачислено: ${pkg.count} генераций`);
-      } catch (e) {
+      } catch (e: any) {
+        if (e.message === "ALREADY_PROCESSED") {
+            console.log("Duplicate webhook received, ignoring.");
+            return res.status(200).send("OK");
+        }
         console.error("Failed to update tokens on webhook:", e);
         await logToTelegram(`❌ Ошибка начисления <b>Stars!</b>\nПользователь ID: <code>${userId}</code>\nСумма: ${starsAmount}`);
       }

@@ -1,3 +1,4 @@
+import fs from "fs";
 import "dotenv/config";
 
 export async function logToTelegram(message: string) {
@@ -5,7 +6,7 @@ export async function logToTelegram(message: string) {
   const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
   
   try {
-    const fs = require('fs');
+    
     fs.appendFileSync('/app/applet/app.log', new Date().toISOString() + ': ' + message + '\n');
   } catch(e) {}
 

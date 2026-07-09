@@ -17,7 +17,7 @@ export const LazyImage = memo(({
   autoLoad = false,
   results,
   onImageLoaded,
-  isPriority = false, isLightMode = false,
+  isPriority = false, isLightMode = false, isLibrary = false,
 }: {
   keyword: string;
   gender: string;
@@ -27,24 +27,24 @@ export const LazyImage = memo(({
   autoLoad?: boolean;
   results?: AnalysisResult;
   onImageLoaded?: (url: string) => void;
-  isPriority?: boolean; isLightMode?: boolean;
+  isPriority?: boolean; isLightMode?: boolean; isLibrary?: boolean;
 }) => {
-  const cacheKey = `${gender}_${keyword}_v4_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`;
+  const cacheKey = `${gender}_${keyword}_v4_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`; const isLib = isLibrary || uniqueName === keyword; const finalCacheKey = isLib ? `LIB_${gender}_${keyword}` : cacheKey;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
-    globalImageCache[cacheKey] || null,
+    globalImageCache[finalCacheKey] || null,
   );
 
   useEffect(() => {
     // Attempt to load from localforage if not in memory cache
     if (!loadedUrl) {
-      localforage.getItem<string>(`genRef_${cacheKey}`).then((cachedUrl) => {
+      localforage.getItem<string>(`genRef_${finalCacheKey}`).then((cachedUrl) => {
         if (cachedUrl) {
-          globalImageCache[cacheKey] = cachedUrl;
+          globalImageCache[finalCacheKey] = cachedUrl;
           setLoadedUrl(cachedUrl);
         }
       });
     }
-  }, [cacheKey, loadedUrl]);
+  }, [finalCacheKey, loadedUrl]);
 
   useEffect(() => {
     if (loadedUrl && onImageLoaded) {
@@ -53,21 +53,21 @@ export const LazyImage = memo(({
   }, [loadedUrl, onImageLoaded]);
 
   const [isLoading, setIsLoading] = useState(
-    autoLoad && !globalImageCache[cacheKey],
+    autoLoad && !globalImageCache[finalCacheKey],
   );
   const [errorString, setErrorString] = useState<string | null>(null);
 
   const generateImage = useCallback(async () => {
-    if (globalImageCache[cacheKey]) {
-      setLoadedUrl(globalImageCache[cacheKey]);
+    if (globalImageCache[finalCacheKey]) {
+      setLoadedUrl(globalImageCache[finalCacheKey]);
       setIsLoading(false);
       return;
     }
 
     try {
-      const cachedUrl = await localforage.getItem<string>(`genRef_${cacheKey}`);
+      const cachedUrl = await localforage.getItem<string>(`genRef_${finalCacheKey}`);
       if (cachedUrl) {
-        globalImageCache[cacheKey] = cachedUrl;
+        globalImageCache[finalCacheKey] = cachedUrl;
         setLoadedUrl(cachedUrl);
         setIsLoading(false);
         return;
@@ -87,7 +87,7 @@ export const LazyImage = memo(({
           "Content-Type": "application/json",
           ...(initData ? { "x-telegram-init-data": initData } : {}),
         },
-        body: JSON.stringify({
+        body: JSON.stringify({ isLibrary: isLib,
           keyword,
           gender,
           haircutName: uniqueName,
@@ -114,6 +114,7 @@ export const LazyImage = memo(({
       try {
           data = JSON.parse(textResponse);
       } catch(e) {
+          console.error("Failed to parse JSON in LazyImage:", textResponse);
           throw new Error("Invalid format from server");
       }
 
@@ -122,9 +123,9 @@ export const LazyImage = memo(({
       }
 
       if (data.imageUrl) {
-        globalImageCache[cacheKey] = data.imageUrl;
+        globalImageCache[finalCacheKey] = data.imageUrl;
         setLoadedUrl(data.imageUrl);
-        localforage.setItem(`genRef_${cacheKey}`, data.imageUrl).catch(e => console.warn('Cache save failed', e));
+        localforage.setItem(`genRef_${finalCacheKey}`, data.imageUrl).catch(e => console.warn('Cache save failed', e));
       } else {
         throw new Error("No image URL in response");
       }
@@ -145,7 +146,7 @@ export const LazyImage = memo(({
     }
 
     setIsLoading(false);
-  }, [cacheKey, keyword, gender, results, uniqueName]);
+  }, [finalCacheKey, keyword, gender, results, uniqueName]);
 
   const [isInView, setIsInView] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

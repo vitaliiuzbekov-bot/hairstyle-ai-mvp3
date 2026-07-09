@@ -11,6 +11,7 @@ interface CameraModalProps {
   startCameraLocal: (mode: string) => void;
 }
 
+import { useModalBackButton } from "../hooks/useTelegramBackButton";
 export const CameraModal: React.FC<CameraModalProps> = ({
   isCameraModalOpen,
   customVideoRef,
@@ -24,7 +25,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   if (!isCameraModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+    <div className="fixed-viewport z-50 bg-black flex flex-col items-center justify-center">
       <video
         ref={customVideoRef}
         autoPlay

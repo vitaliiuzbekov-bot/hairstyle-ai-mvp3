@@ -120,7 +120,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[120] flex flex-col ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}
+      className={`fixed-viewport z-[120] flex flex-col ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}
     >
       <div
         className={`p-4 flex justify-between items-center border-b ${isLightMode ? "border-gray-200" : "border-white/10"}`}

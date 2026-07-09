@@ -1,15 +1,26 @@
 const fs = require('fs');
-const path = './server.ts';
-let code = fs.readFileSync(path, 'utf8');
+let content = fs.readFileSync('server.ts', 'utf8');
 
-code = code.replace(
-  'const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;',
-  'const PORT = 3000;'
-);
+const target = `    const userParam = parsedData.get('user');
+    if (userParam && req.body?.tgUserId) {
+      const userObj = JSON.parse(userParam);
+      if (userObj.id.toString() !== req.body.tgUserId.toString()) { 
+         res.status(403).json({ error: "Telegram User ID mismatch in request and Init Data" });
+         return;
+      }
+    }`;
 
-code = code.replace(
-  'return req.ip || "unknown-ip";',
-  'const ip = req.ip || req.socket.remoteAddress || "unknown"; return ip.replace(/:/g, "_");'
-);
+const replacement = `    const userParam = parsedData.get('user');
+    if (userParam) {
+      const userObj = JSON.parse(userParam);
+      if (req.body) {
+        req.body.tgUserId = userObj.id.toString();
+      }
+    } else {
+      res.status(403).json({ error: "Invalid Telegram Init Data: Missing user" });
+      return;
+    }`;
 
-fs.writeFileSync(path, code);
+content = content.replace(/const userParam = parsedData\.get\('user'\);[\s\S]*?    }/, replacement);
+fs.writeFileSync('server.ts', content);
+console.log("Patched server.ts successfully");

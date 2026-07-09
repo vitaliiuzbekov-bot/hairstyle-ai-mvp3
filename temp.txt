@@ -1,0 +1,9 @@
+          } else if (friendlyError.includes("FAL")) {
+             friendlyError = `Ошибка нейросети: ${error.message}`;
+          }
+
+          return res.status(500).json({ 
+            error: friendlyError,
+            referenceImage: finalImageUrl 
+          });
+        }

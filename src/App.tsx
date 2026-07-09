@@ -11,6 +11,7 @@ const BuyModal = React.lazy(() => import("./components/BuyModal").then(m => ({ d
 const StylistChat = React.lazy(() => import("./components/StylistChat").then(m => ({ default: m.StylistChat })));
 const ProfileModal = React.lazy(() => import("./components/ProfileModal").then(m => ({ default: m.ProfileModal })));
 const QuickTutorial = React.lazy(() => import("./components/QuickTutorial").then(m => ({ default: m.QuickTutorial })));
+const HaircutLibraryModal = React.lazy(() => import("./components/HaircutLibraryModal").then(m => ({ default: m.HaircutLibraryModal })));
 const ShareModal = React.lazy(() => import("./components/ShareModal").then(m => ({ default: m.ShareModal })));
 const PWAPrompt = React.lazy(() => import("./components/PWAPrompt").then(m => ({ default: m.PWAPrompt })));
 
@@ -67,6 +68,7 @@ function App() {
 
   const {
     isProfileOpen, setIsProfileOpen,
+    isLibraryOpen, setIsLibraryOpen,
     faqData, setFaqData,
     showWelcome, setShowWelcome,
     showSalonNameInput, setShowSalonNameInput,
@@ -96,6 +98,12 @@ function App() {
   } = useTokenManager();
 
   const { deleteHistoryItem } = useHistoryHandlers(history, setHistory, userId);
+
+  useEffect(() => {
+    const handleOpenLibrary = () => setIsLibraryOpen(true);
+    window.addEventListener('open-library', handleOpenLibrary);
+    return () => window.removeEventListener('open-library', handleOpenLibrary);
+  }, [setIsLibraryOpen]);
 
   if (!isTelegramEnv && !isDeveloper) {
     return (
@@ -140,7 +148,7 @@ function App() {
 
   return (
     <div
-      className={`min-h-screen w-full overflow-x-clip bg-[#050508] text-white/90 font-sans selection:bg-blue-500/30 ${isLightMode ? "light-mode" : ""}`}
+      className={`min-h-screen w-full bg-[#050508] text-white/90 font-sans selection:bg-blue-500/30 ${isLightMode ? "light-mode" : ""}`}
     >
       {/* Header */}
       <Header
@@ -153,6 +161,8 @@ function App() {
         isDeveloper={isDeveloper}
         setIsDeveloper={setIsDeveloper}
         setIsProfileOpen={setIsProfileOpen}
+        onOpenLibrary={() => setIsLibraryOpen(true)}
+        onOpenTutorial={() => setShowTutorial(true)}
       />
 
       {isOffline && (
@@ -244,7 +254,17 @@ function App() {
           )}
         </React.Suspense>
 
-      {isChatOpen && (
+      
+      {isLibraryOpen && (
+        <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
+          <HaircutLibraryModal
+            isOpen={isLibraryOpen}
+            onClose={() => setIsLibraryOpen(false)}
+            isLightMode={isLightMode}
+          />
+        </React.Suspense>
+      )}
+{isChatOpen && (
         <React.Suspense fallback={<LoadingFallback isLightMode={isLightMode} />}>
           <StylistChat 
              onClose={() => setIsChatOpen(false)}

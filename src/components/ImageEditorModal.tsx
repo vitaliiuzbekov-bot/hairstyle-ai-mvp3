@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Sliders, Save, CheckCircle2, UserCircle2 } from 'lucide-react';
 import { getFaceDetector, getImageSegmenter } from '../services/mediapipeTasks';
@@ -37,8 +38,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     img.crossOrigin = "anonymous";
     img.onload = async () => {
       imageRef.current = img;
-      await runFaceDetection(img);
       drawCanvas();
+      await runFaceDetection(img);
     };
     img.src = originalBase64.startsWith('data:') ? originalBase64 : `data:${mimeType || 'image/jpeg'};base64,${originalBase64}`;
   }, [isOpen, originalBase64]);
@@ -49,7 +50,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     }
   }, [isOpen, brightness, contrast]);
 
+
+
+  useModalBackButton(isOpen, onClose);
   const runFaceDetection = async (img: HTMLImageElement) => {
+
+
     try {
       setStatus('Ищем лицо на фото...');
       const detector = await getFaceDetector();
@@ -204,7 +210,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed-viewport z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 flex items-center justify-between border-b dark:border-white/10">
            <h3 className="text-lg font-bold">Подготовка фото</h3>

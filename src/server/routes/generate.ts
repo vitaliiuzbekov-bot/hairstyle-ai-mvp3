@@ -99,7 +99,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         
         const finalPrompt = base + "Hair is " + hairDesc + "." + colorDesc;
 
-        const falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+        const falRes = await fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
             method: "POST",
             headers: {
                 "Authorization": `Key ${falKey}`,
@@ -109,7 +109,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
                 prompt: finalPrompt,
                 image_size: "portrait_4_3",
                 seed: seedValue,
-                num_inference_steps: 4
+                num_inference_steps: 28
             })
         });
 
@@ -262,7 +262,7 @@ generateRouter.post("/generate-full", async (req, res) => {
       }
 
       // 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨
-      const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey);
+      const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey, req.body.tgUserId, cacheKey);
       if (!billingCheck.ok) {
         return res.status(403).json({ error: billingCheck.error });
       }
@@ -277,7 +277,7 @@ generateRouter.post("/generate-full", async (req, res) => {
 
       const falKey = process.env.FAL_KEY;
       if (!falKey) {
-        return res.status(500).json({ error: "Отсутствует FAL_KEY в переменных окружения." });
+        throw new Error("Отсутствует FAL_KEY в переменных окружения.");
       }
 
       let finalImageUrl = "";
@@ -384,6 +384,19 @@ Instructions:
 
         let contentsPayload: any = [{ text: systemInstruction }];
 
+        // Add the source selfie for deep analysis during prompt generation
+        if (selfieImageFull && selfieImageFull.startsWith("data:image/")) {
+            const selfieMime = selfieImageFull.split(';')[0].split(':')[1];
+            const selfieBase64 = selfieImageFull.split(',')[1];
+            contentsPayload.push({
+               inlineData: {
+                  data: selfieBase64,
+                  mimeType: selfieMime
+               }
+            });
+            contentsPayload[0].text += `\n\n[CRITICAL SOURCE IMAGE]: The FIRST attached image is the user's original photo. You MUST deeply analyze their exact gender, apparent age, face shape, skin tone, eye color, and facial hair. You MUST include these EXACT features in your final prompt to ensure their face remains completely unchanged! Ignoring any generic text specs provided if they conflict with the image.`;
+        }
+
         if (finalTargetImageUrl && finalTargetImageUrl.startsWith("data:image/")) {
             const mimeType = finalTargetImageUrl.split(';')[0].split(':')[1];
             const base64Data = finalTargetImageUrl.split(',')[1];
@@ -393,7 +406,7 @@ Instructions:
                   mimeType: mimeType
                }
             });
-            contentsPayload[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The user provided a reference image showing the target hairstyle (attached). You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
+            contentsPayload[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The SECOND attached image is the target hairstyle reference. You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
         }
 
         const promptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
@@ -434,7 +447,7 @@ Instructions:
         } else {
           try {
             console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
-            let endpoint = "https://fal.run/fal-ai/flux/schnell";
+            let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
             
             const fluxBaseImageUrl = baseImageForFlux.startsWith('data:') ? await uploadImageToFal(baseImageForFlux) : baseImageForFlux;
 
@@ -442,7 +455,7 @@ Instructions:
                prompt: promptEng,
                image_url: fluxBaseImageUrl,
                strength: fluxStrength,
-               num_inference_steps: 4
+               num_inference_steps: 28
             };
             
             const fluxRes = await imageGenQueue.add(() => fetch(endpoint, {
@@ -530,10 +543,7 @@ Instructions:
              friendlyError = `Ошибка нейросети: ${error.message}`;
           }
 
-          return res.status(500).json({ 
-            error: friendlyError,
-            referenceImage: finalImageUrl 
-          });
+          throw new Error(friendlyError);
         }
 
       // Ensure fallback or fast CDN upload
@@ -783,6 +793,16 @@ generateRouter.post("/transcribe", async (req, res) => {
 generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
   try {
     const { userId, existingNames, features, preferredStyle } = req.body;
+    
+    // We deduct 1 generation for AI load more
+    if (!userId) {
+        return res.status(401).json({ error: "Missing userId" });
+    }
+    const billingCheck = await checkAndDeductGeneration(userId, 'load-more-' + Date.now(), req.body.tgUserId, 'load-more-' + Date.now());
+    if (!billingCheck.ok) {
+        return res.status(403).json({ error: billingCheck.error });
+    }
+
     
     let existingStr = "";
     if (Array.isArray(existingNames) && existingNames.length > 0) {

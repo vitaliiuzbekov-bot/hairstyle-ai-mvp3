@@ -3,7 +3,7 @@ import { signInAnonymously } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useUI } from "../context/UIContext";
-import { getHistory } from "../services/localHistory";
+import { getHistory, saveHistory } from "../services/localHistory";
 
 export const useTokenManager = () => {
   const { addToast } = useUI();
@@ -172,7 +172,7 @@ export const useTokenManager = () => {
                 if (newItems.length > 0) {
                   const mergedHistory = [...newItems, ...localHistory].sort((a,b) => b.timestamp - a.timestamp);
                   setHistory(mergedHistory);
-                  import('../services/localHistory').then(m => m.saveHistory(mergedHistory));
+                  saveHistory(mergedHistory);
                 }
               }
             } catch (e) {

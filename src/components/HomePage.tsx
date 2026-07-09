@@ -134,6 +134,16 @@ export const HomePage: React.FC<HomePageProps> = ({
   }, [originalHandleFileUpload, setResults, setArGeneratedImageUrl, setTryOnStyle]);
 
   useEffect(() => {
+    const handleSelectStyle = (e: any) => {
+      setTryOnStyle(e.detail);
+      // scroll to top or smoothly to the try-on section if desired
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('select-style', handleSelectStyle);
+    return () => window.removeEventListener('select-style', handleSelectStyle);
+  }, [setTryOnStyle]);
+
+  useEffect(() => {
     setVtonResultUrl(null);
     setVtonError(null);
     setCustomHairColor(null);

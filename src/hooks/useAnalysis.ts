@@ -109,9 +109,11 @@ export const useAnalysis = ({
         try {
             const res = await fetch("/api/reference", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", ...((window as any).Telegram?.WebApp?.initData ? { "x-telegram-init-data": (window as any).Telegram.WebApp.initData } : {}) },
                 body: JSON.stringify({
                     keyword: rec.imageKeyword,
+                    isLibrary: true,
+                    haircutName: rec.name,
                     gender: resultData.gender,
                     faceShape: resultData.faceShape,
                     hairColor: resultData.hairColor,
@@ -198,7 +200,7 @@ export const useAnalysis = ({
           if (preferredStyle) formData.append("preferredStyle", encodeURIComponent(preferredStyle));
           
           if (localStats) {
-              formData.append("skipVision", "true");
+              formData.append("skipVision", "false");
               formData.append("faceApiGender", localStats.gender);
               formData.append("faceApiShape", localStats.faceShape);
               formData.append("faceApiAge", localStats.ageRange);
@@ -206,7 +208,46 @@ export const useAnalysis = ({
               if (localStats.hairColor) formData.append("localHairColor", localStats.hairColor);
           }
 
-          let parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
+          let parsedResults: AnalysisResult;
+          if (localStats) {
+              console.log("Skipping server analysis, using fast local analysis to speed up.");
+              parsedResults = localStats;
+          } else {
+              parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
+          }
+
+          // Only inject initial library styles if this is a fresh analysis.
+          // Otherwise, we keep the previously generated or assigned styles.
+          if (!localStats) {
+            try {
+              const { FEMALE_LIBRARY, MALE_LIBRARY } = await import('../data/haircutLibrary');
+              const lib = parsedResults.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
+              const allStyles = Object.values(lib).flat();
+              
+              let filteredStyles = allStyles;
+              if (preferredStyle === "Спортивный") {
+                  filteredStyles = allStyles.filter(s => s.category === 'short' || s.category === 'creative');
+              } else if (preferredStyle === "Деловой") {
+                  filteredStyles = allStyles.filter(s => s.category === 'short' || s.category === 'medium');
+              } else if (preferredStyle === "Романтичный") {
+                  filteredStyles = allStyles.filter(s => s.category === 'medium' || s.category === 'long');
+              }
+
+              if (filteredStyles.length < 3) filteredStyles = allStyles;
+
+              const shuffled = filteredStyles.sort(() => 0.5 - Math.random());
+              const picked = shuffled.slice(0, 3).map(s => ({
+                name: s.name,
+                description: s.description,
+                stylingTips: s.stylingTips,
+                imageKeyword: s.name
+              }));
+              parsedResults.recommendations = picked;
+            } catch(e) {
+              console.warn("Failed to inject library styles", e);
+            }
+          }
+
           setResults(parsedResults);
           hapticNotification('success');
           
@@ -364,7 +405,7 @@ export const useAnalysis = ({
             try {
               // Dynamically import to avoid top level import issues if needed, or import at top
               const { applyWatermark } = await import('../utils/watermark');
-              watermarkedUrl = await applyWatermark(data.imageUrl, "https://t.me/neirostilist_bot");
+              watermarkedUrl = await applyWatermark(data.imageUrl, "t.me/neirostilist_bot");
             } catch (e) {
               console.error("Failed to apply watermark", e);
             }
@@ -405,8 +446,19 @@ export const useAnalysis = ({
         }
     };
 
-    const loadMoreRecommendations = useCallback(async () => {
+    const loadMoreRecommendations = useCallback(async (mode: 'library' | 'ai' = 'ai') => {
         if ((!imageBase64 && !imageUrl) || !results) return;
+
+        if (mode === 'ai') {
+          if (!isDeveloper && generationsLeft !== null && generationsLeft <= 0) {
+            setShowBuyModal(true);
+            return;
+          }
+          const proceed = await checkLimits();
+          if (!proceed) return;
+          // Optimistically reduce local count so they can't spam it
+          await consumeToken();
+        }
 
         setIsLoadingMore(true);
         setError(null);
@@ -414,22 +466,53 @@ export const useAnalysis = ({
         const existingNames = results.recommendations.map((r) => r.name);
 
         try {
-          const data = await loadMoreApi(userId, existingNames, results, preferredStyle, telegramInitData);
-
-          if (data.recommendations) {
-            setResults((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    recommendations: [
-                      ...prev.recommendations,
-                      ...data.recommendations,
-                    ],
-                  }
-                : prev,
-            );
+          if (mode === 'library') {
+             // pull from static library
+             const { FEMALE_LIBRARY, MALE_LIBRARY } = await import('../data/haircutLibrary');
+             const lib = results.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
+             // flatten
+             const allStyles = Object.values(lib).flat();
+             const available = allStyles.filter(s => !existingNames.includes(s.name));
+             if (available.length === 0) {
+               throw new Error("В библиотеке больше нет новых стилей для вашего типа.");
+             }
+             // pick 3 random
+             const shuffled = available.sort(() => 0.5 - Math.random());
+             const picked = shuffled.slice(0, 3).map(s => ({
+                name: s.name,
+                description: s.description,
+                stylingTips: s.stylingTips,
+                imageKeyword: (s as any).imageKeyword || s.name
+             }));
+             setResults((prev) =>
+               prev
+                 ? {
+                     ...prev,
+                     recommendations: [
+                       ...prev.recommendations,
+                       ...picked,
+                     ],
+                   }
+                 : prev,
+             );
           } else {
-            throw new Error("Модель не вернула результат.");
+            const data = await loadMoreApi(userId, existingNames, results, preferredStyle, telegramInitData);
+
+            if (data.recommendations) {
+              setResults((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      recommendations: [
+                        ...prev.recommendations,
+                        ...data.recommendations,
+                      ],
+                    }
+                  : prev,
+              );
+            } else {
+              throw new Error("Модель не вернула результат.");
+            }
           }
         } catch (err: any) {
           console.error("AI Load More Error:", err);
@@ -437,7 +520,7 @@ export const useAnalysis = ({
         } finally {
           setIsLoadingMore(false);
         }
-        }, [imageBase64, imageUrl, results, userId, preferredStyle, telegramInitData, setError]);
+    }, [imageBase64, imageUrl, results, userId, preferredStyle, telegramInitData, setError, checkLimits, consumeToken, setShowBuyModal, generationsLeft, isDeveloper]);
     
     return {
         isAnalyzing,

@@ -48,7 +48,7 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isLightMode 
   if (!showModal) return null;
 
   return (
-    <div className={`fixed inset-0 z-[110] flex items-center justify-center p-4 ${isLightMode ? 'bg-gray-900/40 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
+    <div className={`fixed-viewport z-[110] flex items-center justify-center p-4 ${isLightMode ? 'bg-gray-900/40 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
       <div className={`relative w-full max-w-sm rounded-[2rem] p-8 text-center shadow-2xl animate-in zoom-in-95 fade-in duration-500 overflow-hidden ${isLightMode ? 'bg-white border border-gray-200' : 'bg-[#0f0c1b] border border-white/10'}`}>
         
         {/* Background Glow */}

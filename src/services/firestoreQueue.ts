@@ -1,7 +1,7 @@
-import { doc, writeBatch } from "firebase/firestore";
+import { doc, writeBatch, WriteBatch } from "firebase/firestore";
 import { db } from "../firebase";
 
-let currentBatch = writeBatch(db);
+let currentBatch: WriteBatch | null = null;
 let batchTimeout: NodeJS.Timeout | null = null;
 let operationCount = 0;
 const MAX_OPERATIONS = 10;
@@ -9,7 +9,10 @@ const BATCH_DELAY = 2000;
 
 export const scheduleBatchUpdate = (userId: string, data: any) => {
   if (!userId || userId === "local-user") return;
-
+  if (!currentBatch) {
+    currentBatch = writeBatch(db);
+  }
+  
   const userRef = doc(db, "users", userId);
   currentBatch.update(userRef, data);
   operationCount++;
@@ -27,7 +30,7 @@ export const scheduleBatchUpdate = (userId: string, data: any) => {
 };
 
 export const commitBatch = async () => {
-  if (operationCount === 0) return;
+  if (operationCount === 0 || !currentBatch) return;
   
   const batchToCommit = currentBatch;
   currentBatch = writeBatch(db);
@@ -54,12 +57,10 @@ if (typeof window !== "undefined") {
       commitBatch();
     }
   });
-
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.onEvent("viewportChanged", () => {
-      // Just a hook for generic events if needed, but the main close event usually triggers beforeunload 
-      // where supported. Although Telegram webviews might have their own behavior.
+      // hook
     });
   }
 }

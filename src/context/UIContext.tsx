@@ -17,6 +17,8 @@ interface UIContextType {
   chatStyleName: string;
   setChatStyleName: (val: string) => void;
   isCameraModalOpen: boolean;
+  isLibraryOpen: boolean;
+  setIsLibraryOpen: (val: boolean) => void;
   setIsCameraModalOpen: (val: boolean) => void;
 
   // Модалка "Поделиться" (Новое)
@@ -52,6 +54,7 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatStyleName, setChatStyleName] = useState("");
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastType[]>([]);
 
   // Состояния для шеринга (Новое)
@@ -114,6 +117,8 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
         setChatStyleName,
         isCameraModalOpen,
         setIsCameraModalOpen,
+        isLibraryOpen,
+        setIsLibraryOpen,
         isShareOpen,
         setIsShareOpen,
         shareUrl,

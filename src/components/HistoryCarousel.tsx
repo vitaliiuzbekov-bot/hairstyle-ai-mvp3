@@ -46,7 +46,7 @@ const HistoryCarouselComponent: React.FC<HistoryCarouselProps> = ({
               src={item.url || undefined}
               alt={item.keyword}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
+              
             />
 
             <button

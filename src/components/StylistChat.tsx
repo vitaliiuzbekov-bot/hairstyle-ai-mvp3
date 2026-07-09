@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Sparkles, Loader2, X, Mic, Square } from 'lucide-react';
 
@@ -14,6 +15,8 @@ interface ChatMessage {
 }
 
 export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, styleName, isLightMode }) => {
+  useModalBackButton(true, onClose);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', text: `Привет! Я твой ИИ-стилист. ${styleName ? `У нас выбрана стрижка "${styleName}". ` : ''}Готов ответить на любые вопросы о твоих волосах и стиле.` }
   ]);
@@ -182,7 +185,7 @@ export const StylistChat: React.FC<StylistChatProps> = ({ onClose, features, sty
   };
 
   return (
-    <div className={`fixed inset-0 z-[110] flex items-end sm:items-center justify-center animate-in fade-in duration-300 ${isLightMode ? 'bg-black/20 sm:bg-white/40' : 'bg-black/60 sm:bg-white/10'} sm:backdrop-blur-md`}>
+    <div className={`fixed-viewport z-[110] flex items-end sm:items-center justify-center animate-in fade-in duration-300 ${isLightMode ? 'bg-black/20 sm:bg-white/40' : 'bg-black/60 sm:bg-white/10'} sm:backdrop-blur-md`}>
                      <div className={`w-full sm:w-[450px] sm:rounded-2xl h-[90vh] sm:h-[650px] flex flex-col shadow-2xl relative animate-in slide-in-from-bottom-10 sm:zoom-in-95 backdrop-blur-sm ${isLightMode ? 'bg-white/95 border-gray-200 border' : 'bg-[#0f0c1b]/95 border border-white/10'}`}>
           {/* Header */}
           <div className={`flex items-center justify-between px-5 py-4 border-b sm:rounded-t-2xl z-10 relative shadow-sm ${isLightMode ? 'border-gray-200 bg-white/80' : 'border-white/10 bg-black/40'}`}>

@@ -56,12 +56,12 @@ export async function generateReference(prompt: string): Promise<string> {
     console.warn("FAL_KEY is missing, returning a fallback image for reference.");
     return "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=600&auto=format&fit=crop&q=60";
   }
-  const result = await fal.subscribe('fal-ai/flux/dev', {
+  const result = await fal.subscribe('fal-ai/flux/schnell', {
     input: {
       prompt: prompt,
       negative_prompt: 'ugly, deformed, extra fingers, blurry, text, watermark',
-      num_inference_steps: 25,
-      guidance_scale: 7.0,
+      num_inference_steps: 4,
+      // guidance_scale: 7.0,
       image_size: 'portrait_4_3',
     },
     logs: false,

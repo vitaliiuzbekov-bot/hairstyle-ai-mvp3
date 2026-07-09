@@ -7,8 +7,19 @@ export const getCacheKey = (payload: any): string => {
 };
 
 let persistentCacheDisabled = false;
+const memoryCache = new Map<string, { value: any, expiry: number }>();
 
 export const getCachedValue = async <T>(key: string): Promise<T | null> => {
+  // Check memory cache first
+  const memHit = memoryCache.get(key);
+  if (memHit) {
+    if (Date.now() < memHit.expiry) {
+      return memHit.value as T;
+    } else {
+      memoryCache.delete(key);
+    }
+  }
+
   // Check persistent Firestore cache if adminDb is available
   if (adminDb && !persistentCacheDisabled) {
     try {
@@ -16,6 +27,8 @@ export const getCachedValue = async <T>(key: string): Promise<T | null> => {
       if (doc.exists) {
         const data = doc.data();
         if (data && data.expiry && Date.now() < data.expiry) {
+          // Store in memory for next time
+          memoryCache.set(key, { value: data.value, expiry: data.expiry });
           return data.value as T;
         } else {
           // Expired in persistent DB
@@ -39,6 +52,9 @@ export const getCachedValue = async <T>(key: string): Promise<T | null> => {
 export const setCachedValue = async (key: string, value: any, ttlSeconds: number): Promise<void> => {
   const expiry = Date.now() + ttlSeconds * 1000;
   
+  // Set memory cache
+  memoryCache.set(key, { value, expiry });
+
   // Set persistent Firestore cache if adminDb is available
   if (adminDb && !persistentCacheDisabled) {
     try {

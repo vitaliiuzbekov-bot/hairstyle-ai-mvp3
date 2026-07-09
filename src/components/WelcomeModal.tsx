@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React, { useState } from "react";
 import { Scissors, User, Store, Sparkles, Image, Zap, ChevronRight, ChevronLeft } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -31,6 +32,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
   if (!showWelcome) return null;
 
   const handleRoleSelect = (role: 'client' | 'master' | 'salon', name?: string) => {
+  useModalBackButton(showWelcome, () => setShowWelcome(false));
+
     setUserRole(role);
     setShowWelcome(false);
     localStorage.setItem("userRole", role);
@@ -72,7 +75,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
   ];
 
   return (
-    <div className={`fixed inset-0 z-[120] flex items-center justify-center p-4 ${isLightMode ? 'bg-black/20 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
+    <div className={`fixed-viewport z-[120] flex items-center justify-center p-4 ${isLightMode ? 'bg-black/20 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

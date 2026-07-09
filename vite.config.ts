@@ -16,7 +16,7 @@ export default defineConfig(() => {
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: "auto",
-        workbox: {
+        workbox: { maximumFileSizeToCacheInBytes: 10485760,
           globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}"],
           runtimeCaching: [
             {
@@ -50,7 +50,9 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    base: "./",
     build: {
+      assetsInlineLimit: 10000000,
       rollupOptions: {
         output: {
           manualChunks: {

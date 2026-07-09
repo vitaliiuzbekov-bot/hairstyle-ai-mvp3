@@ -1,16 +1,14 @@
-import { serverDb } from '../firebaseClient';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { adminDb } from '../firebase';
 
 export async function cleanupExpiredSessions(): Promise<void> {
   try {
-    if (!serverDb) return;
-    const sessionsRef = collection(serverDb, 'sessions');
-    const q = query(sessionsRef, where('expiresAt', '<', Date.now()));
-    const snapshot = await getDocs(q);
+    if (!adminDb) return;
+    const sessionsRef = adminDb.collection('sessions');
+    const snapshot = await sessionsRef.where('expiresAt', '<', Date.now()).get();
     
     if (snapshot.empty) return;
 
-    const batch = writeBatch(serverDb);
+    const batch = adminDb.batch();
     snapshot.docs.forEach((d: any) => {
       batch.delete(d.ref);
     });

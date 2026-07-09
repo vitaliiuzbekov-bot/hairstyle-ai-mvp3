@@ -170,14 +170,14 @@ export const MaskEditorModal: React.FC<MaskEditorModalProps> = ({ beforeImage, a
 
   if (!imagesLoaded) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95">
+      <div className="fixed-viewport z-[100] flex items-center justify-center bg-black/95">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 text-white animate-in fade-in duration-200">
+    <div className="fixed-viewport z-[100] flex flex-col bg-black/95 text-white animate-in fade-in duration-200">
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20">
           <X size={20} />

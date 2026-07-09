@@ -69,7 +69,10 @@ export const usePhotoHandlers = ({
 
     if (isCamera) {
       // Synchronous check to preserve user interaction token for fallback file input trigger
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const tg = (window as any).Telegram?.WebApp;
+      const isTgMobile = tg && ['android', 'ios'].includes(tg.platform);
+      
+      if (!isTgMobile && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         startCameraLocal("user");
       } else {
         console.warn(

@@ -1,11 +1,23 @@
+import crypto from "crypto";
 import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
 import { callYandexGPT } from "../services/yandex";
 import { safeParseJSON } from "../utils/json";
 import { geminiQueue, withRetry } from "../utils/queues";
 import { createRateLimiter } from "../utils/rateLimiter";
+import { MALE_LIBRARY, FEMALE_LIBRARY } from "../../data/haircutLibrary";
 
 export const analysisRouter = Router();
+
+const analyzeJobMap = new Map<string, { status: 'processing' | 'completed' | 'error', result?: any, error?: string }>();
+
+analysisRouter.get("/analyze-job/:jobId", (req, res) => {
+  const { jobId } = req.params;
+  if (!analyzeJobMap.has(jobId)) {
+    return res.status(404).json({ error: "Job not found" });
+  }
+  res.json(analyzeJobMap.get(jobId));
+});
 
 // Max 5 analysis requests per 10 minutes per user
 const analyzeLimiter = createRateLimiter(10 * 60 * 1000, 5);
@@ -65,6 +77,18 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
         return;
     }
 
+    const jobId = req.body.idempotencyKey || crypto.randomUUID();
+    if (analyzeJobMap.has(jobId) && analyzeJobMap.get(jobId).status === 'processing') {
+      res.json({ jobId });
+      return;
+    }
+    
+    analyzeJobMap.set(jobId, { status: 'processing' });
+    
+    // Start background task
+    (async () => {
+      try {
+
     let visualDescription = "";
 
     // If we have precise local Face-API data, we can use it directly and skip full vision,
@@ -93,7 +117,7 @@ ${preDetectedFacts}
 7) Skin tone and facial hair style (beard, mustache, clean shaven). 
 8) ONLY a concise description of clothing (exact color, type) and background (color/setting). Evaluate hair quality objectively. Be brutally honest.`;
 
-        let base64PrefixRemoved = targetBase64;
+        let base64PrefixRemoved = targetBase64.replace(/\s+/g, "");
         if (targetBase64.startsWith("data:")) {
             base64PrefixRemoved = targetBase64.replace(/^data:[\w-]+\/[\w-]+;base64,/, "");
         }
@@ -110,7 +134,7 @@ ${preDetectedFacts}
                 
                 const contentsPayload = [
                   { text: visionPrompt },
-                  { inlineData: { mimeType: "image/jpeg", data: base64PrefixRemoved } }
+                  { inlineData: { mimeType: req.body.mimeType || "image/jpeg", data: base64PrefixRemoved } }
                 ];
 
                 const response = await geminiQueue.add(() => withRetry(async () => {
@@ -140,7 +164,7 @@ ${preDetectedFacts}
                 throw new Error("GEMINI_API_KEY не установлен. Нейросеть не может проанализировать изображение.");
             }
         } catch (e: any) {
-            console.error("Gemini Vision failed, entering fallback mode:", e.message);
+            console.error("Gemini Vision failed, entering fallback mode:", e.message); logToTelegram("⚠️ *Gemini Vision Fallback:* " + e.message).catch(console.error);
             // DO NOT THROW EXCEPTIONS! We can still process using preDetectedFacts
             visualDescription = preDetectedFacts + "\nВНИМАНИЕ: Детальный визуальный анализ временно недоступен из-за перегрузки серверов ИИ. Используйте только базовые параметры из описания выше для подбора подходящих причесок. По умолчанию считайте длину волос средней/короткой, густоту нормальной, текстуру прямой.";
         }
@@ -150,7 +174,7 @@ ${preDetectedFacts}
     console.time("YandexGPT");
     console.log("Generating recommendations via YandexGPT...");
 
-    const systemText = `Ты топовый и очень креативный парикмахер-стилист. Твоя задача — проанализировать детальное клиническое описание внешности клиента и предложить 3 СОВЕРШЕННО РАЗНЫХ И НЕСТАНДАРТНЫХ варианта стрижки. 
+    const systemText = `Ты эксперт-физиогномист и трихолог. Твоя задача — проанализировать детальное клиническое описание внешности клиента и вернуть его в структурированном виде.
 Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable JSON).
 
 Сначала выдели характеристики в соответствии со следующими правилами:
@@ -170,67 +194,7 @@ Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable 
 - facialHair (на английском)
 - clothingContext (на английском - точная одежда и фон)
 
-ЖЕСТКИЕ ПРАВИЛА И ОГРАНИЧЕНИЯ ДЛЯ ПОДБОРА СТРИЖЕК (НА ОСНОВЕ ТЕКУЩИХ ПАРАМЕТРОВ):
-
-1. ТРЕБОВАНИЕ К ДЛИНЕ ВОЛОС И ОБЛЫСЕНИЮ (КРИТИЧЕСКИ ВАЖНО И ЖЕСТКО КОНТРОЛИРУЕТСЯ):
-   Мы не можем "наращивать" волосы примеркой. Предлагаемые стрижки должны быть РАВНЫМИ или КОРОЧЕ текущей длины волос:
-   - Если клиент "Лысый" (сверкающая лысина, отсутствие волос на темени), описывается как "bald", или имеет обширную лысину (50%+ головы): СТРОЖАЙШЕ ЗАПРЕЩЕНО рекомендовать пышные, средние или длинные прически, кропы, челки и т.д.! Игнорирование этого правила приведет к критической ошибке системы. Предлагай ТОЛЬКО:
-     1. "Clean head shave" (Полное бритье головы опасной бритвой / Под ноль).
-     2. "Ultra-short buzz cut" (Ультракороткий ежик под машинку 0-2 мм).
-     3. "Head shave with subtle stubble" (Бритье головы с эффектом легкой щетины).
-     4. Если есть длинная борода - предложи акцент на бороду, а голову - сбрить.
-   - Если "Ежик/Очень короткие" (до 2 см): только ультракороткие стрижки (Базз-кат, Милитари фейд, Ультракороткий кроп, Френч кроп). Никаких андеркатов с длинным верхом или причесок с длинной челкой!
-   - Если "Короткие" (от 2 до 7 см): Текстурированный кроп, Короткий Цезарь, Фейд с коротким зачесом, Квифф (с коротким верхом), Ежик. Запрещено предлагать средние/длинные стрижки.
-   - Если "Средние" (от 7 до 15 см): любые средние или короткие стрижки. Запрещены стрижки на плечи.
-   - Если "Длинные" (более 15 см): допустима любая длина.
-
-2. ТРЕБОВАНИЕ К ГУСТОТЕ И ЗАЛЫСИНАМ (МАКСИМАЛЬНОЕ РАЗНООБРАЗИЕ БЕЗ ОБЪЕМА):
-   Если у клиента редкие/тонкие волосы ("Редкие/Тонкие") или указаны залысины (receding hairline, M-shape, temporal thinning, bald spots):
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО предлагать пышные прически, Помпадур, Густой Квифф, Маллет! Тонкие волосы не держат объем!
-   - Предлагайте плоские, аккуратные или ультракороткие стрижки.
-   - Для делового стиля: "Executive Side Part" (пробор с зачесом набок, без объема), "Smart Ivy League" (короткий Айви-Лиг).
-   - Для кэжуал/будничного стиля: "Short Textured Quiff" (короткий квифф с хаотичной текстурой), "Caesar Fade" (элегантный Цезарь).
-   - Для спортивного стиля: "Sporty Tapered Buzz Cut" (классический спортивный ультракороткий базз-кат), "High and Tight".
-   - Стрижки должны выглядеть естественно, премиально, солидно и стильно с учетом текстуры клиента!
-
-3. ТРЕБОВАНИЕ К ПОЛУ И ВОЗРАСТУ:
-   - Если сфотографировалась женщина средних лет или пожилая женщина (бабушка), предлагай исключительно СТИЛЬНЫЕ ЖЕНСКИЕ СТРИЖКИ (например, женский Пикси, Боб, Шегги, Каре, Ультракороткий текстурированный женский кроп), соответствующие ее возрасту! Никогда не предлагай бабушкам мужские стрижки вроде "Кроп" или "Фейд", пиши соответствующие ее возрасту модные женские названия.
-   - Для детей предлагай стильные молодежные, детские и практичные стрижки.
-
-4. ТРЕБОВАНИЕ К ВЫБРАННОМУ СТИЛЮ (ЖЕСТКОЕ СООТВЕТСТВИЕ СТИЛЮ):
-   Ожидаемый стиль стрижки: ${preferredStyle !== undefined && preferredStyle !== 'Любой' ? preferredStyle : 'Любой (на твое усмотрение)'}. 
-   Все 3 стрижки из подбора должны строго соответствовать этому стилю! КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО выдавать одни и те же стрижки (например, кроп, кроп, кроп) под разные стили жизни!
-   - "Деловой" (Business) / "Элегантный": Только благородные, аккуратные, соразмерные классические стрижки. Никаких экстремальных андеркатов с выбритым затылком, растрепанного гранжа или кроп-стрижек! Подходящие варианты: Classic Executive Side Part, Ivy League Haircut, Low Pompadour Taper, Gentleman's Tapered Cut.
-   - "Спортивный" (Sporty): Идеально удобные, компактные, атлетичные стрижки. Подходящие варианты: Dynamic Crew Cut, Short Textured Athletic Crop, Buzz Cut low-fade, High and Tight.
-   - "Кэжуал" (Casual): Актуальные повседневные стрижки. Подходящие варианты: Casual Modern Taper, Slick Back Taper, Textured Loose Fringe, Short Messy Quiff.
-   - "Романтичный" / "Креативный" / "Дерзкий": Выразительные, модные, свободные стили. Подходящие варианты: Middle Part Flow "Curtains" (если позволяет длина верха), Modern Taper Mullet (классический мягкий маллет), Wolf Cut, Modern Pompadour Fade, Shaggy Layered Cut.
-
-5. ТРЕБОВАНИЕ К 'imageKeyword' (ДЛЯ ОПТИМАЛЬНОЙ ГЕНЕРАЦИИ РЕФЕРЕНСОВ):
-   - 'imageKeyword' должен быть детальным набором ключевых слов НА АНГЛИЙСКОМ через запятую.
-   - Он должен сочетать название стрижки, ее текстуру, правильный возраст и пол, густоту, чтобы результат генерации точно наложился за счет правильного референса.
-   - КРИТИЧНО ДЛЯ ГЕНЕРАЦИИ: Чтобы нейросети не раздували прически до абсурда, добавляй в imageKeyword жесткие ограничения объема: "absolutely no puffy hair, strictly flat lying top, realistic natural fall, zero artificial volume".
-   - Например: "neat gentleman clean side part haircut, low taper fade, absolutely no puffiness, flat hair, 40 years old man classic business executive hair model, high-quality studio portrait".
-   - Избегай банального названия "Fade". Всегда пиши конкретную стрижку, возраст, пол и структуру волос.
-
-4. ТРЕБОВАНИЯ К ЕСТЕСТВЕННОСТИ, ОБЪЕМУ И ПОВСЕДНЕВНОСТИ (КРИТИЧЕСКИ ВАЖНО):
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕТСЯ предлагать прически с "гипер-объемом", салонные укладки с начесом, зализанные идеально глянцевые волосы каскадом, аниме-укладки или "пышные шапки" волос, если только у клиента изначально волосы не обладают огромной густотой (афро и т.д.).
-   - Для 95% людей предлагай ЕСТЕСТВЕННЫЕ, повседневные (casual) стрижки. Они должны выглядеть так, как люди носят волосы в реальной жизни каждый день (слегка небрежные, естественная текстура, без рекламного лоска).
-   - При написании \`description\` избегай слов "пышная укладка", "идеальный объем", "роскошный объем". Используй "естественное падение волос", "повседневная текстура", "волосы естественно лежат по форме головы".
-
-Твой ответ должен быть СТРОГО в формате валидного JSON объекта:
-{
-  "warning": "Предупредите мягко, если запрос недостижим" (или пустая строка),
-  "recommendations": [
-    {
-      "name": "Название стрижки на русском (уникальное!)",
-      "description": "Точное объяснение, почему она скрывает недостатки и подчеркивает достоинства клиента...",
-      "stylingTips": "Специфичные советы по укладке для его типа волос...",
-      "imageKeyword": "Exact english descriptive keywords, hair length, hair density, hairline detail, style style, close-up portrait"
-    },
-    { ...второй вариант... },
-    { ...третий вариант... }
-  ]
-}
+Твой ответ должен быть СТРОГО в формате валидного JSON объекта.
 Return ONLY the raw JSON string matching this schema:
 {
   "gender": "",
@@ -247,8 +211,7 @@ Return ONLY the raw JSON string matching this schema:
   "ageRange": "",
   "facialFeatures": "",
   "facialHair": "",
-  "clothingContext": "",
-  "recommendations": []
+  "clothingContext": ""
 }`;
 
     let textOutput = await callYandexGPT(systemText, `Visual description: ${visualDescription}`);
@@ -256,15 +219,25 @@ Return ONLY the raw JSON string matching this schema:
     
     const parsedResults = safeParseJSON(textOutput);
     
+    // 🔥 INJECT 3 RANDOM LIBRARY RECOMMENDATIONS TO SAVE AI COSTS 🔥
+    const lib = parsedResults.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
+    const shuffled = [...lib].sort(() => 0.5 - Math.random());
+    const picked = shuffled.slice(0, 3);
+    parsedResults.recommendations = picked.map(item => ({
+      name: item.name,
+      description: item.description,
+      stylingTips: item.stylingTips,
+      imageKeyword: (item as any).imageKeyword || item.name // Ensure imageKeyword exists or fall back to name
+    }));
+    
     // Save to cache for 7 days
     await setCachedValue(cacheKey, parsedResults, 7 * 24 * 60 * 60);
 
     logToTelegram(`🔍 <b>Анализ лица (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
-    res.json(parsedResults);
-
+    
+    analyzeJobMap.set(jobId, { status: 'completed', result: parsedResults });
   } catch (err: any) {
     console.error(err);
-
     let errorMsg = err.message || "Ошибка при анализе фото";
     if (typeof errorMsg === "string" && errorMsg.trim().startsWith("{")) {
       try {
@@ -273,9 +246,13 @@ Return ONLY the raw JSON string matching this schema:
       } catch(e) {}
     }
     if (typeof errorMsg === "object") errorMsg = JSON.stringify(errorMsg);
-
     logToTelegram(`❌ <b>Ошибка Анализа Лица (${req.body.userId || 'unknown'})</b>\n<code>${errorMsg}</code>`).catch(console.error);
+    analyzeJobMap.set(jobId, { status: 'error', error: errorMsg });
+  }
+    })(); // end IIFE
 
-    res.status(500).json({ error: errorMsg });
+    res.json({ jobId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Pipeline error" });
   }
 });

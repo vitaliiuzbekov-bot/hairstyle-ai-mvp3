@@ -1,4 +1,4 @@
-import html2pdf from "html2pdf.js";
+declare var html2pdf: any;
 
 function getBase64Image(img: HTMLImageElement): string {
   const canvas = document.createElement("canvas");
@@ -28,6 +28,20 @@ async function urlToBase64(url) {
   }
 }
 
+const loadHtml2Pdf = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && (window as any).html2pdf) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load html2pdf.js"));
+    document.head.appendChild(script);
+  });
+};
+
 export const exportToPDF = async (
   elementIdOrEvent?: string | React.MouseEvent,
   filename: string = "neurostylist-guide.pdf",
@@ -42,6 +56,7 @@ export const exportToPDF = async (
   if (!guideElement) return;
 
   try {
+    await loadHtml2Pdf();
     // 1. Get images (from passed props or fallback to DOM)
     let imgBeforeSrc = images?.before;
     let imgRefSrc = images?.reference;
@@ -203,7 +218,7 @@ export const exportToPDF = async (
     }
 
     const file = new File([pdfBlob], filename, { type: "application/pdf" });
-    const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : null;
+    const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
     const isTelegramEnv = !!tg?.initDataUnsafe?.user;
 
     if (isTelegramEnv && tg.initDataUnsafe?.user?.id) {

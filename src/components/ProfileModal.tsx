@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React from "react";
 import { X, User, Share2, Sun, Moon, LogOut, ArrowDownToLine, Clock } from "lucide-react";
 import { useUser } from "../context/UserContext";
@@ -28,6 +29,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const navigate = useNavigate();
 
   const handleShare = () => {
+  useModalBackButton(true, onClose);
+
     const botLink = "https://t.me/neirostilist_bot/app?startapp=ref_" + userId;
     const text = "Подбери себе идеальную стрижку с помощью ИИ!";
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent(botLink) + "&text=" + encodeURIComponent(text);
@@ -40,7 +43,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose}></div>
+      <div className="fixed-viewport z-40" onClick={onClose}></div>
       <div 
         className={`absolute top-16 right-4 sm:right-6 w-64 border rounded-2xl p-3 shadow-xl flex flex-col gap-2 z-50 animate-in slide-in-from-top-2 origin-top-right ${
           isLightMode ? 'bg-white border-gray-200 text-gray-900' : 'bg-[#18181b] border-white/10 text-white'
@@ -96,6 +99,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
 
+        {/* Referral Section */}
+        <div className="flex flex-col gap-1 mt-1 p-2">
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${isLightMode ? 'text-gray-400' : 'text-gray-500'}`}>Реферальная ссылка</p>
+          <div className="flex items-center gap-2">
+            <input 
+              readOnly 
+              value={`https://t.me/neirostilist_bot/app?startapp=ref_${userId}`}
+              className={`flex-1 text-[10px] px-2 py-1.5 rounded-md outline-none border ${isLightMode ? 'bg-gray-50 border-gray-200 text-gray-600' : 'bg-white/5 border-white/10 text-gray-400'}`}
+            />
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(`https://t.me/neirostilist_bot/app?startapp=ref_${userId}`);
+                if (window.Telegram?.WebApp?.showAlert) {
+                  window.Telegram.WebApp.showAlert("Ссылка скопирована!");
+                } else {
+                  alert("Ссылка скопирована!");
+                }
+              }}
+              className={`p-1.5 rounded-md transition-colors ${isLightMode ? 'bg-blue-50 text-blue-500 hover:bg-blue-100' : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'}`}
+            >
+              <Share2 size={14} />
+            </button>
+          </div>
+        </div>
+        <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
         {/* History Link */}
         <div className="flex flex-col gap-0.5 mt-1">
           <button 

@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { X, Star, Gift, Share2 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { ImageSlider } from "./ImageSlider";
+import { useModalBackButton } from "../hooks/useTelegramBackButton";
 
 interface BuyModalProps {
   showBuyModal: boolean;
@@ -23,11 +24,12 @@ export const BuyModal: React.FC<BuyModalProps> = ({
   isLightMode,
 }) => {
   useScrollLock(showBuyModal);
+  useModalBackButton(showBuyModal, () => setShowBuyModal(false));
 
   if (!showBuyModal) return null;
 
   return (
-    <div className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${isLightMode ? 'bg-gray-900/40 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
+    <div className={`fixed-viewport z-[200] flex items-center justify-center p-4 ${isLightMode ? 'bg-gray-900/40 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`}>
       <div className={`w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative flex flex-col items-center animate-in zoom-in-95 fade-in duration-300 overflow-hidden ${isLightMode ? 'bg-white border border-gray-200' : 'bg-[#0f0c1b] border border-white/10'} max-h-[95vh] overflow-y-auto custom-scrollbar`}>
         
         {/* Glow effect */}

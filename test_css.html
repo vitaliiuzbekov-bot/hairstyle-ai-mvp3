@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.container {
+  width: 400px;
+  height: 500px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid black;
+}
+.right-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  transform: translateX(-50%);
+  object-fit: cover;
+}
+.left-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  transform: translateX(0);
+  object-fit: cover;
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <img src="split3.jpg" class="right-face">
+  </div>
+  <div class="container">
+    <img src="split3.jpg" class="left-face">
+  </div>
+</body>
+</html>

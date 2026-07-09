@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React, { useRef, useEffect } from "react";
 import { Scissors, X, Zap, Sparkles, FileDown, Send, Download, ShoppingBag, Share2 } from "lucide-react";
 import { LazyImage } from "./LazyImage";
@@ -104,7 +105,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
 
   if (!tryOnStyle) return null;
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-300 ${isLightMode ? 'bg-black/20 sm:bg-white/40' : 'bg-black/60 sm:bg-white/10'} sm:backdrop-blur-md`}>
+    <div className={`fixed-viewport z-[100] flex items-center justify-center animate-in fade-in duration-300 ${isLightMode ? 'bg-black/20 sm:bg-white/40' : 'bg-black/60 sm:bg-white/10'} sm:backdrop-blur-md`}>
       <div className={`sm:glass-panel border-t sm:border sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-5xl sm:max-h-[90vh] flex flex-col shadow-2xl relative ${isLightMode ? 'bg-white border-gray-200' : 'bg-[#0f0c1b] border-white/10'}`}>
         <div className={`p-4 sm:p-6 border-b flex justify-between items-center sm:bg-transparent sticky top-0 z-50 ${isLightMode ? 'bg-white border-gray-200' : 'bg-[#0f0c1b] border-white/10'}`}>
           <h3 className={`font-serif text-xl sm:text-2xl flex items-center gap-3 tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>

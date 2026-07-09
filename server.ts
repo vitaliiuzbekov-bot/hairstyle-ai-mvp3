@@ -57,13 +57,15 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
       return;
     }
     
-    const userParam = parsedData.get('user');
-    if (userParam && req.body?.tgUserId) {
+        const userParam = parsedData.get('user');
+    if (userParam) {
       const userObj = JSON.parse(userParam);
-      if (userObj.id.toString() !== req.body.tgUserId.toString()) {
-         res.status(403).json({ error: "Telegram User ID mismatch in request and Init Data" });
-         return;
+      if (req.body) {
+        req.body.tgUserId = userObj.id.toString();
       }
+    } else {
+      res.status(403).json({ error: "Invalid Telegram Init Data: Missing user" });
+      return;
     }
 
     next();
@@ -149,7 +151,9 @@ async function startServer() {
   });
 
   app.use("/api/analyze", apiLimiter, upload.single("image"), telegramValidationMiddleware);
+  app.use("/api/generate-reference", telegramValidationMiddleware, apiLimiter);
   app.use("/api/reference", telegramValidationMiddleware, apiLimiter);
+  app.use("/api/send-pdf", telegramValidationMiddleware, apiLimiter);
   app.use("/api/generate-full", apiLimiter, upload.single("image"), telegramValidationMiddleware);
   app.use("/api/generate-ar", telegramValidationMiddleware, apiLimiter);
   app.use("/api/chat-stylist", telegramValidationMiddleware, apiLimiter);

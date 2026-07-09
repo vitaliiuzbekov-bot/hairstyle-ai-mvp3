@@ -57,7 +57,18 @@ export const RecommendationCard = React.memo(({
                   <span className="text-[11px] font-medium text-amber-500 uppercase tracking-widest text-center mt-2 leading-relaxed relative z-10">Поиск идеального<br/>референса...</span>
                 </div>
               ) : (
-                <div className="absolute inset-0 w-full h-full bg-[#0a0812]"></div>
+                <>
+                  <LazyImage
+                    keyword={rec.imageKeyword || rec.name}
+                    gender={results?.gender || ""}
+                    uniqueName={rec.name}
+                    description={rec.description}
+                    results={results}
+                    autoLoad={true} isLightMode={isLightMode}
+                    className="absolute inset-0 w-full h-full object-cover object-center blur-md opacity-40 scale-105"
+                  />
+                  <div className="absolute inset-0 w-full h-full bg-[#0a0812]/50"></div>
+                </>
               )}
               
               <div className={`absolute inset-x-0 bottom-0 h-32 pointer-events-none z-10 ${isLightMode ? 'bg-gradient-to-t from-black/20 to-transparent' : 'bg-gradient-to-t from-black/80 to-transparent'}`}></div>
