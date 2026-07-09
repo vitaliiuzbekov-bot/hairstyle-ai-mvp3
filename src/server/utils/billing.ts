@@ -61,7 +61,7 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
     }
     return { ok: true };
   } catch (err: any) {
-    if (err.message && err.message.includes('PERMISSION_DENIED')) {
+    if (err.code === 7 || (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('Missing or insufficient permissions')))) {
       console.warn("Firebase permission denied. Bypassing billing check.");
       return { ok: true };
     }
@@ -88,7 +88,7 @@ export const refundGeneration = async (userId: string | undefined): Promise<void
     const userRef = adminDb.collection("users").doc(userId);
     await userRef.update({ generationsLeft: FieldValue.increment(1) });
   } catch (err: any) {
-    if (err.message && err.message.includes('PERMISSION_DENIED')) {
+    if (err.code === 7 || (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('Missing or insufficient permissions')))) {
       return;
     }
     console.error("Failed to refund token:", err);

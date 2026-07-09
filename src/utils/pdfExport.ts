@@ -122,7 +122,7 @@ export const exportToPDF = async (
         /* Visual footer for the end of the document */
         .pdf-footer { margin-top: 60px; border-top: 1px solid #e5e7eb; padding-top: 20px; display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; page-break-inside: avoid; font-weight: 600; }
         
-        .pdf-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 140px; font-weight: 900; color: rgba(0,0,0,0.015); pointer-events: none; white-space: nowrap; z-index: -1; }
+        .pdf-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 140px; font-weight: 900; color: rgba(0,0,0,0.03); pointer-events: none; white-space: nowrap; z-index: 9999; }
       </style>
       <div class="pdf-page">
         <div class="pdf-watermark">HAIRSTYLE AI</div>
@@ -228,6 +228,9 @@ export const exportToPDF = async (
           fd.append("pdf", file);
           const res = await fetch("/api/send-pdf", {
              method: "POST",
+             headers: {
+                "x-telegram-init-data": tg.initData || ""
+             },
              body: fd
           });
           if (res.ok) {
