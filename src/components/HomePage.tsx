@@ -207,8 +207,8 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Intro */}
         {!imageBase64 && (
           <div className="text-center max-w-2xl mx-auto mb-10 md:mb-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <h2 className={`font-serif text-3xl sm:text-4xl md:text-5xl lg:text-5xl mb-4 md:mb-6 leading-tight tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
-              Какая стрижка подойдет <br className="hidden sm:block" />{" "}
+            <h2 className={`font-serif text-2xl sm:text-3xl md:text-5xl lg:text-5xl mb-4 md:mb-6 leading-tight tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
+              Какая стрижка подойдет <br />{" "}
               <span className={`italic ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>именно вам?</span>
             </h2>
             

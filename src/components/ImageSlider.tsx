@@ -89,7 +89,7 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
           className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
         />
       </div>
-      <div className="absolute top-4 left-[75%] -translate-x-1/2 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide whitespace-nowrap">
+      <div className="absolute top-4 right-4 px-2 sm:px-3 py-1 sm:py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[9px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide whitespace-nowrap">
         ИИ-РЕЗУЛЬТАТ
       </div>
       
@@ -110,7 +110,7 @@ export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
             draggable={false}
             className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
           />
-          <div className="absolute top-4 left-[25%] -translate-x-1/2 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide whitespace-nowrap">
+          <div className="absolute top-4 left-4 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[9px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide whitespace-nowrap">
             ОБЫЧНОЕ ФОТО
           </div>
         </div>
