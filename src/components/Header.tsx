@@ -76,9 +76,9 @@ export const Header: React.FC<HeaderProps> = ({
             {isDeveloper && <span className="ml-1 sm:ml-2 text-[9px] bg-red-500/90 text-white font-mono px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-sm">DEV</span>}
           </h1>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-mono shrink-0 ${isLightMode ? 'bg-amber-50 border-amber-100 text-amber-800' : 'bg-white/5 border-white/10 text-white/90'}`}>
-            <Coins size={14} className="text-amber-500 shrink-0" />
+        <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+          <div className={`flex items-center gap-1 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-full border text-[10px] sm:text-xs font-mono shrink-0 ${isLightMode ? 'bg-amber-50 border-amber-100 text-amber-800' : 'bg-white/5 border-white/10 text-white/90'}`}>
+            <Coins size={12} className="text-amber-500 shrink-0 sm:w-3.5 sm:h-3.5" />
             <span className="shrink-0">
               <span className="hidden sm:inline">Баланс: </span>{generationsLeft !== null ? generationsLeft : "..."}
             </span>
@@ -86,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={buyTokens}
             disabled={isBuying}
-            className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 active:scale-95 disabled:opacity-50 text-black font-bold text-[9px] sm:text-[11px] uppercase tracking-wider px-2 sm:px-3 py-1.5 rounded-full transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] whitespace-nowrap shrink-0"
+            className="flex items-center gap-0.5 sm:gap-1 bg-amber-500 hover:bg-amber-400 active:scale-95 disabled:opacity-50 text-black font-bold text-[9px] sm:text-[11px] uppercase tracking-wider px-2 sm:px-3 py-1 sm:py-1.5 rounded-full transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] whitespace-nowrap shrink-0"
           >
             <Zap size={10} fill="currentColor" className="sm:inline hidden shrink-0" />
             {isBuying ? "..." : "Купить"}

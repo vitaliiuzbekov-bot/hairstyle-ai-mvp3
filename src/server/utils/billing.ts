@@ -72,7 +72,7 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
     if (err.message === "REPLAY_ATTACK") {
        return { ok: false, error: "Попытка повторного использования ключа (Replay Attack)." };
     }
-    return { ok: false, error: "Внутренняя ошибка биллинга." };
+    return { ok: false, error: `Внутренняя ошибка биллинга: ${err.message}` };
   }
 };
 
