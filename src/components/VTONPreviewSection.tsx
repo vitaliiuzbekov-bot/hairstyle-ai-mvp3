@@ -219,13 +219,42 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   try {
                      const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
                      const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
-                     const url = URL.createObjectURL(videoBlob);
-                     const a = document.createElement('a');
-                     a.href = url;
-                     // In Telegram ios Safari, downloads might need to be explicitly opened or shared, but download attribute works for files
-                     a.download = `before_after_${Date.now()}.mp4`;
-                     a.click();
-                     setTimeout(() => URL.revokeObjectURL(url), 10000);
+                     const tg = (window as any).Telegram?.WebApp;
+                     
+                     if (tg && tg.shareToStory) {
+                        const base64Promise = new Promise<string>((resolve, reject) => {
+                           const reader = new FileReader();
+                           reader.onloadend = () => resolve(reader.result as string);
+                           reader.onerror = reject;
+                           reader.readAsDataURL(videoBlob);
+                        });
+                        const videoBase64 = await base64Promise;
+                        
+                        const res = await fetch("/api/upload-video", {
+                           method: "POST",
+                           headers: { "Content-Type": "application/json" },
+                           body: JSON.stringify({ videoBase64, mimeType: videoBlob.type })
+                        });
+                        
+                        if (!res.ok) throw new Error("Failed to upload video for story");
+                        const { url } = await res.json();
+                        
+                        tg.shareToStory(url, {
+                           text: "Мой новый стиль от нейросети! 💇‍♀️✨",
+                           widget_link: {
+                              url: "https://t.me/neirostilist_bot",
+                              name: "Примерить тоже"
+                           }
+                        });
+                     } else {
+                        const url = URL.createObjectURL(videoBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        // In Telegram ios Safari, downloads might need to be explicitly opened or shared, but download attribute works for files
+                        a.download = `before_after_${Date.now()}.mp4`;
+                        a.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 10000);
+                     }
                   } catch (err) {
                      console.error("Video export failed", err);
                      alert("К сожалению, видео не удалось сохранить на вашем устройстве.");
@@ -236,7 +265,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100' : 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30'}`}
              >
                 {isExportingVideo ? <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div> : <Video size={16} />}
-                <span className="hidden sm:inline">Видео</span>
+                <span className="hidden sm:inline">{(window as any).Telegram?.WebApp?.shareToStory ? 'В Сторис' : 'Видео'}</span>
              </button>
              <div className="flex gap-2">
                  <button

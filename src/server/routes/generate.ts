@@ -51,6 +51,38 @@ generateRouter.get("/proxy-image", async (req, res) => {
   }
 });
 
+generateRouter.post("/upload-video", async (req, res) => {
+  try {
+    const { videoBase64, mimeType = 'video/mp4' } = req.body;
+    if (!videoBase64) return res.status(400).send("No video provided");
+    if (!adminStorage) return res.status(500).send("Storage not configured");
+    
+    const buffer = Buffer.from(videoBase64.split(",")[1] || videoBase64, "base64");
+    const bucket = adminStorage.bucket();
+    if (!bucket.name) return res.status(500).send("Bucket missing");
+    
+    const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+    const fileName = `stories/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+    const file = bucket.file(fileName);
+    const uuid = crypto.randomUUID();
+    
+    await file.save(buffer, {
+      metadata: {
+        contentType: mimeType,
+        metadata: {
+          firebaseStorageDownloadTokens: uuid
+        }
+      }
+    });
+    
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
+    res.json({ url: publicUrl });
+  } catch(e: any) {
+    console.error("Upload video error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const jobMap = new Map<string, { status: 'processing' | 'completed' | 'error', result?: any, error?: string }>();
 
 generateRouter.get("/job/:jobId", (req, res) => {
