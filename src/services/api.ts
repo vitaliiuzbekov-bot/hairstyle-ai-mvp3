@@ -1,6 +1,10 @@
 import { AnalysisResult } from '../types';
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 1000): Promise<Response> {
+  const isDev = localStorage.getItem("developerMode") === "true";
+  if (isDev) {
+    options.headers = { ...options.headers, "X-Developer-Mode": "true" };
+  }
   try {
     const response = await fetch(url, options);
     // Do not retry 4xx errors, only 5xx or network errors

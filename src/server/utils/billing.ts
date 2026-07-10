@@ -1,12 +1,16 @@
 import { adminDb } from "../firebase";
 import { FieldValue } from "firebase-admin/firestore";
 
-export const checkAndDeductGeneration = async (userId: string | undefined, idempotencyKey?: string, tgUserId?: string, cacheKey?: string): Promise<{ ok: boolean; error?: string }> => {
+export const checkAndDeductGeneration = async (userId: string | undefined, idempotencyKey?: string, tgUserId?: string, cacheKey?: string, isDeveloper?: boolean): Promise<{ ok: boolean; error?: string }> => {
   if (!userId) {
     return { ok: false, error: "Missing userId" };
   }
   if (!adminDb) {
     return { ok: true }; // Firebase admin not configured, allow
+  }
+  
+  if (isDeveloper) {
+    return { ok: true }; // Bypass for dev testing
   }
   
   // Local dev mode, allow ONLY if dev
@@ -35,7 +39,18 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
       }
 
       const doc = await t.get(userRef);
-      if (!doc.exists) return false;
+      if (!doc.exists) {
+        // Выдаем 3 бесплатные генерации новым пользователям (1 списываем сейчас, остается 2)
+        t.set(userRef, {
+          tgId: tgUserId || null,
+          generationsLeft: 2,
+          createdAt: FieldValue.serverTimestamp()
+        });
+        if (deductionRef) {
+          t.set(deductionRef, { timestamp: FieldValue.serverTimestamp(), cacheKey: cacheKey || null });
+        }
+        return true;
+      }
       
       const data = doc.data();
 
