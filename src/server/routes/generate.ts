@@ -331,20 +331,12 @@ generateRouter.post("/generate-full", async (req, res) => {
       let uiStrength = Number(vtonStrength) || 45; 
       let fluxStrength = 0.95; // Default for Schnell
 
-      if (finalTargetImageUrl) {
-          // Studio Shot logic: Use catalog image as base and completely skip flux for exact 100% hair shape. 
-          // Note: This results in the catalog model's body being used.
-          console.log("Visual reference provided, enabling Catalog Studio Shot");
-          baseImageForFlux = finalTargetImageUrl;
-          fluxStrength = 0.05; 
-      } else {
-          // Map linearly: 50 -> 0.45, 100 -> 0.75
-          if (uiStrength >= 50 && uiStrength <= 100) {
-              fluxStrength = 0.70 + ((uiStrength - 50) / 50) * 0.25;
-          }
-          if (keyword && keyword.includes("same exact current hairstyle")) {
-              fluxStrength = 0.60; // keep original structure
-          }
+      // Map linearly: 50 -> 0.45, 100 -> 0.75
+      if (uiStrength >= 50 && uiStrength <= 100) {
+          fluxStrength = 0.70 + ((uiStrength - 50) / 50) * 0.25;
+      }
+      if (keyword && keyword.includes("same exact current hairstyle")) {
+          fluxStrength = 0.60; // keep original structure
       }
 
       let promptEng = "";

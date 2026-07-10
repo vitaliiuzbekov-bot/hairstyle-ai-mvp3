@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { getTelegramFileUrl } from "../services/telegramBot";
-import fetch from "node-fetch";
 
 export const tgStorageRouter = Router();
 
@@ -22,8 +21,10 @@ tgStorageRouter.get("/:fileId", async (req, res) => {
     res.set("Content-Type", imageRes.headers.get("content-type") || "image/jpeg");
     res.set("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
     
-    // Stream the image directly to the client
-    imageRes.body?.pipe(res);
+    // Read the arrayBuffer and send it, since native fetch body is not a Node stream
+    const arrayBuffer = await imageRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.send(buffer);
   } catch (err: any) {
     console.error("TG Storage Proxy Error:", err);
     res.status(500).send("Internal server error");
