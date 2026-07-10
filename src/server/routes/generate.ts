@@ -34,6 +34,23 @@ import { uploadImageToFal } from "../services/falClient";
 
 export const generateRouter = Router();
 
+generateRouter.get("/proxy-image", async (req, res) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl) return res.status(400).send("No URL provided");
+  try {
+    const fetchRes = await fetch(imageUrl);
+    if (!fetchRes.ok) return res.status(fetchRes.status).send("Failed to fetch");
+    const buffer = await fetchRes.arrayBuffer();
+    const mime = fetchRes.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+    res.send(Buffer.from(buffer));
+  } catch (e) {
+    res.status(500).send("Proxy error");
+  }
+});
+
 const jobMap = new Map<string, { status: 'processing' | 'completed' | 'error', result?: any, error?: string }>();
 
 generateRouter.get("/job/:jobId", (req, res) => {
@@ -324,17 +341,23 @@ generateRouter.post("/generate-full", async (req, res) => {
       const targetHairColor = isCustomColorRequested ? customHairColor : hairColor;
       const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
       
-      let baseImageForFlux = selfieImageFull;
+      let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
       
-      // Map UI vtonStrength (50-100) to fluxStrength (0.3 - 0.75). 
-      // Higher strength means more hair change, lower means strict adherence to original jaw/face.
       let uiStrength = Number(vtonStrength) || 45; 
       let fluxStrength = 0.95; // Default for Schnell
 
-      // Map linearly: 50 -> 0.45, 100 -> 0.75
-      if (uiStrength >= 50 && uiStrength <= 100) {
-          fluxStrength = 0.70 + ((uiStrength - 50) / 50) * 0.25;
+      if (finalTargetImageUrl) {
+          // If reference image provided, we use it as base. 
+          // We want very low strength to preserve the reference hair shape perfectly.
+          fluxStrength = 0.20 + ((uiStrength - 50) / 50) * 0.15; // 0.20 - 0.35
+          if (fluxStrength < 0.1) fluxStrength = 0.20;
+      } else {
+          // If no reference, modify the selfie
+          if (uiStrength >= 50 && uiStrength <= 100) {
+              fluxStrength = 0.70 + ((uiStrength - 50) / 50) * 0.25; // 0.70 - 0.95
+          }
       }
+      
       if (keyword && keyword.includes("same exact current hairstyle")) {
           fluxStrength = 0.60; // keep original structure
       }
@@ -387,19 +410,41 @@ Instructions:
                   mimeType: selfieMime
                }
             });
-            contentsPayload[0].text += `\n\n[CRITICAL SOURCE IMAGE]: The FIRST attached image is the user's original photo. You MUST deeply analyze their exact gender, apparent age, face shape, skin tone, eye color, and facial hair. You MUST include these EXACT features in your final prompt to ensure their face remains completely unchanged! Ignoring any generic text specs provided if they conflict with the image.`;
+            contentsPayload[0].text += `\n\n[CRITICAL SOURCE IMAGE]: The FIRST attached image is the user's original photo. You MUST deeply analyze their exact gender, apparent age, face shape, skin tone, eye color, and facial hair. You MUST include these EXACT features in your final prompt to ensure their face remains completely unchanged! IMPORTANT: DO NOT describe the hair from this first image. The hair description MUST come ONLY from the target style.`;
         }
 
-        if (finalTargetImageUrl && finalTargetImageUrl.startsWith("data:image/")) {
-            const mimeType = finalTargetImageUrl.split(';')[0].split(':')[1];
-            const base64Data = finalTargetImageUrl.split(',')[1];
-            contentsPayload.push({
-               inlineData: {
-                  data: base64Data,
-                  mimeType: mimeType
-               }
-            });
-            contentsPayload[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The SECOND attached image is the target hairstyle reference. You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts!`;
+        if (finalTargetImageUrl) {
+            let base64Data = "";
+            let mimeType = "image/jpeg";
+            
+            if (finalTargetImageUrl.startsWith("data:image/")) {
+                mimeType = finalTargetImageUrl.split(';')[0].split(':')[1];
+                base64Data = finalTargetImageUrl.split(',')[1];
+            } else if (finalTargetImageUrl.startsWith("http")) {
+                try {
+                    console.log("[generate-full] Fetching target image URL for Gemini visual reference...");
+                    const imgRes = await fetch(finalTargetImageUrl);
+                    if (imgRes.ok) {
+                        const arrayBuffer = await imgRes.arrayBuffer();
+                        base64Data = Buffer.from(arrayBuffer).toString('base64');
+                        mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+                    } else {
+                        console.log(`[generate-full] WARNING: Failed to fetch target image URL for Gemini. Status: ${imgRes.status}`);
+                    }
+                } catch (e) {
+                    console.error("[generate-full] Error fetching target image URL for Gemini:", e);
+                }
+            }
+
+            if (base64Data) {
+                contentsPayload.push({
+                   inlineData: {
+                      data: base64Data,
+                      mimeType: mimeType
+                   }
+                });
+                contentsPayload[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The SECOND attached image is the target hairstyle reference. You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts! Focus heavily on ensuring the exact haircut structure is transferred.`;
+            }
         }
 
         const promptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({

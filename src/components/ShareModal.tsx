@@ -43,9 +43,9 @@ const VkIcon = () => (
 );
 
 export const ShareModal: React.FC = () => {
-  useModalBackButton(true, () => {});
-
   const { isShareOpen, setIsShareOpen, shareUrl, shareTitle } = useUI();
+  useModalBackButton(true, () => setIsShareOpen(false));
+
   const [copiedApp, setCopiedApp] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
   const [activeTab, setActiveTab] = useState<"networks" | "instagram">("networks");

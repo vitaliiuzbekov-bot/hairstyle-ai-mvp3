@@ -11,19 +11,33 @@ function getBase64Image(img: HTMLImageElement): string {
 }
 
 
-async function urlToBase64(url) {
+async function urlToBase64(url: string | null) {
   if (!url || url.startsWith('data:')) return url;
   try {
-    const response = await fetch(url, { mode: 'cors' });
+    if (url.startsWith('blob:')) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // Route through our proxy to avoid CORS tainting in Safari/Telegram WebView
+    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error("Proxy fetch failed");
     const blob = await response.blob();
-    return await new Promise((resolve, reject) => {
+    return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
+      reader.onloadend = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
   } catch (e) {
-    console.warn("Failed to fetch image to base64:", url, e);
+    console.warn("Failed to fetch image to base64 via proxy:", url, e);
     return url;
   }
 }
@@ -77,13 +91,24 @@ export const exportToPDF = async (
 
     // 2. Clone the content to extract textual data
     const cloneText = guideElement.cloneNode(true) as HTMLElement;
-    const interactiveElements = cloneText.querySelectorAll("button, input, textarea, svg, img, .hide-in-pdf");
+    const interactiveElements = cloneText.querySelectorAll("button, input, textarea, .hide-in-pdf");
     interactiveElements.forEach(el => el.remove());
-
-    // Strip all class attributes to prevent complex Tailwind v4 colors from appearing in the cloned HTML
+    
+    // Force light mode styles for PDF to prevent invisible text
     const allElements = cloneText.querySelectorAll("*");
-    allElements.forEach(el => el.removeAttribute("class"));
-    cloneText.removeAttribute("class");
+    allElements.forEach(el => {
+      const className = el.className;
+      if (typeof className === 'string' && className.length > 0) {
+        const newClass = className
+          .replace(/text-white(?:\/\d+)?/g, 'text-gray-900')
+          .replace(/text-gray-[1234]00/g, 'text-gray-600')
+          .replace(/bg-gray-[89]00/g, 'bg-gray-50')
+          .replace(/bg-black/g, 'bg-gray-50')
+          .replace(/bg-\\[#[a-fA-F0-9]+\\](?:\/\d+)?/g, 'bg-gray-50')
+          .replace(/border-white(?:\/\d+)?/g, 'border-gray-200');
+        el.className = newClass;
+      }
+    });
 
     let contentHTML = cloneText.innerHTML;
 
@@ -94,9 +119,34 @@ export const exportToPDF = async (
     pdfContainer.style.color = "#111827";
     pdfContainer.style.fontFamily = "Arial, Helvetica, sans-serif";
     pdfContainer.style.position = "relative";
-    
+
+    // Fetch and sanitize all external stylesheets and style tags to preserve Tailwind
+    let injectedCSS = "";
+    const styleTags = document.querySelectorAll('style');
+    styleTags.forEach(s => {
+       let css = s.innerHTML || "";
+       css = css.replace(/oklch\([^)]+\)/g, '#cbd5e1');
+       injectedCSS += css + "\\n";
+    });
+
+    const links = document.querySelectorAll('link[rel="stylesheet"]');
+    for (const link of Array.from(links)) {
+      try {
+        const href = (link as HTMLLinkElement).href;
+        if (href) {
+          const res = await fetch(href);
+          let cssText = await res.text();
+          cssText = cssText.replace(/oklch\([^)]+\)/g, '#cbd5e1');
+          injectedCSS += cssText + "\\n";
+        }
+      } catch (e) {
+        console.warn("Failed to fetch stylesheet for PDF", e);
+      }
+    }
+
     pdfContainer.innerHTML = `
       <style>
+        ${injectedCSS}
         .pdf-page { box-sizing: border-box; padding: 10px 20px; }
         
         .pdf-header { border-bottom: 2px solid #111; padding-bottom: 24px; margin-bottom: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
@@ -167,18 +217,28 @@ export const exportToPDF = async (
       </div>
     `;
 
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "absolute";
-    iframe.style.width = "718px";
-    iframe.style.height = "2000px";
-    iframe.style.top = "-9999px";
-    iframe.style.left = "-9999px";
-    document.body.appendChild(iframe);
+    const wrapper = document.createElement("div");
+    wrapper.id = "pdf-export-wrapper-secret";
+    wrapper.style.position = "absolute";
+    wrapper.style.width = "718px";
+    wrapper.style.top = "0px";
+    wrapper.style.left = "0px";
+    wrapper.style.zIndex = "-1";
+    wrapper.appendChild(pdfContainer);
+    document.body.appendChild(wrapper);
+
+    // Wait for all images inside pdfContainer to load
+    const pdfImages = Array.from(pdfContainer.querySelectorAll('img'));
+    await Promise.all(pdfImages.map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continue even if an image fails
+      });
+    }));
     
-    const idoc = iframe.contentDocument || (iframe.contentWindow ? iframe.contentWindow.document : null);
-    if (idoc) {
-      idoc.body.appendChild(pdfContainer);
-    }
+    // Add a tiny delay to allow browser to flush rendering
+    await new Promise(r => setTimeout(r, 100));
 
     const opt = {
       margin: 15,
@@ -188,8 +248,28 @@ export const exportToPDF = async (
       html2canvas: { 
          scale: 2, 
          useCORS: true,
+         scrollY: 0,
+         scrollX: 0,
+         x: 0,
+         y: 0,
+         windowWidth: 718,
          // REMOVED letterRendering: true, this fixes glued text in PDF
         onclone: (clonedDoc: Document) => {
+          clonedDoc.documentElement.style.overflow = 'visible';
+          clonedDoc.documentElement.style.width = '100%';
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.body.style.width = '100%';
+          clonedDoc.body.style.margin = '0';
+          clonedDoc.body.style.padding = '0';
+          
+          const clonedWrapper = clonedDoc.getElementById('pdf-export-wrapper-secret');
+          if (clonedWrapper) {
+             clonedWrapper.style.position = "static";
+             clonedWrapper.style.margin = "0";
+             clonedWrapper.style.padding = "0";
+             clonedWrapper.style.transform = "none";
+          }
+          
           // Keep our custom PDF styles, but remove/sanitize others that crash html2canvas
           const styles = clonedDoc.querySelectorAll('style');
           styles.forEach(s => {
@@ -213,8 +293,8 @@ export const exportToPDF = async (
     let sentToBot = false;
     const pdfBlob = await worker.output('blob');
 
-    if (iframe.parentNode) {
-      iframe.parentNode.removeChild(iframe);
+    if (wrapper.parentNode) {
+      wrapper.parentNode.removeChild(wrapper);
     }
 
     const file = new File([pdfBlob], filename, { type: "application/pdf" });

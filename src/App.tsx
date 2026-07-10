@@ -74,6 +74,7 @@ function App() {
     showSalonNameInput, setShowSalonNameInput,
     isChatOpen, setIsChatOpen,
     chatStyleName, setChatStyleName,
+    isShareOpen,
     addToast
   } = useUI();
 
@@ -212,30 +213,34 @@ function App() {
           {showTutorial && (
             <QuickTutorial isLightMode={isLightMode} onComplete={handleTutorialComplete} />
           )}
-          <BuyModal
-            showBuyModal={showBuyModal}
-            setShowBuyModal={setShowBuyModal}
-            isBuying={isBuying}
-            userRole={userRole}
-            userId={userId}
-            processPayment={processPayment}
-            isLightMode={isLightMode}
-          />
+          {showBuyModal && (
+            <BuyModal
+              showBuyModal={showBuyModal}
+              setShowBuyModal={setShowBuyModal}
+              isBuying={isBuying}
+              userRole={userRole}
+              userId={userId}
+              processPayment={processPayment}
+              isLightMode={isLightMode}
+            />
+          )}
 
-          <WelcomeModal
-            showWelcome={showWelcome}
-            setShowWelcome={setShowWelcome}
-            setUserRole={setUserRole}
-            salonName={salonName}
-            setSalonName={setSalonName}
-            showSalonNameInput={showSalonNameInput}
-            setShowSalonNameInput={setShowSalonNameInput}
-            isLightMode={isLightMode}
-          />
+          {showWelcome && (
+            <WelcomeModal
+              showWelcome={showWelcome}
+              setShowWelcome={setShowWelcome}
+              setUserRole={setUserRole}
+              salonName={salonName}
+              setSalonName={setSalonName}
+              showSalonNameInput={showSalonNameInput}
+              setShowSalonNameInput={setShowSalonNameInput}
+              isLightMode={isLightMode}
+            />
+          )}
 
           <DailyRewardModal isLightMode={isLightMode} />
 
-          <ShareModal />
+          {isShareOpen && <ShareModal />}
           <PWAPrompt isLightMode={isLightMode} />
 
           {isProfileOpen && (

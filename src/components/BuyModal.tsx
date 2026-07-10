@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { X, Star, Gift, Share2 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { ImageSlider } from "./ImageSlider";
