@@ -109,7 +109,11 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
           >
             Установить сейчас
           </button>
-        ) : null}
+        ) : (
+          <div className={`p-3 rounded-xl mt-1 text-sm ${isLightMode ? 'bg-gray-50 text-gray-700' : 'bg-white/5 text-gray-300'}`}>
+            <p>Для установки откройте приложение в системном браузере (через меню <b>⋯</b>) и выберите <b>"Добавить на главный экран"</b>.</p>
+          </div>
+        )}
       </div>
     </div>
   );

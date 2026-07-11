@@ -11,6 +11,7 @@ import { useAnalysisContext } from "../context/AnalysisContext";
 import { useUser } from "../context/UserContext";
 import { useUI } from "../context/UIContext";
 import { ImageSlider } from "../components/ImageSlider";
+import { PresetsCarousel } from "../components/PresetsCarousel";
 
 const LoadingFallback = ({ isLightMode }: { isLightMode: boolean }) => (
   <div className={`flex items-center justify-center p-8 ${isLightMode ? 'text-blue-500' : 'text-blue-400'}`}>
@@ -235,6 +236,18 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
 
+        {!imageBase64 && (
+          <div className="fade-in">
+            <PresetsCarousel 
+              isLightMode={isLightMode} 
+              onSelectPreset={(presetName) => {
+                setPreferredStyle(presetName);
+                triggerFileInput({ stopPropagation: () => {} } as React.MouseEvent);
+              }} 
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
           {/* Left / Top: Upload Zone */}
           {isInitializing ? (
@@ -330,7 +343,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         />
 
         <CameraModal
-          isCameraModalOpen={isCameraModalOpen}
+          isCameraModalOpen={isCameraModalOpen} cameraStream={cameraStream}
           customVideoRef={customVideoRef}
           facingMode={facingMode}
           stopCamera={stopCamera}

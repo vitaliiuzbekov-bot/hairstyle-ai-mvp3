@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { X, RefreshCw } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { useModalBackButton } from "../hooks/useTelegramBackButton";
 
 interface CameraModalProps {
+  cameraStream: MediaStream | null;
   isCameraModalOpen: boolean;
   customVideoRef: React.RefObject<HTMLVideoElement>;
   facingMode: string;
@@ -11,8 +13,8 @@ interface CameraModalProps {
   startCameraLocal: (mode: string) => void;
 }
 
-import { useModalBackButton } from "../hooks/useTelegramBackButton";
 export const CameraModal: React.FC<CameraModalProps> = ({
+  cameraStream,
   isCameraModalOpen,
   customVideoRef,
   facingMode,
@@ -21,6 +23,12 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   startCameraLocal,
 }) => {
   useScrollLock(isCameraModalOpen);
+  
+  useEffect(() => {
+    if (isCameraModalOpen && customVideoRef.current && cameraStream) {
+      customVideoRef.current.srcObject = cameraStream;
+    }
+  }, [isCameraModalOpen, cameraStream, customVideoRef]);
 
   if (!isCameraModalOpen) return null;
 
@@ -45,16 +53,13 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
       <div className="absolute bottom-0 inset-x-0 p-6 sm:p-10 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent">
         <div className="w-12 h-12 sm:w-14 sm:h-14">
-          {/* Spacer for centering logic if button removed, or leave flip logic */}
         </div>
-
         <button
           onClick={capturePhoto}
           className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white/40 bg-white/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
         >
           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full"></div>
         </button>
-
         <button
           onClick={() =>
             startCameraLocal(facingMode === "user" ? "environment" : "user")

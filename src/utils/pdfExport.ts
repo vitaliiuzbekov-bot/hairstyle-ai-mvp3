@@ -160,11 +160,11 @@ export const exportToPDF = async (
         .pdf-img-wrap { width: 100%; height: 260px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .pdf-img-wrap img { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px; }
         
-        .pdf-content { text-align: left; font-size: 14px; line-height: 1.6; color: #1f2937; letter-spacing: normal; word-spacing: normal; }
+        .pdf-content { text-align: left; font-size: 16px; line-height: 1.8; color: #000000; letter-spacing: normal; word-spacing: normal; }
         
         /* Strong aesthetic typography and clear structure */
-        .pdf-content h2, .pdf-content h3, .pdf-content h4 { font-size: 18px; font-weight: 800; text-transform: uppercase; margin-top: 36px; margin-bottom: 16px; color: #000; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; page-break-after: avoid; page-break-inside: avoid; letter-spacing: 0.02em; }
-        .pdf-content p { margin-bottom: 16px; font-weight: 400; page-break-inside: avoid; word-wrap: break-word; }
+        .pdf-content h2, .pdf-content h3, .pdf-content h4 { font-size: 20px; font-weight: 900; text-transform: uppercase; margin-top: 36px; margin-bottom: 16px; color: #000; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; page-break-after: avoid; page-break-inside: avoid; letter-spacing: 0.02em; }
+        .pdf-content p { margin-bottom: 16px; font-weight: 500; page-break-inside: avoid; word-wrap: break-word; color: #000; }
         .pdf-content ul { padding-left: 24px; margin-bottom: 24px; }
         .pdf-content li { margin-bottom: 10px; page-break-inside: avoid; }
         .pdf-content strong { font-weight: 700; color: #000; }

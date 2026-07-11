@@ -137,11 +137,13 @@ export const loadMoreApi = async (
   preferredStyle: string,
   telegramInitData?: string
 ) => {
+  const isDev = localStorage.getItem("isDeveloperMode") === "true";
   const response = await fetchWithRetry("/api/load-more", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(telegramInitData ? { "X-Telegram-Init-Data": telegramInitData } : {})
+      ...(telegramInitData ? { "X-Telegram-Init-Data": telegramInitData } : {}),
+      ...(isDev ? { "x-developer-mode": "true" } : {})
     },
     body: JSON.stringify({
       userId,
@@ -174,12 +176,14 @@ export const generateFullApi = async (
   telegramInitData?: string,
   signal?: AbortSignal
 ) => {
+  const isDev = localStorage.getItem("isDeveloperMode") === "true";
   let response: Response;
   try {
     response = await fetchWithRetry("/api/generate-full", {
       method: "POST",
       headers: {
-        ...(telegramInitData ? { "X-Telegram-Init-Data": telegramInitData } : {})
+        ...(telegramInitData ? { "X-Telegram-Init-Data": telegramInitData } : {}),
+        ...(isDev ? { "x-developer-mode": "true" } : {})
       },
       signal,
       body: formData,

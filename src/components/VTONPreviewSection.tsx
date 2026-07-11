@@ -218,25 +218,19 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   setIsExportingVideo(true);
                   try {
                      const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
-                     const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
                      const tg = (window as any).Telegram?.WebApp;
                      
                      if (tg && tg.shareToStory) {
-                        const base64Promise = new Promise<string>((resolve, reject) => {
-                           const reader = new FileReader();
-                           reader.onloadend = () => resolve(reader.result as string);
-                           reader.onerror = reject;
-                           reader.readAsDataURL(videoBlob);
-                        });
-                        const videoBase64 = await base64Promise;
+                        // Generate collage image instead of video for Telegram Stories
+                        const collageBase64 = await generateCollage(beforeSrc, displayResultUrl || "", "НейроСтилист");
                         
                         const res = await fetch("/api/upload-video", {
                            method: "POST",
                            headers: { "Content-Type": "application/json" },
-                           body: JSON.stringify({ videoBase64, mimeType: videoBlob.type })
+                           body: JSON.stringify({ videoBase64: collageBase64, mimeType: "image/jpeg" })
                         });
                         
-                        if (!res.ok) throw new Error("Failed to upload video for story");
+                        if (!res.ok) throw new Error("Failed to upload image for story");
                         const { url } = await res.json();
                         
                         tg.shareToStory(url, {
@@ -247,6 +241,8 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                            }
                         });
                      } else {
+                        // Fallback to video for browsers if needed
+                        const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
                         const url = URL.createObjectURL(videoBlob);
                         const a = document.createElement('a');
                         a.href = url;
@@ -256,8 +252,8 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                         setTimeout(() => URL.revokeObjectURL(url), 10000);
                      }
                   } catch (err) {
-                     console.error("Video export failed", err);
-                     alert("К сожалению, видео не удалось сохранить на вашем устройстве.");
+                     console.error("Story export failed", err);
+                     alert("К сожалению, не удалось поделиться в сторис.");
                   } finally {
                      setIsExportingVideo(false);
                   }

@@ -54,14 +54,18 @@ generateRouter.get("/proxy-image", async (req, res) => {
 generateRouter.post("/upload-video", async (req, res) => {
   try {
     const { videoBase64, mimeType = 'video/mp4' } = req.body;
-    if (!videoBase64) return res.status(400).send("No video provided");
+    if (!videoBase64) return res.status(400).send("No media provided");
     if (!adminStorage) return res.status(500).send("Storage not configured");
     
     const buffer = Buffer.from(videoBase64.split(",")[1] || videoBase64, "base64");
     const bucket = adminStorage.bucket();
     if (!bucket.name) return res.status(500).send("Bucket missing");
     
-    const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+    let ext = "mp4";
+    if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
+    else if (mimeType.includes("png")) ext = "png";
+    else if (mimeType.includes("webm")) ext = "webm";
+
     const fileName = `stories/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
     const file = bucket.file(fileName);
     const uuid = crypto.randomUUID();
@@ -78,7 +82,7 @@ generateRouter.post("/upload-video", async (req, res) => {
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
     res.json({ url: publicUrl });
   } catch(e: any) {
-    console.error("Upload video error:", e);
+    console.error("Upload media error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -385,13 +389,12 @@ generateRouter.post("/generate-full", async (req, res) => {
           if (fluxStrength < 0.1) fluxStrength = 0.20;
       } else {
           // If no reference, modify the selfie
-          if (uiStrength >= 50 && uiStrength <= 100) {
-              fluxStrength = 0.70 + ((uiStrength - 50) / 50) * 0.25; // 0.70 - 0.95
-          }
+          // Map uiStrength (0-100) to a reasonable range. 0.95 destroys face shape.
+          fluxStrength = 0.40 + (uiStrength / 100) * 0.35; 
       }
       
       if (keyword && keyword.includes("same exact current hairstyle")) {
-          fluxStrength = 0.60; // keep original structure
+          fluxStrength = 0.30; // keep original structure
       }
 
       let promptEng = "";
@@ -614,9 +617,7 @@ Instructions:
           }
 
           throw new Error(friendlyError);
-        }
-
-      // Ensure fallback or fast CDN upload
+      }
       let tgFileId = null;
       let sentViaTelegram = false;
 
