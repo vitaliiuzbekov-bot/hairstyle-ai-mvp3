@@ -36,7 +36,11 @@ export const useTokenManager = () => {
       }
 
       let currentUid = null;
-      let tgUser = tg?.initDataUnsafe?.user;
+      let tgUser = null;
+      try {
+         const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+         tgUser = tg?.initDataUnsafe?.user;
+      } catch(e) {}
 
       try {
         const userCred = (await Promise.race([

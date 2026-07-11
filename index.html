@@ -17,16 +17,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>НейроСтилист AI</title>
     <meta name="description" content="AI подбор причесок и стрижек в реальном времени" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-          }
-        });
-      }
-    </script>
+    <!-- VitePWA automatically injects manifest and service worker registration -->
   </head>
   <body>
     <div id="root">

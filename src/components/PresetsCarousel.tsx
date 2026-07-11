@@ -8,54 +8,55 @@ interface Preset {
   imageUrl: string;
 }
 
+// Top haircuts presets with actual AI-generated images
 const PRESETS: Preset[] = [
   {
     id: "m_french_crop",
     name: "Френч кроп",
     gender: "male",
-    imageUrl: "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&q=80&fit=crop"
+    imageUrl: "/presets/m_french_crop.jpg"
   },
   {
     id: "f_pixie",
     name: "Пикси",
     gender: "female",
-    imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80&fit=crop"
+    imageUrl: "/presets/f_pixie.jpg"
   },
   {
     id: "m_pompadour",
     name: "Помпадур",
     gender: "male",
-    imageUrl: "https://images.unsplash.com/photo-1502672023488-70e25813eb80?w=400&q=80&fit=crop"
+    imageUrl: "/presets/m_pompadour.jpg"
   },
   {
     id: "f_bob",
     name: "Укороченный боб",
     gender: "female",
-    imageUrl: "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=400&q=80&fit=crop"
+    imageUrl: "/presets/f_bob.jpg"
   },
   {
     id: "m_buzz",
     name: "Базз кат",
     gender: "male",
-    imageUrl: "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=400&q=80&fit=crop"
+    imageUrl: "/presets/m_buzz.jpg"
   },
   {
     id: "f_shag",
     name: "Шегги",
     gender: "female",
-    imageUrl: "https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=400&q=80&fit=crop"
+    imageUrl: "/presets/f_shag.jpg"
   },
   {
     id: "m_quiff",
     name: "Квифф",
     gender: "male",
-    imageUrl: "https://images.unsplash.com/photo-1512163143273-bde0e3cc7407?w=400&q=80&fit=crop"
+    imageUrl: "/presets/m_quiff.jpg"
   },
   {
     id: "f_curls",
     name: "Естественные кудри",
     gender: "female",
-    imageUrl: "https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=400&q=80&fit=crop"
+    imageUrl: "/presets/f_curls.jpg"
   }
 ];
 

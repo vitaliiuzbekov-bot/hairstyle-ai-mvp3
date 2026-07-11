@@ -79,7 +79,7 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
 async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
-  const PORT = process.env.PORT || 3000;
+  const PORT = 3000;
 
   // Enhance security with Helmet
   app.use(helmet({
@@ -162,6 +162,25 @@ async function startServer() {
   app.use("/api/create-invoice", telegramValidationMiddleware, apiLimiter);
   app.use("/api/set-telegram-webhook", apiLimiter);
   
+  app.get("/api/proxy-image", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      if (!url) return res.status(400).send("No url provided");
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Fetch failed");
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const mimeType = response.headers.get("content-type") || "image/jpeg";
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Cache-Control", "public, max-age=31536000");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(buffer);
+    } catch (e) {
+      console.error("Proxy error", e);
+      res.status(500).send("Failed to proxy image");
+    }
+  });
+
   app.use("/api", analysisRouter);
   app.use("/api", generateRouter);
   app.use("/api", authRouter);

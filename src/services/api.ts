@@ -1,7 +1,7 @@
 import { AnalysisResult } from '../types';
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 1000): Promise<Response> {
-  const isDev = localStorage.getItem("developerMode") === "true";
+  const isDev = localStorage.getItem("isDeveloperMode") === "true";
   if (isDev) {
     options.headers = { ...options.headers, "X-Developer-Mode": "true" };
   }

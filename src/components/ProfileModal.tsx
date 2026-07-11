@@ -41,6 +41,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   };
 
+  const [devClicks, setDevClicks] = React.useState(0);
+
+  const handleIdClick = () => {
+    const next = devClicks + 1;
+    setDevClicks(next);
+    if (next === 7) {
+      localStorage.setItem("isDeveloperMode", "true");
+      window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: "🚀 Developer mode activated!" } }));
+      setTimeout(() => window.location.reload(), 1000);
+    }
+  };
+
   return (
     <>
       <div className="fixed-viewport z-40" onClick={onClose}></div>
@@ -63,7 +75,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               )}
             </div>
             <div>
-              <p className={`text-[10px] font-mono leading-none ${isLightMode ? 'text-gray-500' : 'text-gray-400'}`}>ID: {userId}</p>
+              <p onClick={handleIdClick} className={`text-[10px] font-mono leading-none cursor-pointer ${isLightMode ? 'text-gray-500' : 'text-gray-400'}`}>ID: {userId}</p>
             </div>
           </div>
         </div>

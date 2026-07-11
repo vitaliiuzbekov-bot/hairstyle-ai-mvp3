@@ -1,4 +1,0 @@
-
-Fetching http://127.0.0.1:3001/api/hairstyle/references...
-
-Error: FetchError: request to http://127.0.0.1:3001/api/hairstyle/references failed, reason: connect ECONNREFUSED 127.0.0.1:3001

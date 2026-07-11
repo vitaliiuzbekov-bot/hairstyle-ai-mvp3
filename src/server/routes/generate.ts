@@ -108,7 +108,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       const { 
         gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
         skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
-        hairlineStatus, hairQuality, haircutName
+        hairlineStatus, hairQuality, idempotencyKey, haircutName
       } = req.body;
       
       if (!keyword) {
@@ -119,7 +119,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       const cacheKey = getCacheKey({ 
         route: "generate-reference-v28-gender-fixed", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
-        hairDensity, hairType, hairLength, hairlineStatus, hairQuality, clothingContext
+        hairDensity, hairType, hairLength, hairlineStatus, hairQuality, idempotencyKey, clothingContext
       });
       const cachedImage = await getCachedValue<string>(cacheKey);
       if (cachedImage) {
@@ -306,7 +306,7 @@ generateRouter.post("/generate-full", async (req, res) => {
         // using string truncation or full string to hash the selfie.
         // String hashing is deterministic.
         selfieHash: getCacheKey(selfieImage),
-        hairlineStatus, hairQuality
+        hairlineStatus, hairQuality, idempotencyKey
       });
       const cachedImage = await getCachedValue<string>(cacheKey);
       if (cachedImage) {
@@ -380,19 +380,13 @@ generateRouter.post("/generate-full", async (req, res) => {
       let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
       
       let uiStrength = Number(vtonStrength) || 45; 
-      let fluxStrength = 0.95; // Default for Schnell
-
+      let fluxStrength = 0.95;
       if (finalTargetImageUrl) {
-          // If reference image provided, we use it as base. 
-          // We want very low strength to preserve the reference hair shape perfectly.
-          fluxStrength = 0.20 + ((uiStrength - 50) / 50) * 0.15; // 0.20 - 0.35
+          fluxStrength = 0.20 + ((uiStrength - 50) / 50) * 0.15;
           if (fluxStrength < 0.1) fluxStrength = 0.20;
       } else {
-          // If no reference, modify the selfie
-          // Map uiStrength (0-100) to a reasonable range. 0.95 destroys face shape.
-          fluxStrength = 0.40 + (uiStrength / 100) * 0.35; 
+          fluxStrength = 0.40 + (uiStrength / 100) * 0.35;
       }
-      
       if (keyword && keyword.includes("same exact current hairstyle")) {
           fluxStrength = 0.30; // keep original structure
       }

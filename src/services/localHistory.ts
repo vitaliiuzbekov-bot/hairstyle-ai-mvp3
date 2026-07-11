@@ -126,12 +126,24 @@ export const clearHistoryObjectUrls = () => revokeAllObjectUrls();
 export const getHistory = async (): Promise<HistoryItem[]> => {
   try {
     revokeAllObjectUrls();
+  } catch(e) {}
 
-    const raw = (await get<StoredHistoryItem[]>(HISTORY_KEY)) || [];
-    if (raw.length > 0) return await Promise.all(raw.map(reviveHistoryItem));
+  let raw: StoredHistoryItem[] = [];
+  try {
+    raw = (await get<StoredHistoryItem[]>(HISTORY_KEY)) || [];
+  } catch (e) {
+    console.warn("IndexedDB get failed, falling back", e);
+  }
 
-    const tg = (window as any).Telegram?.WebApp as any;
-    if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
+  if (raw.length > 0) {
+    try {
+      return await Promise.all(raw.map(reviveHistoryItem));
+    } catch(e) {}
+  }
+
+  const tg = (window as any).Telegram?.WebApp as any;
+  if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
+    try {
       const fromTelegram = await new Promise<StoredHistoryItem[]>((resolve) => {
         tg.CloudStorage.getItem(TELEGRAM_HISTORY_KEY, (_err: any, value: string) => {
           if (!value) return resolve([]);
@@ -144,30 +156,31 @@ export const getHistory = async (): Promise<HistoryItem[]> => {
       });
 
       if (fromTelegram.length > 0) {
-        await set(HISTORY_KEY, fromTelegram);
+        try { await set(HISTORY_KEY, fromTelegram); } catch(e) {}
         return await Promise.all(fromTelegram.map(reviveHistoryItem));
       }
-    }
+    } catch(e) {}
+  }
 
-    try {
-      const fallback = JSON.parse(localStorage.getItem(LOCAL_HISTORY_KEY) || '[]') as StoredHistoryItem[];
-      return await Promise.all(fallback.map(reviveHistoryItem));
-    } catch {
-      return [];
-    }
-  } catch (e) {
-    console.error('Failed to load history', e);
+  try {
+    const fallback = JSON.parse(localStorage.getItem(LOCAL_HISTORY_KEY) || '[]') as StoredHistoryItem[];
+    return await Promise.all(fallback.map(reviveHistoryItem));
+  } catch {
     return [];
   }
 };
 
 export const saveHistory = async (history: HistoryItem[]): Promise<void> => {
   const stored = await Promise.all(history.map(normalizeHistoryItem));
-  await set(HISTORY_KEY, stored);
-
-  const lightweight = stored.slice(0, 5).map(({ blobDataUrl, originalBlobDataUrl, ...rest }) => rest);
-  localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(lightweight));
-  syncTelegram(TELEGRAM_HISTORY_KEY, lightweight);
+  try {
+    await set(HISTORY_KEY, stored);
+  } catch (e) {}
+  
+  try {
+    const lightweight = stored.slice(0, 5).map(({ blobDataUrl, originalBlobDataUrl, ...rest }) => rest);
+    localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(lightweight));
+    syncTelegram(TELEGRAM_HISTORY_KEY, lightweight);
+  } catch(e) {}
 };
 
 export const addHistoryItem = async (item: HistoryItem): Promise<HistoryItem[]> => {

@@ -144,7 +144,8 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                <Eraser size={18} />
              </button>
            </div>
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full">
+          <div className="flex flex-col gap-3 mt-4 w-full">
+            <div className="flex flex-wrap gap-2 sm:gap-3 w-full">
              <button 
                onClick={async (e) => {
                   e.stopPropagation();
@@ -220,29 +221,37 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
                      const tg = (window as any).Telegram?.WebApp;
                      
+                     const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
+
                      if (tg && tg.shareToStory) {
-                        // Generate collage image instead of video for Telegram Stories
-                        const collageBase64 = await generateCollage(beforeSrc, displayResultUrl || "", "НейроСтилист");
-                        
-                        const res = await fetch("/api/upload-video", {
-                           method: "POST",
-                           headers: { "Content-Type": "application/json" },
-                           body: JSON.stringify({ videoBase64: collageBase64, mimeType: "image/jpeg" })
+                        const blobToBase64 = (b: Blob): Promise<string> => new Promise((resolve, reject) => {
+                           const reader = new FileReader();
+                           reader.onloadend = () => resolve(reader.result as string);
+                           reader.onerror = reject;
+                           reader.readAsDataURL(b);
                         });
+                        const base64data = await blobToBase64(videoBlob);
                         
-                        if (!res.ok) throw new Error("Failed to upload image for story");
-                        const { url } = await res.json();
-                        
-                        tg.shareToStory(url, {
-                           text: "Мой новый стиль от нейросети! 💇‍♀️✨",
-                           widget_link: {
-                              url: "https://t.me/neirostilist_bot",
-                              name: "Примерить тоже"
-                           }
+                        const response = await fetch('/api/generate/upload-video', {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ videoBase64: base64data, mimeType: 'video/mp4' })
                         });
+                        const data = await response.json();
+                        
+                        if (data.url) {
+                           tg.shareToStory(data.url, {
+                              text: "Мой новый стиль от нейросети! 💇‍♀️✨",
+                              widget_link: {
+                                 url: "https://t.me/neirostilist_bot",
+                                 name: "Примерить тоже"
+                              }
+                           });
+                        } else {
+                           throw new Error("No image URL available for story");
+                        }
                      } else {
                         // Fallback to video for browsers if needed
-                        const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
                         const url = URL.createObjectURL(videoBlob);
                         const a = document.createElement('a');
                         a.href = url;
@@ -263,7 +272,6 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                 {isExportingVideo ? <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div> : <Video size={16} />}
                 <span className="hidden sm:inline">{(window as any).Telegram?.WebApp?.shareToStory ? 'В Сторис' : 'Видео'}</span>
              </button>
-             <div className="flex gap-2">
                  <button
                    onClick={(e) => {
                      e.stopPropagation();
@@ -272,8 +280,8 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                    className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
                    title="Поделиться фото"
                  >
-                   <Share2 size={16} className="sm:mx-auto" />
-                   <span className="sm:hidden">Поделиться</span>
+                   <Share2 size={16} />
+                   <span className="hidden sm:inline">Поделиться</span>
                  </button>
                  <button
                    onClick={(e) => {
@@ -283,10 +291,10 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                    className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
                    title="Скачать фото"
                  >
-                   <Download size={16} className="sm:mx-auto" />
-                   <span className="sm:hidden">Скачать</span>
+                   <Download size={16} />
+                   <span className="hidden sm:inline">Скачать</span>
                  </button>
-             </div>
+            </div>
           </div>
         </div>
       )}
@@ -312,7 +320,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                  >
                     <span className="text-[16px] drop-shadow-md text-center">Убрать блюр и примерить ещё 2 варианта — 199 ⭐</span>
                  </button>
-              </div>
+             </div>
            </div>
         </div>
       )}

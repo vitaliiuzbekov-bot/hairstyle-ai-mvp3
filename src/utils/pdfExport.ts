@@ -147,32 +147,33 @@ export const exportToPDF = async (
     pdfContainer.innerHTML = `
       <style>
         ${injectedCSS}
-        .pdf-page { box-sizing: border-box; padding: 10px 20px; }
+        .pdf-page { box-sizing: border-box; padding: 10px 20px; font-family: Arial, Helvetica, sans-serif !important; color: #000000 !important; }
         
-        .pdf-header { border-bottom: 2px solid #111; padding-bottom: 24px; margin-bottom: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
-        .pdf-header h1 { font-size: 34px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; color: #000; }
-        .pdf-header p { font-size: 13px; color: #4b5563; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 600; }
-        .pdf-date { font-size: 12px; font-weight: 500; color: #6b7280; margin-top: 12px; }
+        .pdf-header { border-bottom: 2px solid #000; padding-bottom: 24px; margin-bottom: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
+        .pdf-header h1 { font-size: 40px; font-weight: bold; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; color: #000 !important; }
+        .pdf-header p { font-size: 18px; color: #000 !important; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; }
+        .pdf-date { font-size: 14px; font-weight: 600; color: #000 !important; margin-top: 12px; }
         
         .pdf-images-grid { display: flex; flex-direction: row; justify-content: center; align-items: stretch; gap: 16px; width: 100%; margin-bottom: 36px; page-break-inside: avoid; }
         .pdf-img-col { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
-        .pdf-img-col span { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; color: #111; width: 100%; text-align: center; }
+        .pdf-img-col span { display: block; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 4px; color: #000; width: 100%; text-align: center; }
         .pdf-img-wrap { width: 100%; height: 260px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .pdf-img-wrap img { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px; }
+        .pdf-img-wrap img { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px; border: 1px solid #d1d5db; }
         
-        .pdf-content { text-align: left; font-size: 16px; line-height: 1.8; color: #000000; letter-spacing: normal; word-spacing: normal; }
+        .pdf-content { text-align: left; font-size: 22px; line-height: 1.6; color: #000000 !important; letter-spacing: normal; word-spacing: normal; }
         
         /* Strong aesthetic typography and clear structure */
-        .pdf-content h2, .pdf-content h3, .pdf-content h4 { font-size: 20px; font-weight: 900; text-transform: uppercase; margin-top: 36px; margin-bottom: 16px; color: #000; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; page-break-after: avoid; page-break-inside: avoid; letter-spacing: 0.02em; }
-        .pdf-content p { margin-bottom: 16px; font-weight: 500; page-break-inside: avoid; word-wrap: break-word; color: #000; }
-        .pdf-content ul { padding-left: 24px; margin-bottom: 24px; }
-        .pdf-content li { margin-bottom: 10px; page-break-inside: avoid; }
-        .pdf-content strong { font-weight: 700; color: #000; }
+        .pdf-content h1, .pdf-content h2, .pdf-content h3, .pdf-content h4, .pdf-content h5 { font-size: 28px; font-weight: bold; text-transform: uppercase; margin-top: 40px; margin-bottom: 16px; color: #000 !important; border-bottom: 3px solid #000 !important; padding-bottom: 8px; page-break-after: avoid; page-break-inside: avoid; letter-spacing: 0.02em; }
+        .pdf-content p { margin-bottom: 18px; font-weight: normal; font-size: 20px; page-break-inside: avoid; word-wrap: break-word; color: #000 !important; line-height: 1.6; }
+        .pdf-content ul { padding-left: 28px; margin-bottom: 24px; color: #000 !important; }
+        .pdf-content li { margin-bottom: 12px; font-weight: normal; font-size: 20px; page-break-inside: avoid; color: #000 !important; line-height: 1.6; }
+        .pdf-content strong, .pdf-content b { font-weight: bold; color: #000 !important; }
+        .pdf-content * { color: #000000 !important; }
         
         /* Visual footer for the end of the document */
-        .pdf-footer { margin-top: 60px; border-top: 1px solid #e5e7eb; padding-top: 20px; display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; page-break-inside: avoid; font-weight: 600; }
+        .pdf-footer { margin-top: 60px; border-top: 2px solid #000; padding-top: 20px; display: flex; justify-content: space-between; font-size: 14px; color: #000 !important; text-transform: uppercase; letter-spacing: 0.1em; page-break-inside: avoid; font-weight: bold; }
         
-        .pdf-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 140px; font-weight: 900; color: rgba(0,0,0,0.03); pointer-events: none; white-space: nowrap; z-index: 9999; }
+        .pdf-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 140px; font-weight: bold; color: rgba(0,0,0,0.05); pointer-events: none; white-space: nowrap; z-index: 9999; }
       </style>
       <div class="pdf-page">
         <div class="pdf-watermark">HAIRSTYLE AI</div>
@@ -207,7 +208,7 @@ export const exportToPDF = async (
         </div>
 
         <div class="pdf-content">
-          ${contentHTML.replace(/TailwindClasses/g, '')}
+          ${contentHTML.replace(/class="[^"]*"/g, '').replace(/style="[^"]*"/g, '')}
         </div>
 
         <div class="pdf-footer">
@@ -246,7 +247,8 @@ export const exportToPDF = async (
       image: { type: "jpeg" as const, quality: 1 },
       pagebreak: { mode: ['css', 'legacy'] },
       html2canvas: { 
-         scale: 2, 
+         scale: 3,
+         letterRendering: true, 
          useCORS: true,
          scrollY: 0,
          scrollX: 0,
@@ -270,14 +272,11 @@ export const exportToPDF = async (
              clonedWrapper.style.transform = "none";
           }
           
-          // Keep our custom PDF styles, but remove/sanitize others that crash html2canvas
+          // Remove ALL stylesheets that are not our custom PDF styles to prevent html2canvas crashes and styling bugs
           const styles = clonedDoc.querySelectorAll('style');
           styles.forEach(s => {
-             // If it's our injected PDF style, keep it
-             if (s.innerHTML.includes('.pdf-page')) return;
-             // Otherwise sanitize oklch
-             if (s.innerHTML) {
-                s.innerHTML = s.innerHTML.replace(/oklch\([^)]+\)/g, '#cbd5e1');
+             if (!s.innerHTML.includes('.pdf-page')) {
+                s.remove();
              }
           });
           const links = clonedDoc.querySelectorAll('link[rel="stylesheet"]');

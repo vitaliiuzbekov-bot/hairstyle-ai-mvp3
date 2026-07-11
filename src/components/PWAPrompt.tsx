@@ -36,13 +36,40 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('show-pwa-prompt', handleManualShow);
 
-    // If iOS and not installed, maybe show after some time using logic
-    if (isIosDevice && !isModalStandalone && !isSaveMode) {
-      // Check if we previously dismissed it
-      const hasDismissed = localStorage.getItem('pwa_prompt_dismissed');
-      if (!hasDismissed) {
-         setTimeout(() => setShowPrompt(true), 20000); 
-      }
+    const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+    
+    // Check Telegram Home Screen status
+    if (tg && tg.checkHomeScreenStatus) {
+       try {
+         tg.checkHomeScreenStatus((status: string) => {
+            if (status === 'missed' || status === 'unknown') {
+               const hasDismissed = localStorage.getItem('pwa_prompt_dismissed');
+               if (!hasDismissed) {
+                  setTimeout(() => setShowPrompt(true), 20000);
+               }
+            } else if (status === 'added') {
+               setIsStandalone(true);
+            }
+         });
+       } catch (e) {
+         console.warn("checkHomeScreenStatus failed or is unsupported:", e);
+         // Fallback logic for iOS
+         if (isIosDevice && !isModalStandalone && !isSaveMode) {
+           const hasDismissed = localStorage.getItem('pwa_prompt_dismissed');
+           if (!hasDismissed) {
+              setTimeout(() => setShowPrompt(true), 20000); 
+           }
+         }
+       }
+    } else {
+       // If iOS and not installed, maybe show after some time using logic
+       if (isIosDevice && !isModalStandalone && !isSaveMode) {
+         // Check if we previously dismissed it
+         const hasDismissed = localStorage.getItem('pwa_prompt_dismissed');
+         if (!hasDismissed) {
+            setTimeout(() => setShowPrompt(true), 20000); 
+         }
+       }
     }
 
     return () => {
@@ -52,6 +79,13 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
   }, []);
 
   const handleInstallClick = async () => {
+    const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+    if (tg && tg.addToHomeScreen) {
+       tg.addToHomeScreen();
+       setShowPrompt(false);
+       return;
+    }
+
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -61,6 +95,9 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
       }
     }
   };
+
+  const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
+  const isTgInstallSupported = !!(tg && tg.addToHomeScreen);
 
   const handleDismiss = () => {
     setShowPrompt(false);
@@ -91,7 +128,14 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
           </div>
         </div>
 
-        {isIOS ? (
+        {isTgInstallSupported || deferredPrompt ? (
+          <button
+            onClick={handleInstallClick}
+            className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-colors"
+          >
+            Установить сейчас
+          </button>
+        ) : isIOS ? (
           <div className={`p-3 rounded-xl mt-1 text-sm flex flex-col gap-2 ${isLightMode ? 'bg-gray-50 text-gray-700' : 'bg-white/5 text-gray-300'}`}>
             <div className="flex items-center gap-2">
               <span>1. Нажмите иконку <b>Поделиться</b></span>
@@ -102,13 +146,6 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
               <PlusSquare size={16} className="text-blue-500 ml-auto" />
             </div>
           </div>
-        ) : deferredPrompt ? (
-          <button
-            onClick={handleInstallClick}
-            className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-colors"
-          >
-            Установить сейчас
-          </button>
         ) : (
           <div className={`p-3 rounded-xl mt-1 text-sm ${isLightMode ? 'bg-gray-50 text-gray-700' : 'bg-white/5 text-gray-300'}`}>
             <p>Для установки откройте приложение в системном браузере (через меню <b>⋯</b>) и выберите <b>"Добавить на главный экран"</b>.</p>
