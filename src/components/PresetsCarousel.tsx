@@ -14,49 +14,49 @@ const PRESETS: Preset[] = [
     id: "m_french_crop",
     name: "Френч кроп",
     gender: "male",
-    imageUrl: "/presets/m_french_crop.jpg"
+    imageUrl: "./presets/m_french_crop.jpg"
   },
   {
     id: "f_pixie",
     name: "Пикси",
     gender: "female",
-    imageUrl: "/presets/f_pixie.jpg"
+    imageUrl: "./presets/f_pixie.jpg"
   },
   {
     id: "m_pompadour",
     name: "Помпадур",
     gender: "male",
-    imageUrl: "/presets/m_pompadour.jpg"
+    imageUrl: "./presets/m_pompadour.jpg"
   },
   {
     id: "f_bob",
     name: "Укороченный боб",
     gender: "female",
-    imageUrl: "/presets/f_bob.jpg"
+    imageUrl: "./presets/f_bob.jpg"
   },
   {
     id: "m_buzz",
     name: "Базз кат",
     gender: "male",
-    imageUrl: "/presets/m_buzz.jpg"
+    imageUrl: "./presets/m_buzz.jpg"
   },
   {
     id: "f_shag",
     name: "Шегги",
     gender: "female",
-    imageUrl: "/presets/f_shag.jpg"
+    imageUrl: "./presets/f_shag.jpg"
   },
   {
     id: "m_quiff",
     name: "Квифф",
     gender: "male",
-    imageUrl: "/presets/m_quiff.jpg"
+    imageUrl: "./presets/m_quiff.jpg"
   },
   {
     id: "f_curls",
     name: "Естественные кудри",
     gender: "female",
-    imageUrl: "/presets/f_curls.jpg"
+    imageUrl: "./presets/f_curls.jpg"
   }
 ];
 

@@ -205,8 +205,17 @@ export const useTokenManager = () => {
 
     initUser();
 
-    const handleDailyReward = () => {
+    const handleDailyReward = async () => {
       setGenerationsLeft((prev) => (prev !== null ? prev + 1 : 1));
+      const currentUid = auth.currentUser?.uid;
+      if (currentUid && currentUid !== "local-user") {
+        try {
+          const userRef = doc(db, "users", currentUid);
+          await updateDoc(userRef, { generationsLeft: increment(1) });
+        } catch (e) {
+          console.error("Failed to sync daily reward to backend", e);
+        }
+      }
     };
 
     window.addEventListener("daily_reward_claimed", handleDailyReward);

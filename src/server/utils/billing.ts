@@ -56,8 +56,14 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
 
       // IMPORTANT: Validate that the userId actually belongs to the authenticated Telegram user
       // If tgUserId is provided, the document MUST have a matching tgId
-      if (tgUserId && tgUserId !== "local-user" && data?.tgId?.toString() !== tgUserId.toString()) {
-         throw new Error("AUTHORIZATION_ERROR"); // Mismatch
+      if (tgUserId && tgUserId !== "local-user") {
+        if (data?.tgId) {
+          if (data.tgId.toString() !== tgUserId.toString()) {
+            throw new Error("AUTHORIZATION_ERROR"); // Mismatch
+          }
+        } else {
+          t.update(userRef, { tgId: tgUserId });
+        }
       }
 
       const gens = data?.generationsLeft || 0;
