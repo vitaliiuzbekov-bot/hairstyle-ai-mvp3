@@ -12,49 +12,49 @@ interface Preset {
 const PRESETS: Preset[] = [
   {
     id: "m_french_crop",
-    name: "Френч кроп",
+    name: "French Crop",
     gender: "male",
     imageUrl: "./presets/m_french_crop.jpg"
   },
   {
     id: "f_pixie",
-    name: "Пикси",
+    name: "Пикси (Pixie)",
     gender: "female",
     imageUrl: "./presets/f_pixie.jpg"
   },
   {
     id: "m_pompadour",
-    name: "Помпадур",
+    name: "Pompadour (Помпадур)",
     gender: "male",
     imageUrl: "./presets/m_pompadour.jpg"
   },
   {
     id: "f_bob",
-    name: "Укороченный боб",
+    name: "Укороченный боб (Short Bob)",
     gender: "female",
     imageUrl: "./presets/f_bob.jpg"
   },
   {
     id: "m_buzz",
-    name: "Базз кат",
+    name: "Buzz Cut (Под машинку)",
     gender: "male",
     imageUrl: "./presets/m_buzz.jpg"
   },
   {
     id: "f_shag",
-    name: "Шегги",
+    name: "Шегги (Shag)",
     gender: "female",
     imageUrl: "./presets/f_shag.jpg"
   },
   {
     id: "m_quiff",
-    name: "Квифф",
+    name: "Quiff (Квифф)",
     gender: "male",
     imageUrl: "./presets/m_quiff.jpg"
   },
   {
     id: "f_curls",
-    name: "Естественные кудри",
+    name: "Многослойный Каскад",
     gender: "female",
     imageUrl: "./presets/f_curls.jpg"
   }

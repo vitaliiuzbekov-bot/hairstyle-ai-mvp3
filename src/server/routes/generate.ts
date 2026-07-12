@@ -315,10 +315,10 @@ generateRouter.post("/generate-full", async (req, res) => {
       }
 
       // 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨
-      const isDeveloper = req.header('x-developer-mode') === 'true';
+      const isDeveloper = req.header('x-developer-mode') === 'true' || req.body?.isDeveloper === 'true';
       const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey, req.body.tgUserId, cacheKey, isDeveloper);
       if (!billingCheck.ok) {
-        return res.status(403).json({ error: billingCheck.error });
+        return res.status(400).json({ error: billingCheck.error });
       }
 
       // Set job processing
@@ -863,10 +863,10 @@ generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
     if (!userId) {
         return res.status(401).json({ error: "Missing userId" });
     }
-    const isDeveloper = req.header('x-developer-mode') === 'true';
+    const isDeveloper = req.header('x-developer-mode') === 'true' || req.body?.isDeveloper === 'true';
     const billingCheck = await checkAndDeductGeneration(userId, 'load-more-' + Date.now(), req.body.tgUserId, 'load-more-' + Date.now(), isDeveloper);
     if (!billingCheck.ok) {
-        return res.status(403).json({ error: billingCheck.error });
+        return res.status(400).json({ error: billingCheck.error });
     }
 
     

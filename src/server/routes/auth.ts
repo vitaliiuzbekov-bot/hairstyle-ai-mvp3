@@ -135,7 +135,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
   
   if (providedToken !== expectedToken) {
     console.error("Unauthorized webhook request!");
-    return res.status(403).send("Unauthorized");
+    return res.status(400).send("Unauthorized");
   }
 
   const body = req.body;

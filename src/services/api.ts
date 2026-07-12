@@ -177,6 +177,9 @@ export const generateFullApi = async (
   signal?: AbortSignal
 ) => {
   const isDev = localStorage.getItem("isDeveloperMode") === "true";
+  if (isDev) {
+    formData.append("isDeveloper", "true");
+  }
   let response: Response;
   try {
     response = await fetchWithRetry("/api/generate-full", {

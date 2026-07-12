@@ -33,7 +33,7 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
 
   // Если мы в Telegram (бота токен есть), то initData ОБЯЗАТЕЛЕН
   if (!initData) {
-    res.status(403).json({ error: "Access Denied: Telegram Init Data is required" });
+    res.status(400).json({ error: "Access Denied: Telegram Init Data is required" });
     return;
   }
 
@@ -41,7 +41,7 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
     const parsedData = new URLSearchParams(initData);
     const hash = parsedData.get('hash');
     if (!hash) {
-      res.status(403).json({ error: "Invalid Telegram Init Data: Missing hash" });
+      res.status(400).json({ error: "Invalid Telegram Init Data: Missing hash" });
       return;
     }
 
@@ -53,7 +53,7 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
     const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
     if (calculatedHash !== hash) {
-      res.status(403).json({ error: "Invalid Telegram Init Data: Signature mismatch" });
+      res.status(400).json({ error: "Invalid Telegram Init Data: Signature mismatch" });
       return;
     }
     
@@ -64,14 +64,14 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
         req.body.tgUserId = userObj.id.toString();
       }
     } else {
-      res.status(403).json({ error: "Invalid Telegram Init Data: Missing user" });
+      res.status(400).json({ error: "Invalid Telegram Init Data: Missing user" });
       return;
     }
 
     next();
   } catch (e) {
     console.error("Telegram Validation Error:", e);
-    res.status(403).json({ error: "Telegram Validation Exception" });
+    res.status(400).json({ error: "Telegram Validation Exception" });
     return;
   }
 };

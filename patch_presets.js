@@ -1,0 +1,11 @@
+import fs from 'fs';
+let content = fs.readFileSync('src/components/PresetsCarousel.tsx', 'utf8');
+content = content.replace('name: "Френч кроп",', 'name: "French Crop",');
+content = content.replace('name: "Пикси",', 'name: "Пикси (Pixie)",');
+content = content.replace('name: "Помпадур",', 'name: "Pompadour (Помпадур)",');
+content = content.replace('name: "Укороченный боб",', 'name: "Укороченный боб (Short Bob)",');
+content = content.replace('name: "Базз кат",', 'name: "Buzz Cut (Под машинку)",');
+content = content.replace('name: "Шегги",', 'name: "Шегги (Shag)",');
+content = content.replace('name: "Квифф",', 'name: "Quiff (Квифф)",');
+content = content.replace('name: "Естественные кудри",', 'name: "Многослойный Каскад",');
+fs.writeFileSync('src/components/PresetsCarousel.tsx', content);
