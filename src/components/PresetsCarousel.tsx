@@ -1,6 +1,15 @@
 import React, { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Wand2 } from "lucide-react";
 
+import m_french_crop from "../assets/presets/m_french_crop.jpg";
+import f_pixie from "../assets/presets/f_pixie.jpg";
+import m_pompadour from "../assets/presets/m_pompadour.jpg";
+import f_bob from "../assets/presets/f_bob.jpg";
+import m_buzz from "../assets/presets/m_buzz.jpg";
+import f_shag from "../assets/presets/f_shag.jpg";
+import m_quiff from "../assets/presets/m_quiff.jpg";
+import f_curls from "../assets/presets/f_curls.jpg";
+
 interface Preset {
   id: string;
   name: string;
@@ -14,49 +23,49 @@ const PRESETS: Preset[] = [
     id: "m_french_crop",
     name: "French Crop",
     gender: "male",
-    imageUrl: "./presets/m_french_crop.jpg"
+    imageUrl: m_french_crop
   },
   {
     id: "f_pixie",
     name: "Пикси (Pixie)",
     gender: "female",
-    imageUrl: "./presets/f_pixie.jpg"
+    imageUrl: f_pixie
   },
   {
     id: "m_pompadour",
     name: "Pompadour (Помпадур)",
     gender: "male",
-    imageUrl: "./presets/m_pompadour.jpg"
+    imageUrl: m_pompadour
   },
   {
     id: "f_bob",
     name: "Укороченный боб (Short Bob)",
     gender: "female",
-    imageUrl: "./presets/f_bob.jpg"
+    imageUrl: f_bob
   },
   {
     id: "m_buzz",
     name: "Buzz Cut (Под машинку)",
     gender: "male",
-    imageUrl: "./presets/m_buzz.jpg"
+    imageUrl: m_buzz
   },
   {
     id: "f_shag",
     name: "Шегги (Shag)",
     gender: "female",
-    imageUrl: "./presets/f_shag.jpg"
+    imageUrl: f_shag
   },
   {
     id: "m_quiff",
     name: "Quiff (Квифф)",
     gender: "male",
-    imageUrl: "./presets/m_quiff.jpg"
+    imageUrl: m_quiff
   },
   {
     id: "f_curls",
     name: "Многослойный Каскад",
     gender: "female",
-    imageUrl: "./presets/f_curls.jpg"
+    imageUrl: f_curls
   }
 ];
 
