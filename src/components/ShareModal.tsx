@@ -126,7 +126,7 @@ export const ShareModal: React.FC = () => {
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.9, y: 20, opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 350 }}
-          className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#0d0e12] p-6 text-white shadow-2xl z-10"
+          className="relative w-full max-w-md max-h-[95vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0d0e12] p-6 text-white shadow-2xl z-10"
         >
           {/* Свечение на заднем плане модалки */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />

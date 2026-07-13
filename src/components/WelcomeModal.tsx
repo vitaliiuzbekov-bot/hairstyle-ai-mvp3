@@ -79,7 +79,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className={`relative w-full max-w-lg rounded-3xl shadow-2xl flex flex-col overflow-hidden ${isLightMode ? 'bg-white border border-gray-200' : 'bg-[#111] border border-white/10'}`}
+        className={`relative w-full max-w-lg max-h-[95vh] overflow-y-auto rounded-3xl shadow-2xl flex flex-col ${isLightMode ? 'bg-white border border-gray-200' : 'bg-[#111] border border-white/10'}`}
       >
         <div className="relative overflow-hidden min-h-[360px] flex flex-col">
           <AnimatePresence mode="wait">

@@ -242,7 +242,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                         const beforeBase64 = await getBase64(beforeSrc);
                         const afterBase64 = await getBase64(afterSrc);
                         
-                        const response = await fetch('/api/generate/render-video', {
+                        const response = await fetch('/api/render-video', {
                            method: 'POST',
                            headers: { 'Content-Type': 'application/json' },
                            body: JSON.stringify({ beforeBase64, afterBase64 })
@@ -263,7 +263,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                            reader.readAsDataURL(b);
                         });
                         const base64data = await blobToBase64(mediaBlob);
-                        const response = await fetch('/api/generate/upload-video', {
+                        const response = await fetch('/api/upload-video', {
                            method: 'POST',
                            headers: { 'Content-Type': 'application/json' },
                            body: JSON.stringify({ videoBase64: base64data, mimeType: 'image/jpeg' })
