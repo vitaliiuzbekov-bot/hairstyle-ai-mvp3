@@ -422,10 +422,11 @@ Instructions:
 3. The prompt MUST describe the person's age/gender accurately based on the specs (e.g. "middle-aged man", "young adult woman"). Do not add unnatural smoothing if the person is old.
 4. The requested hairstyle MUST be described in critical detail and clarity based on the targeted style.
 5. If a hair color is specified, make it absolutely clear that it must be applied across the ENTIRE head without gradients/other shades. Use strict phrasing.
-6. Make sure to specify that the person's face structure (eyes, nose, mouth, chin, jawline) MUST remain completely unchanged.
-7. The clothing/background instructions should be incorporated if present.
-8. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
-9. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters.`;
+6. Make sure to specify that the person's face structure (eyes, nose, mouth, chin, jawline, and core head shape) MUST remain completely unchanged.
+7. IMPORTANT: Do NOT alter the facial features. If the person is bald in the source image and you are adding hair, ensure the face strictly matches the source.
+8. The clothing/background instructions should be incorporated if present.
+9. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
+10. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters.`;
 
         let contentsPayload: any = [{ text: systemInstruction }];
 

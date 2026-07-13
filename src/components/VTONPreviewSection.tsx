@@ -221,21 +221,33 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
                      const tg = (window as any).Telegram?.WebApp;
                      
-                     const videoBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
+                     let mediaBlob: Blob;
+                     let mediaMimeType = 'video/mp4';
+                     try {
+                        const canvas = document.createElement('canvas');
+                        if (!(canvas as any).captureStream) throw new Error("captureStream not supported");
+                        mediaBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
+                     } catch(videoErr) {
+                        console.warn("Video generation failed, falling back to collage", videoErr);
+                        const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl || "", userRole === 'salon' ? salonName : undefined);
+                        const res = await fetch(collageDataUrl);
+                        mediaBlob = await res.blob();
+                        mediaMimeType = 'image/jpeg';
+                     }
 
-                     if (tg && tg.shareToStory) {
+                     if (tg && tg.shareToStory && tg.platform !== 'unknown') {
                         const blobToBase64 = (b: Blob): Promise<string> => new Promise((resolve, reject) => {
                            const reader = new FileReader();
                            reader.onloadend = () => resolve(reader.result as string);
                            reader.onerror = reject;
                            reader.readAsDataURL(b);
                         });
-                        const base64data = await blobToBase64(videoBlob);
+                        const base64data = await blobToBase64(mediaBlob);
                         
                         const response = await fetch('/api/generate/upload-video', {
                            method: 'POST',
                            headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify({ videoBase64: base64data, mimeType: 'video/mp4' })
+                           body: JSON.stringify({ videoBase64: base64data, mimeType: mediaMimeType })
                         });
                         const data = await response.json();
                         
@@ -252,17 +264,24 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                         }
                      } else {
                         // Fallback to video for browsers if needed
-                        const url = URL.createObjectURL(videoBlob);
+                        const url = URL.createObjectURL(mediaBlob);
                         const a = document.createElement('a');
                         a.href = url;
+                        a.target = '_blank';
                         // In Telegram ios Safari, downloads might need to be explicitly opened or shared, but download attribute works for files
-                        a.download = `before_after_${Date.now()}.mp4`;
+                        a.download = `before_after_${Date.now()}.${mediaMimeType.includes('image') ? 'jpg' : 'mp4'}`;
+                        document.body.appendChild(a);
                         a.click();
+                        document.body.removeChild(a);
                         setTimeout(() => URL.revokeObjectURL(url), 10000);
+                        
+                        if (!tg || tg.platform === 'unknown') {
+                           alert(`Функция 'В сторис' работает только внутри приложения Telegram.\n\nФайл (видео или фото) был запрошен на скачивание (или открыт в новой вкладке).\n\nПримечание: в некоторых веб-браузерах (например, в песочнице Google) скачивание может быть заблокировано.`);
+                        }
                      }
                   } catch (err) {
                      console.error("Story export failed", err);
-                     alert("К сожалению, не удалось поделиться в сторис.");
+                     alert(`К сожалению, не удалось поделиться в сторис: ${(err as Error).message}`);
                   } finally {
                      setIsExportingVideo(false);
                   }
@@ -270,7 +289,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100' : 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30'}`}
              >
                 {isExportingVideo ? <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div> : <Video size={16} />}
-                <span className="hidden sm:inline">{(window as any).Telegram?.WebApp?.shareToStory ? 'В Сторис' : 'Видео'}</span>
+                <span className="hidden sm:inline">{((window as any).Telegram?.WebApp?.shareToStory && (window as any).Telegram?.WebApp?.platform !== 'unknown') ? 'В Сторис' : 'Видео'}</span>
              </button>
                  <button
                    onClick={(e) => {
