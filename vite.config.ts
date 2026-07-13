@@ -63,7 +63,7 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
-    base: "./",
+    base: "/",
     build: {
       assetsInlineLimit: 4096,
       rollupOptions: {
