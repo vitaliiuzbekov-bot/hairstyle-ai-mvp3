@@ -1,20 +1,11 @@
 import React, { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Wand2 } from "lucide-react";
-
-import m_french_crop from "../assets/presets/m_french_crop.jpg";
-import f_pixie from "../assets/presets/f_pixie.jpg";
-import m_pompadour from "../assets/presets/m_pompadour.jpg";
-import f_bob from "../assets/presets/f_bob.jpg";
-import m_buzz from "../assets/presets/m_buzz.jpg";
-import f_shag from "../assets/presets/f_shag.jpg";
-import m_quiff from "../assets/presets/m_quiff.jpg";
-import f_curls from "../assets/presets/f_curls.jpg";
+import { LazyImage } from "./LazyImage";
 
 interface Preset {
   id: string;
   name: string;
   gender: "male" | "female";
-  imageUrl: string;
 }
 
 // Top haircuts presets with actual AI-generated images
@@ -23,49 +14,41 @@ const PRESETS: Preset[] = [
     id: "m_french_crop",
     name: "French Crop",
     gender: "male",
-    imageUrl: m_french_crop + "?v=3"
   },
   {
     id: "f_pixie",
     name: "Пикси (Pixie)",
     gender: "female",
-    imageUrl: f_pixie + "?v=3"
   },
   {
     id: "m_pompadour",
     name: "Pompadour (Помпадур)",
     gender: "male",
-    imageUrl: m_pompadour + "?v=3"
   },
   {
     id: "f_bob",
     name: "Укороченный боб (Short Bob)",
     gender: "female",
-    imageUrl: f_bob + "?v=3"
   },
   {
     id: "m_buzz",
     name: "Buzz Cut (Под машинку)",
     gender: "male",
-    imageUrl: m_buzz + "?v=3"
   },
   {
     id: "f_shag",
     name: "Шегги (Shag)",
     gender: "female",
-    imageUrl: f_shag + "?v=3"
   },
   {
     id: "m_quiff",
     name: "Quiff (Квифф)",
     gender: "male",
-    imageUrl: m_quiff + "?v=3"
   },
   {
     id: "f_curls",
     name: "Многослойный Каскад",
     gender: "female",
-    imageUrl: f_curls + "?v=3"
   }
 ];
 
@@ -144,14 +127,20 @@ export const PresetsCarousel: React.FC<PresetsCarouselProps> = ({ isLightMode, o
               className={`snap-start shrink-0 w-[160px] sm:w-[200px] rounded-2xl overflow-hidden cursor-pointer group/card border transition-all hover:scale-[1.02] ${isLightMode ? 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-lg' : 'bg-white/5 border-white/10 hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]'}`}
             >
               <div className="h-[200px] sm:h-[240px] relative overflow-hidden">
-                <img 
-                  src={preset.imageUrl}
-                  alt={preset.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
+                <div className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110">
+                  <LazyImage
+                    keyword={preset.name}
+                    gender={preset.gender}
+                    uniqueName={preset.name}
+                    results={null as any}
+                    autoLoad={true}
+                    isLightMode={isLightMode}
+                    isLibrary={true}
+                  />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 pointer-events-none" />
                 
-                <div className="absolute inset-0 flex flex-col justify-end p-4">
+                <div className="absolute inset-0 flex flex-col justify-end p-4 pointer-events-none">
                   <h3 className="text-white font-medium text-lg leading-tight mb-1">{preset.name}</h3>
                   <div className="flex items-center gap-1.5 text-blue-300 text-sm opacity-0 translate-y-2 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all">
                     <Wand2 size={14} />
