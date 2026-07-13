@@ -39,7 +39,7 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
     const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
     
     // Check Telegram Home Screen status
-    if (tg && tg.checkHomeScreenStatus) {
+    if (tg && tg.checkHomeScreenStatus && tg.isVersionAtLeast && tg.isVersionAtLeast("8.0")) {
        try {
          tg.checkHomeScreenStatus((status: string) => {
             if (status === 'missed' || status === 'unknown') {
@@ -80,7 +80,7 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
 
   const handleInstallClick = async () => {
     const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
-    if (tg && tg.addToHomeScreen) {
+    if (tg && tg.addToHomeScreen && tg.isVersionAtLeast && tg.isVersionAtLeast("8.0")) {
        tg.addToHomeScreen();
        setShowPrompt(false);
        return;
@@ -97,7 +97,7 @@ export const PWAPrompt: React.FC<{ isLightMode?: boolean }> = ({ isLightMode }) 
   };
 
   const tg = typeof window !== "undefined" ? (window as any).Telegram?.WebApp : null;
-  const isTgInstallSupported = !!(tg && tg.addToHomeScreen);
+  const isTgInstallSupported = !!(tg && tg.addToHomeScreen && tg.isVersionAtLeast && tg.isVersionAtLeast("8.0"));
 
   const handleDismiss = () => {
     setShowPrompt(false);
