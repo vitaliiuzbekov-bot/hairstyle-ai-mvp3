@@ -1,5 +1,6 @@
 export type ProcessImageRequest = {
-  dataUrl: string;
+  file?: File | Blob;
+  dataUrl?: string; // Kept for backwards compatibility
   maxDim: number;
   quality: number;
   mimeType: string;
@@ -11,12 +12,19 @@ export type ProcessImageResponse = {
 };
 
 self.onmessage = async (e: MessageEvent<ProcessImageRequest>) => {
-  const { dataUrl, maxDim, quality, mimeType } = e.data;
+  const { file, dataUrl, maxDim, quality, mimeType } = e.data;
 
   try {
-    const response = await fetch(dataUrl);
-    const blob = await response.blob();
-    const bitmap = await createImageBitmap(blob);
+    let bitmap: ImageBitmap;
+    if (file) {
+      bitmap = await createImageBitmap(file);
+    } else if (dataUrl) {
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      bitmap = await createImageBitmap(blob);
+    } else {
+      throw new Error("No image data provided");
+    }
 
     let { width, height } = bitmap;
     if (width > height) {

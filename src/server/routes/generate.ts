@@ -2,6 +2,8 @@
 import { Request, Response, Router } from "express";
 import fs from "fs";
 import path from "path";
+import os from "os";
+import { exec } from "child_process";
 import { logToTelegram } from "../services/logger";
 import { callYandexGPT, callYandexGPTChat, getYandexIamToken, extractFolderId } from "../services/yandex";
 import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
@@ -83,6 +85,63 @@ generateRouter.post("/upload-video", async (req, res) => {
     res.json({ url: publicUrl });
   } catch(e: any) {
     console.error("Upload media error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+generateRouter.post("/render-video", async (req, res) => {
+  try {
+    const { beforeBase64, afterBase64 } = req.body;
+    if (!beforeBase64 || !afterBase64) return res.status(400).send("Images required");
+    
+    const tmpDir = os.tmpdir();
+    const id = Date.now() + "_" + Math.random().toString(36).substring(7);
+    const beforeFile = path.join(tmpDir, `before_${id}.jpg`);
+    const afterFile = path.join(tmpDir, `after_${id}.jpg`);
+    const outputFile = path.join(tmpDir, `output_${id}.mp4`);
+    
+    const bBuffer = Buffer.from(beforeBase64.split(",")[1] || beforeBase64, "base64");
+    const aBuffer = Buffer.from(afterBase64.split(",")[1] || afterBase64, "base64");
+    fs.writeFileSync(beforeFile, bBuffer);
+    fs.writeFileSync(afterFile, aBuffer);
+    
+    // scale to 1080x1920 for stories, crop to fill, then wipeleft transition
+    const filter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0];[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v1];[v0][v1]xfade=transition=wipeleft:duration=1:offset=1,format=yuv420p`;
+    const cmd = `ffmpeg -y -loop 1 -t 2 -i ${beforeFile} -loop 1 -t 2 -i ${afterFile} -filter_complex "${filter}" -c:v libx264 -preset veryfast -pix_fmt yuv420p ${outputFile}`;
+    
+    exec(cmd, async (error, stdout, stderr) => {
+        if (error) {
+            console.error("FFMPEG error:", stderr);
+            try { fs.unlinkSync(beforeFile); fs.unlinkSync(afterFile); fs.unlinkSync(outputFile); } catch(e) {}
+            return res.status(500).json({ error: "FFMPEG failed" });
+        } else {
+            try {
+                const outBuffer = fs.readFileSync(outputFile);
+                // Now upload to firebase
+                if (!adminStorage) return res.status(500).send("Storage not configured");
+                const bucket = adminStorage.bucket();
+                if (!bucket.name) return res.status(500).send("Bucket missing");
+                
+                const fileName = `stories/${id}.mp4`;
+                const file = bucket.file(fileName);
+                const uuid = crypto.randomUUID();
+                
+                await file.save(outBuffer, {
+                  metadata: { contentType: 'video/mp4', metadata: { firebaseStorageDownloadTokens: uuid } }
+                });
+                const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
+                
+                res.json({ url: publicUrl });
+            } catch(e: any) {
+                console.error("Upload ffmpeg error:", e);
+                res.status(500).json({ error: e.message });
+            } finally {
+                try { fs.unlinkSync(beforeFile); fs.unlinkSync(afterFile); fs.unlinkSync(outputFile); } catch(e) {}
+            }
+        }
+    });
+  } catch(e: any) {
+    console.error("Render video error:", e);
     res.status(500).json({ error: e.message });
   }
 });

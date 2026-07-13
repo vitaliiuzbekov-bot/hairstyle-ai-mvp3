@@ -102,9 +102,14 @@ function App() {
 
   useEffect(() => {
     const handleOpenLibrary = () => setIsLibraryOpen(true);
+    const handleOpenBuyModal = () => setShowBuyModal(true);
     window.addEventListener('open-library', handleOpenLibrary);
-    return () => window.removeEventListener('open-library', handleOpenLibrary);
-  }, [setIsLibraryOpen]);
+    window.addEventListener('open-buy-modal', handleOpenBuyModal);
+    return () => {
+      window.removeEventListener('open-library', handleOpenLibrary);
+      window.removeEventListener('open-buy-modal', handleOpenBuyModal);
+    };
+  }, [setIsLibraryOpen, setShowBuyModal]);
 
   if (!isTelegramEnv && !isDeveloper) {
     return (
@@ -224,7 +229,6 @@ function App() {
               isLightMode={isLightMode}
             />
           )}
-
           {showWelcome && (
             <WelcomeModal
               showWelcome={showWelcome}
@@ -237,12 +241,9 @@ function App() {
               isLightMode={isLightMode}
             />
           )}
-
           <DailyRewardModal isLightMode={isLightMode} />
-
           {isShareOpen && <ShareModal />}
           <PWAPrompt isLightMode={isLightMode} />
-
           {isProfileOpen && (
             <ProfileModal
               userId={userId}

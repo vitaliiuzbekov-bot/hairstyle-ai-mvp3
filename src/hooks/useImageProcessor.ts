@@ -10,14 +10,13 @@ export const useImageProcessor = () => {
       setIsProcessing(true);
       setError(null);
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-
-        const doFallback = () => {
+      const doFallback = () => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
           const img = new Image();
           img.onload = () => {
-             const MAX_DIM = 800;
+             const MAX_DIM = 1024;
              let { width, height } = img;
              if (width > height) {
                if (width > MAX_DIM) {
@@ -30,7 +29,6 @@ export const useImageProcessor = () => {
                  height = MAX_DIM;
                }
              }
-
              const canvas = document.createElement("canvas");
              canvas.width = width;
              canvas.height = height;
@@ -50,7 +48,7 @@ export const useImageProcessor = () => {
                    setIsProcessing(false);
                    resolve(dataUrl.split(",")[1]); // fallback
                  }
-               }, "image/jpeg", 0.75);
+               }, "image/jpeg", 0.8);
              } else {
                setIsProcessing(false);
                resolve(dataUrl.split(",")[1]);
@@ -64,43 +62,42 @@ export const useImageProcessor = () => {
           };
           img.src = dataUrl;
         };
-        
-        try {
-          const worker = new ImageWorker();
-          worker.onmessage = (msg) => {
-            if (msg.data.error) {
-              console.warn("Worker error, running fallback. Reason:", msg.data.error);
-              doFallback();
-            } else {
-              setIsProcessing(false);
-              resolve(msg.data.base64);
-            }
-            worker.terminate();
-          };
-          worker.onerror = (err) => {
-            console.warn("Worker onerror, running fallback. Error:", err);
-            worker.terminate();
+        reader.onerror = () => {
+          setIsProcessing(false);
+          setError("Ошибка чтения файла");
+          reject(new Error("Ошибка чтения файла"));
+        };
+        reader.readAsDataURL(file);
+      };
+      
+      try {
+        const worker = new ImageWorker();
+        worker.onmessage = (msg) => {
+          if (msg.data.error) {
+            console.warn("Worker error, running fallback. Reason:", msg.data.error);
             doFallback();
-          };
-
-          worker.postMessage({
-            dataUrl,
-            maxDim: 800,
-            quality: 0.75,
-            mimeType: "image/jpeg"
-          });
-        } catch (err) {
-          // Fallback if worker fails to initialize
-          console.warn("Worker Init failed, running fallback. Error:", err);
+          } else {
+            setIsProcessing(false);
+            resolve(msg.data.base64);
+          }
+          worker.terminate();
+        };
+        worker.onerror = (err) => {
+          console.warn("Worker onerror, running fallback. Error:", err);
+          worker.terminate();
           doFallback();
-        }
-      };
-      reader.onerror = () => {
-        setIsProcessing(false);
-        setError("Ошибка чтения файла");
-        reject(new Error("Ошибка чтения файла"));
-      };
-      reader.readAsDataURL(file);
+        };
+        worker.postMessage({
+          file: file,
+          maxDim: 1024,
+          quality: 0.8,
+          mimeType: "image/jpeg"
+        });
+      } catch (err) {
+        // Fallback if worker fails to initialize
+        console.warn("Worker Init failed, running fallback. Error:", err);
+        doFallback();
+      }
     });
   }, []);
 

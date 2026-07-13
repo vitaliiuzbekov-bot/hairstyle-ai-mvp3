@@ -9,6 +9,7 @@ import { generateCollage } from "../utils/collage";
 import { generateBeforeAfterVideo } from "../utils/videoExport";
 import { useUI } from "../context/UIContext";
 import { MaskEditorModal } from "./MaskEditorModal";
+import { Toast } from "./Toast";
 
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
@@ -73,6 +74,8 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
   const [isMaskEditorOpen, setIsMaskEditorOpen] = useState(false);
   const [editedResultUrl, setEditedResultUrl] = useState<string | null>(null);
   const [isExportingVideo, setIsExportingVideo] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastIsError, setToastIsError] = useState(false);
 
   // Сброс редактированного изображения при смене исходного результата
   React.useEffect(() => {
@@ -221,21 +224,38 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
                      const tg = (window as any).Telegram?.WebApp;
                      
-                     let mediaBlob: Blob;
-                     let mediaMimeType = 'video/mp4';
+                     const afterSrc = displayResultUrl || "";
+                     let publicUrl = "";
+                     let isVideo = true;
                      try {
-                        const canvas = document.createElement('canvas');
-                        if (!(canvas as any).captureStream) throw new Error("captureStream not supported");
-                        mediaBlob = await generateBeforeAfterVideo(beforeSrc, displayResultUrl || "");
+                        const getBase64 = async (src: string) => {
+                           if (src.startsWith('data:')) return src;
+                           const res = await fetch(src);
+                           const blob = await res.blob();
+                           return new Promise<string>((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(blob);
+                           });
+                        };
+                        const beforeBase64 = await getBase64(beforeSrc);
+                        const afterBase64 = await getBase64(afterSrc);
+                        
+                        const response = await fetch('/api/generate/render-video', {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ beforeBase64, afterBase64 })
+                        });
+                        const data = await response.json();
+                        if (data.url) publicUrl = data.url;
+                        else throw new Error("No URL returned from video render");
                      } catch(videoErr) {
-                        console.warn("Video generation failed, falling back to collage", videoErr);
-                        const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl || "", userRole === 'salon' ? salonName : undefined);
+                        console.warn("Video generation failed on server, falling back to collage", videoErr);
+                        isVideo = false;
+                        const collageDataUrl = await generateCollage(beforeSrc, afterSrc, userRole === 'salon' ? salonName : undefined);
                         const res = await fetch(collageDataUrl);
-                        mediaBlob = await res.blob();
-                        mediaMimeType = 'image/jpeg';
-                     }
-
-                     if (tg && tg.shareToStory && tg.platform !== 'unknown') {
+                        const mediaBlob = await res.blob();
                         const blobToBase64 = (b: Blob): Promise<string> => new Promise((resolve, reject) => {
                            const reader = new FileReader();
                            reader.onloadend = () => resolve(reader.result as string);
@@ -243,45 +263,47 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                            reader.readAsDataURL(b);
                         });
                         const base64data = await blobToBase64(mediaBlob);
-                        
                         const response = await fetch('/api/generate/upload-video', {
                            method: 'POST',
                            headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify({ videoBase64: base64data, mimeType: mediaMimeType })
+                           body: JSON.stringify({ videoBase64: base64data, mimeType: 'image/jpeg' })
                         });
                         const data = await response.json();
-                        
-                        if (data.url) {
-                           tg.shareToStory(data.url, {
-                              text: "Мой новый стиль от нейросети! 💇‍♀️✨",
-                              widget_link: {
-                                 url: "https://t.me/neirostilist_bot",
-                                 name: "Примерить тоже"
-                              }
-                           });
-                        } else {
-                           throw new Error("No image URL available for story");
-                        }
+                        if (data.url) publicUrl = data.url;
+                        else throw new Error("No image URL available for story");
+                     }
+                     
+                     if (tg && tg.shareToStory && tg.platform !== 'unknown') {
+                        tg.shareToStory(publicUrl, {
+                           text: "Мой новый стиль от нейросети! 💇‍♀️✨",
+                           widget_link: {
+                              url: "https://t.me/neirostilist_bot",
+                              name: "Примерить тоже"
+                           }
+                        });
                      } else {
-                        // Fallback to video for browsers if needed
-                        const url = URL.createObjectURL(mediaBlob);
                         const a = document.createElement('a');
-                        a.href = url;
+                        a.href = publicUrl;
                         a.target = '_blank';
-                        // In Telegram ios Safari, downloads might need to be explicitly opened or shared, but download attribute works for files
-                        a.download = `before_after_${Date.now()}.${mediaMimeType.includes('image') ? 'jpg' : 'mp4'}`;
+                        a.download = `before_after_${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
-                        setTimeout(() => URL.revokeObjectURL(url), 10000);
                         
                         if (!tg || tg.platform === 'unknown') {
-                           alert(`Функция 'В сторис' работает только внутри приложения Telegram.\n\nФайл (видео или фото) был запрошен на скачивание (или открыт в новой вкладке).\n\nПримечание: в некоторых веб-браузерах (например, в песочнице Google) скачивание может быть заблокировано.`);
+                           setToastIsError(false);
+                           setToastMessage(`Видео готово и сохранено на устройство.`);
                         }
                      }
                   } catch (err) {
                      console.error("Story export failed", err);
-                     alert(`К сожалению, не удалось поделиться в сторис: ${(err as Error).message}`);
+                     const tg = (window as any).Telegram?.WebApp;
+                     if (tg && tg.showAlert) {
+                        tg.showAlert(`К сожалению, не удалось поделиться в сторис: ${(err as Error).message}`);
+                     } else {
+                        setToastIsError(true);
+                        setToastMessage(`Ошибка экспорта: ${(err as Error).message}`);
+                     }
                   } finally {
                      setIsExportingVideo(false);
                   }
@@ -294,7 +316,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                  <button
                    onClick={(e) => {
                      e.stopPropagation();
-                     if (vtonResultUrl) { openShareModal(vtonResultUrl, "Посмотри, какую классную прическу и цвет волос мне подобрал ИИ в НейроСтилисте!"); }
+                     if (displayResultUrl) { openShareModal(displayResultUrl, "Посмотри, какую классную прическу и цвет волос мне подобрал ИИ в НейроСтилисте!"); }
                    }}
                    className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
                    title="Поделиться фото"
@@ -305,60 +327,32 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                  <button
                    onClick={(e) => {
                      e.stopPropagation();
-                     downloadImage(vtonResultUrl, "ai_result.jpg");
+                     setIsMaskEditorOpen(true);
                    }}
-                   className={`flex-1 sm:w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
-                   title="Скачать фото"
+                   className={`w-12 py-3 sm:py-0 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                   title="Стереть лишнее"
                  >
-                   <Download size={16} />
-                   <span className="hidden sm:inline">Скачать</span>
+                   <Eraser size={16} />
                  </button>
-            </div>
+             </div>
           </div>
         </div>
       )}
-
-      {vtonResultUrl && isTeaserResult && (
-        <div className={`mb-4 relative rounded-2xl overflow-hidden border ${isLightMode ? 'bg-gray-100 border-gray-200' : 'bg-black/40 border-white/10'}`}>
-           <div className="relative aspect-[3/4] w-full flex items-center justify-center">
-              <CachedImage src={vtonResultUrl || undefined as any} alt="Blurred Result" className="absolute inset-0 object-cover blur-xl opacity-70 scale-110 pointer-events-none" style={{ width: '100%', height: '100%' }} />
-              
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
-                 <span className="text-white/60 font-bold text-xl sm:text-2xl rotate-[-15deg] uppercase tracking-wider drop-shadow-xl select-none">
-                   https://t.me/neirostilist_bot
-                 </span>
-              </div>
-              
-              <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center px-4">
-                 <button 
-                   onClick={(e) => {
-                      e.stopPropagation();
-                      processPayment("popular", 199, 3);
-                   }}
-                   className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold py-4 px-6 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all flex flex-col items-center gap-1 active:scale-95 border border-white/20"
-                 >
-                    <span className="text-[16px] drop-shadow-md text-center">Убрать блюр и примерить ещё 2 варианта — 199 ⭐</span>
-                 </button>
-             </div>
-           </div>
-        </div>
-      )}
       
-      {/* COLOR_BRANDS removed as per user request */}
-
       {isMaskEditorOpen && displayResultUrl && (
         <MaskEditorModal
-           beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) || ''}
-           afterImage={displayResultUrl}
-               isLightMode={isLightMode}
-           onClose={() => setIsMaskEditorOpen(false)}
-           onSave={(mergedDataUrl) => {
-              setEditedResultUrl(mergedDataUrl);
-              setIsMaskEditorOpen(false);
-           }}
+          beforeImage={imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) || ""}
+          afterImage={displayResultUrl}
+          onClose={() => setIsMaskEditorOpen(false)}
+          onSave={(editedUrl) => {
+            setEditedResultUrl(editedUrl);
+            setIsMaskEditorOpen(false);
+          }}
+          isLightMode={isLightMode}
         />
       )}
-
+      
+      <Toast message={toastMessage || ""} isError={toastIsError} onClose={() => setToastMessage(null)} />
     </div>
   );
 };

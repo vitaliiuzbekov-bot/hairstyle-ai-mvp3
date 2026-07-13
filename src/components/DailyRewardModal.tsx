@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Gift, Zap, X } from "lucide-react";
-import { useTokenManager } from "../hooks/useTokenManager";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 interface DailyRewardModalProps {

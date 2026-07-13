@@ -53,10 +53,26 @@ export const useCamera = (onPhotoCapture: (file: File) => void): UseCameraResult
 
   const capturePhoto = useCallback(() => {
     if (customVideoRef.current) {
+      let { videoWidth: width, videoHeight: height } = customVideoRef.current;
+      const MAX_DIM = 1024;
+      
+      if (width > height) {
+        if (width > MAX_DIM) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        }
+      } else {
+        if (height > MAX_DIM) {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+      }
+
       const canvas = document.createElement("canvas");
-      canvas.width = customVideoRef.current.videoWidth;
-      canvas.height = customVideoRef.current.videoHeight;
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext("2d");
+      
       if (ctx) {
         if (facingMode === "user") {
           ctx.translate(canvas.width, 0);
@@ -80,7 +96,7 @@ export const useCamera = (onPhotoCapture: (file: File) => void): UseCameraResult
             }
           },
           "image/jpeg",
-          0.9
+          0.8
         );
       }
     }
