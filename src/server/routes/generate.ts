@@ -53,98 +53,7 @@ generateRouter.get("/proxy-image", async (req, res) => {
   }
 });
 
-generateRouter.post("/upload-video", async (req, res) => {
-  try {
-    const { videoBase64, mimeType = 'video/mp4' } = req.body;
-    if (!videoBase64) return res.status(400).send("No media provided");
-    if (!adminStorage) return res.status(500).send("Storage not configured");
-    
-    const buffer = Buffer.from(videoBase64.split(",")[1] || videoBase64, "base64");
-    const bucket = adminStorage.bucket();
-    if (!bucket.name) return res.status(500).send("Bucket missing");
-    
-    let ext = "mp4";
-    if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
-    else if (mimeType.includes("png")) ext = "png";
-    else if (mimeType.includes("webm")) ext = "webm";
 
-    const fileName = `stories/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-    const file = bucket.file(fileName);
-    const uuid = crypto.randomUUID();
-    
-    await file.save(buffer, {
-      metadata: {
-        contentType: mimeType,
-        metadata: {
-          firebaseStorageDownloadTokens: uuid
-        }
-      }
-    });
-    
-    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-    res.json({ url: publicUrl });
-  } catch(e: any) {
-    console.error("Upload media error:", e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-generateRouter.post("/render-video", async (req, res) => {
-  try {
-    const { beforeBase64, afterBase64 } = req.body;
-    if (!beforeBase64 || !afterBase64) return res.status(400).send("Images required");
-    
-    const tmpDir = os.tmpdir();
-    const id = Date.now() + "_" + Math.random().toString(36).substring(7);
-    const beforeFile = path.join(tmpDir, `before_${id}.jpg`);
-    const afterFile = path.join(tmpDir, `after_${id}.jpg`);
-    const outputFile = path.join(tmpDir, `output_${id}.mp4`);
-    
-    const bBuffer = Buffer.from(beforeBase64.split(",")[1] || beforeBase64, "base64");
-    const aBuffer = Buffer.from(afterBase64.split(",")[1] || afterBase64, "base64");
-    fs.writeFileSync(beforeFile, bBuffer);
-    fs.writeFileSync(afterFile, aBuffer);
-    
-    // scale to 1080x1920 for stories, crop to fill, then wipeleft transition
-    const filter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0];[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v1];[v0][v1]xfade=transition=wipeleft:duration=1:offset=1,format=yuv420p`;
-    const cmd = `ffmpeg -y -loop 1 -t 2 -i ${beforeFile} -loop 1 -t 2 -i ${afterFile} -filter_complex "${filter}" -c:v libx264 -preset veryfast -pix_fmt yuv420p ${outputFile}`;
-    
-    exec(cmd, async (error, stdout, stderr) => {
-        if (error) {
-            console.error("FFMPEG error:", stderr);
-            try { fs.unlinkSync(beforeFile); fs.unlinkSync(afterFile); fs.unlinkSync(outputFile); } catch(e) {}
-            return res.status(500).json({ error: "FFMPEG failed" });
-        } else {
-            try {
-                const outBuffer = fs.readFileSync(outputFile);
-                // Now upload to firebase
-                if (!adminStorage) return res.status(500).send("Storage not configured");
-                const bucket = adminStorage.bucket();
-                if (!bucket.name) return res.status(500).send("Bucket missing");
-                
-                const fileName = `stories/${id}.mp4`;
-                const file = bucket.file(fileName);
-                const uuid = crypto.randomUUID();
-                
-                await file.save(outBuffer, {
-                  metadata: { contentType: 'video/mp4', metadata: { firebaseStorageDownloadTokens: uuid } }
-                });
-                const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-                
-                res.json({ url: publicUrl });
-            } catch(e: any) {
-                console.error("Upload ffmpeg error:", e);
-                res.status(500).json({ error: e.message });
-            } finally {
-                try { fs.unlinkSync(beforeFile); fs.unlinkSync(afterFile); fs.unlinkSync(outputFile); } catch(e) {}
-            }
-        }
-    });
-  } catch(e: any) {
-    console.error("Render video error:", e);
-    res.status(500).json({ error: e.message });
-  }
-});
 
 const jobMap = new Map<string, { status: 'processing' | 'completed' | 'error', result?: any, error?: string }>();
 
@@ -211,24 +120,50 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         
         const finalPrompt = base + "Hair is " + hairDesc + "." + colorDesc;
 
-        const falRes = await fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
-            method: "POST",
-            headers: {
-                "Authorization": `Key ${falKey}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                prompt: finalPrompt,
-                image_size: "portrait_4_3",
-                seed: seedValue,
-                num_inference_steps: 28
-            })
-        });
+        let falRes: globalThis.Response | null = null;
+        let retries = 2;
+        let lastErrorText = "";
+        while (retries >= 0) {
+            try {
+                falRes = await fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Key ${falKey}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        prompt: finalPrompt,
+                        image_size: "portrait_4_3",
+                        seed: seedValue,
+                        num_inference_steps: 28
+                    })
+                });
 
-        if (!falRes.ok) {
-            const errText = await falRes.text();
-            throw new Error(`FAL.AI Error: ${falRes.status} - ${errText}`);
+                if (!falRes.ok) {
+                    lastErrorText = await falRes.text();
+                    if (falRes.status === 502 || falRes.status === 503 || falRes.status === 504) {
+                        retries--;
+                        if (retries >= 0) {
+                            console.log(`FAL Flux Dev Reference HTTP ${falRes.status}, retrying...`);
+                            await new Promise(r => setTimeout(r, 1000));
+                            continue;
+                        }
+                    }
+                    throw new Error(`FAL.AI Error: ${falRes.status} - ${lastErrorText}`);
+                }
+                break;
+            } catch (e: any) {
+                if (retries > 0) {
+                    retries--;
+                    console.log("FAL Flux Dev Reference fetch error, retrying...", e.message);
+                    await new Promise(r => setTimeout(r, 1000));
+                } else {
+                    throw e;
+                }
+            }
         }
+        
+        if (!falRes) throw new Error("FAL.AI Flux Dev Reference failed after retries.");
 
         const data = await falRes.json();
         const generatedUrl = data.images[0].url;
@@ -585,20 +520,46 @@ Instructions:
                num_inference_steps: 28
             };
             
-            const fluxRes = await imageGenQueue.add(() => fetch(endpoint, {
-              method: "POST",
-              headers: {
-                "Authorization": `Key ${falKey}`,
-                "Content-Type": "application/json"
-              },
-              signal: controller.signal,
-              body: JSON.stringify(bodyPayload)
-            })) as globalThis.Response;
+            let fluxRes: globalThis.Response | null = null;
+            let retries = 2;
+            let lastErrorText = "";
+            while (retries >= 0) {
+              try {
+                fluxRes = await imageGenQueue.add(() => fetch(endpoint, {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Key ${falKey}`,
+                    "Content-Type": "application/json"
+                  },
+                  signal: controller.signal,
+                  body: JSON.stringify(bodyPayload)
+                })) as globalThis.Response;
 
-            if (!fluxRes.ok) {
-               const errData = await fluxRes.text();
-               throw new Error(`FAL Flux Dev Error HTTP ${fluxRes.status}: ${errData}`);
+                if (!fluxRes.ok) {
+                   lastErrorText = await fluxRes.text();
+                   if (fluxRes.status === 502 || fluxRes.status === 503 || fluxRes.status === 504) {
+                     retries--;
+                     if (retries >= 0) {
+                       console.log(`FAL Flux Dev HTTP ${fluxRes.status}, retrying...`);
+                       await new Promise(r => setTimeout(r, 1000));
+                       continue;
+                     }
+                   }
+                   throw new Error(`FAL Flux Dev Error HTTP ${fluxRes.status}: ${lastErrorText}`);
+                }
+                break;
+              } catch (e: any) {
+                if (e.name === 'AbortError') throw e;
+                if (retries > 0) {
+                    retries--;
+                    console.log("FAL Flux Dev fetch error, retrying...", e.message);
+                    await new Promise(r => setTimeout(r, 1000));
+                } else {
+                    throw e;
+                }
+              }
             }
+            if (!fluxRes) throw new Error("FAL.AI Flux Dev failed after retries.");
             
             const fluxData = await fluxRes.json();
             const generatedUrl = fluxData.images?.[0]?.url || fluxData.image?.url || fluxData.image_url || fluxData.url;
@@ -628,23 +589,50 @@ Instructions:
          };
          console.log("FaceSwap Payload:", JSON.stringify(faceSwapPayload).substring(0, 500) + "... (truncated)");
          
-         const falRes = await imageGenQueue.add(() => fetch("https://fal.run/fal-ai/face-swap", {
-           method: "POST",
-           headers: {
-             "Authorization": `Key ${falKey}`,
-             "Content-Type": "application/json"
-           },
-           signal: controller.signal,
-           body: JSON.stringify(faceSwapPayload)
-         })) as globalThis.Response;
-
-         if (!falRes.ok) {
-           const errText = await falRes.text();
+         let falRes: globalThis.Response | null = null;
+         let retries = 2;
+         let lastErrorText = "";
+         while (retries >= 0) {
            try {
-             fs.appendFileSync('/app/applet/pipeline_error.log', '\nFAL FaceSwap HTTP Error ' + falRes.status + ': ' + errText + '\n');
-           } catch(e) {}
-           throw new Error(`FAL.AI FaceSwap Error: HTTP ${falRes.status} - ${errText}`);
+             falRes = await imageGenQueue.add(() => fetch("https://fal.run/fal-ai/face-swap", {
+               method: "POST",
+               headers: {
+                 "Authorization": `Key ${falKey}`,
+                 "Content-Type": "application/json"
+               },
+               signal: controller.signal,
+               body: JSON.stringify(faceSwapPayload)
+             })) as globalThis.Response;
+
+             if (!falRes.ok) {
+               lastErrorText = await falRes.text();
+               if (falRes.status === 502 || falRes.status === 503 || falRes.status === 504) {
+                 retries--;
+                 if (retries >= 0) {
+                   console.log(`FAL FaceSwap HTTP ${falRes.status}, retrying...`);
+                   await new Promise(r => setTimeout(r, 1000));
+                   continue;
+                 }
+               }
+               try {
+                 fs.appendFileSync('/app/applet/pipeline_error.log', '\nFAL FaceSwap HTTP Error ' + falRes.status + ': ' + lastErrorText + '\n');
+               } catch(e) {}
+               throw new Error(`FAL.AI FaceSwap Error: HTTP ${falRes.status} - ${lastErrorText}`);
+             }
+             break; // Success
+           } catch (e: any) {
+             if (e.name === 'AbortError') throw e;
+             if (retries > 0) {
+                 retries--;
+                 console.log("FAL FaceSwap fetch error, retrying...", e.message);
+                 await new Promise(r => setTimeout(r, 1000));
+             } else {
+                 throw e;
+             }
+           }
          }
+         
+         if (!falRes) throw new Error("FAL.AI FaceSwap failed after retries.");
 
          const falData = await falRes.json();
 
@@ -695,12 +683,11 @@ Instructions:
         );
         if (tgFileId) {
           sentViaTelegram = true;
-          swappedImageUrl = `/api/tg/${tgFileId}`; // Rewrite URL to proxy telegram image
         }
       }
 
-      // Upload to Firebase Storage as fallback if we couldn't send via TG (ex. local dev) or we want permanent url
-      if (adminStorage && imageBuffer && !tgFileId) {
+      // Upload to Firebase Storage for a reliable CDN URL
+      if (adminStorage && imageBuffer) {
          try {
              const bucket = adminStorage.bucket();
              if (bucket.name) {
@@ -719,7 +706,10 @@ Instructions:
              }
          } catch (storageErr: any) {
              console.warn("Storage upload skipped. Falling back to temporary image URL.");
+             if (tgFileId) swappedImageUrl = `/api/tg/${tgFileId}`;
          }
+      } else if (tgFileId) {
+          swappedImageUrl = `/api/tg/${tgFileId}`;
       }
 
       // Final success
@@ -729,6 +719,7 @@ Instructions:
       await setCachedValue(cacheKey, swappedImageUrl, 30 * 24 * 60 * 60);
 
       jobMap.set(jobId, { status: 'completed', result: { imageUrl: swappedImageUrl, referenceImage: finalImageUrl, debugError: lastError } });
+      setTimeout(() => jobMap.delete(jobId), 5 * 60 * 1000); // Clear from memory after 5 minutes
 
     } catch (err: any) {
       console.error("Full pipeline error:", err);
@@ -742,6 +733,7 @@ Instructions:
       await refundGeneration(req.body.userId);
       
        jobMap.set(jobId, { status: 'error', error: err.message || "Pipeline error" });
+       setTimeout(() => jobMap.delete(jobId), 5 * 60 * 1000); // Clear from memory after 5 minutes
         }
       })();
     } catch (e: any) {

@@ -222,88 +222,28 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   setIsExportingVideo(true);
                   try {
                      const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
-                     const tg = (window as any).Telegram?.WebApp;
-                     
                      const afterSrc = displayResultUrl || "";
-                     let publicUrl = "";
-                     let isVideo = true;
-                     try {
-                        const getBase64 = async (src: string) => {
-                           if (src.startsWith('data:')) return src;
-                           const res = await fetch(src);
-                           const blob = await res.blob();
-                           return new Promise<string>((resolve, reject) => {
-                              const reader = new FileReader();
-                              reader.onloadend = () => resolve(reader.result as string);
-                              reader.onerror = reject;
-                              reader.readAsDataURL(blob);
-                           });
-                        };
-                        const beforeBase64 = await getBase64(beforeSrc);
-                        const afterBase64 = await getBase64(afterSrc);
-                        
-                        const response = await fetch('/api/render-video', {
-                           method: 'POST',
-                           headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify({ beforeBase64, afterBase64 })
-                        });
-                        const data = await response.json();
-                        if (data.url) publicUrl = data.url;
-                        else throw new Error("No URL returned from video render");
-                     } catch(videoErr) {
-                        console.warn("Video generation failed on server, falling back to collage", videoErr);
-                        isVideo = false;
-                        const collageDataUrl = await generateCollage(beforeSrc, afterSrc, userRole === 'salon' ? salonName : undefined);
-                        const res = await fetch(collageDataUrl);
-                        const mediaBlob = await res.blob();
-                        const blobToBase64 = (b: Blob): Promise<string> => new Promise((resolve, reject) => {
-                           const reader = new FileReader();
-                           reader.onloadend = () => resolve(reader.result as string);
-                           reader.onerror = reject;
-                           reader.readAsDataURL(b);
-                        });
-                        const base64data = await blobToBase64(mediaBlob);
-                        const response = await fetch('/api/upload-video', {
-                           method: 'POST',
-                           headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify({ videoBase64: base64data, mimeType: 'image/jpeg' })
-                        });
-                        const data = await response.json();
-                        if (data.url) publicUrl = data.url;
-                        else throw new Error("No image URL available for story");
-                     }
                      
-                     if (tg && tg.shareToStory && tg.platform !== 'unknown') {
-                        tg.shareToStory(publicUrl, {
-                           text: "Мой новый стиль от нейросети! 💇‍♀️✨",
-                           widget_link: {
-                              url: "https://t.me/neirostilist_bot",
-                              name: "Примерить тоже"
-                           }
-                        });
-                     } else {
-                        const a = document.createElement('a');
-                        a.href = publicUrl;
-                        a.target = '_blank';
-                        a.download = `before_after_${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        
-                        if (!tg || tg.platform === 'unknown') {
-                           setToastIsError(false);
-                           setToastMessage(`Видео готово и сохранено на устройство.`);
-                        }
-                     }
+                     // Генерируем видео локально
+                     const videoBlob = await generateBeforeAfterVideo(beforeSrc, afterSrc);
+                     const videoUrl = URL.createObjectURL(videoBlob);
+                     
+                     const a = document.createElement('a');
+                     a.href = videoUrl;
+                     a.target = '_blank';
+                     a.download = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+                     document.body.appendChild(a);
+                     a.click();
+                     document.body.removeChild(a);
+                     
+                     setTimeout(() => URL.revokeObjectURL(videoUrl), 10000);
+                     
+                     setToastIsError(false);
+                     setToastMessage(`Видео сохранено на ваше устройство.`);
                   } catch (err) {
-                     console.error("Story export failed", err);
-                     const tg = (window as any).Telegram?.WebApp;
-                     if (tg && tg.showAlert) {
-                        tg.showAlert(`К сожалению, не удалось поделиться в сторис: ${(err as Error).message}`);
-                     } else {
-                        setToastIsError(true);
-                        setToastMessage(`Ошибка экспорта: ${(err as Error).message}`);
-                     }
+                     console.error("Video export failed", err);
+                     setToastIsError(true);
+                     setToastMessage(`Ошибка экспорта: ${(err as Error).message}`);
                   } finally {
                      setIsExportingVideo(false);
                   }
@@ -311,7 +251,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100' : 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30'}`}
              >
                 {isExportingVideo ? <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div> : <Video size={16} />}
-                <span className="hidden sm:inline">{((window as any).Telegram?.WebApp?.shareToStory && (window as any).Telegram?.WebApp?.platform !== 'unknown') ? 'В Сторис' : 'Видео'}</span>
+                <span className="hidden sm:inline">Скачать Видео</span>
              </button>
                  <button
                    onClick={(e) => {
