@@ -51,7 +51,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         </button>
       </div>
 
-      <div className="absolute bottom-0 inset-x-0 p-6 sm:p-10 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+      <div className="absolute bottom-0 inset-x-0 p-6 pb-12 sm:p-10 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent">
         <div className="w-12 h-12 sm:w-14 sm:h-14">
         </div>
         <button

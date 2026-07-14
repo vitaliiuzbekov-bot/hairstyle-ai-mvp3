@@ -151,7 +151,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
         />
       </div>
 
-      <div className={`p-6 ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}>
+      <div className={`p-6 pb-12 sm:pb-6 ${isLightMode ? "bg-white" : "bg-[#0f0c1b]"}`}>
         <div className="flex items-center gap-4 mb-6">
           <span
             className={`text-sm ${isLightMode ? "text-gray-600" : "text-white/60"}`}
