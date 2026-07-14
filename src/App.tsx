@@ -13,6 +13,7 @@ const ProfileModal = React.lazy(() => import("./components/ProfileModal").then(m
 const QuickTutorial = React.lazy(() => import("./components/QuickTutorial").then(m => ({ default: m.QuickTutorial })));
 const HaircutLibraryModal = React.lazy(() => import("./components/HaircutLibraryModal").then(m => ({ default: m.HaircutLibraryModal })));
 const ShareModal = React.lazy(() => import("./components/ShareModal").then(m => ({ default: m.ShareModal })));
+const FeedbackModal = React.lazy(() => import("./components/FeedbackModal").then(m => ({ default: m.FeedbackModal })));
 const PWAPrompt = React.lazy(() => import("./components/PWAPrompt").then(m => ({ default: m.PWAPrompt })));
 
 import { useTokenManager } from "./hooks/useTokenManager";
@@ -100,14 +101,19 @@ function App() {
 
   const { deleteHistoryItem } = useHistoryHandlers(history, setHistory, userId);
 
+  const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+
   useEffect(() => {
     const handleOpenLibrary = () => setIsLibraryOpen(true);
     const handleOpenBuyModal = () => setShowBuyModal(true);
+    const handleOpenFeedback = () => setIsFeedbackOpen(true);
     window.addEventListener('open-library', handleOpenLibrary);
     window.addEventListener('open-buy-modal', handleOpenBuyModal);
+    window.addEventListener('open-feedback-modal', handleOpenFeedback);
     return () => {
       window.removeEventListener('open-library', handleOpenLibrary);
       window.removeEventListener('open-buy-modal', handleOpenBuyModal);
+      window.removeEventListener('open-feedback-modal', handleOpenFeedback);
     };
   }, [setIsLibraryOpen, setShowBuyModal]);
 
@@ -244,6 +250,14 @@ function App() {
           <DailyRewardModal isLightMode={isLightMode} />
           {isShareOpen && <ShareModal />}
           <PWAPrompt isLightMode={isLightMode} />
+          {isFeedbackOpen && (
+            <FeedbackModal 
+              userId={userId} 
+              isLightMode={isLightMode} 
+              onClose={() => setIsFeedbackOpen(false)} 
+              telegramInitData={telegramInitData}
+            />
+          )}
           {isProfileOpen && (
             <ProfileModal
               userId={userId}

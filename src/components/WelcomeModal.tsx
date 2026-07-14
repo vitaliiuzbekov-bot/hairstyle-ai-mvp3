@@ -29,10 +29,11 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
   
   const [step, setStep] = useState(0);
 
+  useModalBackButton(showWelcome, () => setShowWelcome(false));
+
   if (!showWelcome) return null;
 
   const handleRoleSelect = (role: 'client' | 'master' | 'salon', name?: string) => {
-  useModalBackButton(showWelcome, () => setShowWelcome(false));
 
     setUserRole(role);
     setShowWelcome(false);

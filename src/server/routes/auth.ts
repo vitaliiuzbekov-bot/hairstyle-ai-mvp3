@@ -205,5 +205,90 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
     }
   }
   
+  if (body.message && body.message.text) {
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    if (adminChatId && body.message.chat && body.message.chat.id.toString() === adminChatId.toString()) {
+      const text = body.message.text;
+      if (text.startsWith('/give ')) {
+        const parts = text.split(' ');
+        if (parts.length >= 3) {
+          const uId = parts[1];
+          const amount = parseInt(parts[2], 10);
+          if (!isNaN(amount) && adminDb) {
+            try {
+              await adminDb.collection("users").doc(uId).update({
+                generationsLeft: FieldValue.increment(amount)
+              });
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: adminChatId,
+                  text: `✅ Успешно начислено ${amount} генераций пользователю ${uId}`
+                })
+              });
+            } catch (e: any) {
+               await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: adminChatId,
+                  text: `❌ Ошибка начисления: ${e.message}`
+                })
+              });
+            }
+          }
+        }
+      } else if (text.startsWith('/reply ')) {
+        const parts = text.split(' ');
+        if (parts.length >= 3) {
+          const tgUId = parts[1];
+          const replyText = parts.slice(2).join(' ');
+          try {
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: tgUId,
+                text: `📩 Сообщение от разработчика:\n\n${replyText}`
+              })
+            });
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: adminChatId,
+                text: `✅ Сообщение отправлено пользователю ${tgUId}`
+              })
+            });
+          } catch(e: any) {
+             await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: adminChatId,
+                text: `❌ Ошибка отправки: ${e.message}`
+              })
+            });
+          }
+        }
+      }
+    }
+  }
+
   res.status(200).send("OK");
+});
+authRouter.post('/feedback', async (req: Request, res: Response) => {
+  try {
+    const { userId, tgUserId, name, text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Text is required" });
+    }
+    const message = `📝 <b>Отзыв / Обратная связь</b>\nПользователь ID: <code>${userId}</code>\nTg ID: <code>${tgUserId || 'неизвестно'}</code>\nИмя: ${name || 'Без имени'}\nТекст: ${text}`;
+    await logToTelegram(message);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Feedback error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });

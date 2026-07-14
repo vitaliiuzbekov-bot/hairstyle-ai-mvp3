@@ -27,10 +27,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const { setUserRole } = useUser();
   const navigate = useNavigate();
-
-  const handleShare = () => {
   useModalBackButton(true, onClose);
 
+  const handleShare = () => {
     const botLink = "https://t.me/neirostilist_bot/app?startapp=ref_" + userId;
     const text = "Подбери себе идеальную стрижку с помощью ИИ!";
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent(botLink) + "&text=" + encodeURIComponent(text);
@@ -189,6 +188,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           >
             <Share2 size={14} className="text-blue-500" />
             Пригласить друга
+          </button>
+          
+          <button 
+            onClick={() => {
+              window.dispatchEvent(new Event('open-feedback-modal'));
+              onClose();
+            }}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+              isLightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5'
+            }`}
+          >
+            <User size={14} className="text-purple-500" />
+            Оставить отзыв / Контакты
           </button>
         </div>
       </div>
