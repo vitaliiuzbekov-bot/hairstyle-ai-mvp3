@@ -1,2 +1,1 @@
-import * as fal from "@fal-ai/serverless-client";
-console.log(fal.config);
+import { generateWithInpainting } from "./src/server/services/falClient";

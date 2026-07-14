@@ -708,17 +708,8 @@ Instructions:
                  swappedImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
              }
          } catch (storageErr: any) {
-             console.warn("Storage upload skipped. Using fallback URL.");
-             if (tgFileId) {
-                 swappedImageUrl = `/api/tg/${tgFileId}`;
-             } else if (imageBuffer && imageBuffer.length > 0) {
-                 swappedImageUrl = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-             }
+             console.warn("Storage upload failed, keeping original URL.", storageErr.message);
          }
-      } else if (tgFileId) {
-          swappedImageUrl = `/api/tg/${tgFileId}`;
-      } else if (imageBuffer && imageBuffer.length > 0) {
-          swappedImageUrl = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
       }
 
       // Final success
