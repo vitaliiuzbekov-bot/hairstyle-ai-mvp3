@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { adminDb } from "../src/server/firebase";
 import { FieldValue } from "firebase-admin/firestore";
 

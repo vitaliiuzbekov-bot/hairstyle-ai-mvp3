@@ -705,11 +705,8 @@ Instructions:
                  swappedImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
              }
          } catch (storageErr: any) {
-             console.warn("Storage upload skipped. Falling back to temporary image URL.");
-             if (tgFileId) swappedImageUrl = `/api/tg/${tgFileId}`;
+             console.warn("Storage upload skipped. Using original Fal URL.");
          }
-      } else if (tgFileId) {
-          swappedImageUrl = `/api/tg/${tgFileId}`;
       }
 
       // Final success
