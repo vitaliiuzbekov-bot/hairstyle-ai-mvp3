@@ -6,24 +6,25 @@ async function run() {
     console.log("No adminStorage");
     return;
   }
+  
+  const bucket = adminStorage.bucket();
+  console.log("Bucket name:", bucket.name);
+  
   try {
-    const bucket = adminStorage.bucket();
     const fileName = `test_${Date.now()}.txt`;
     const file = bucket.file(fileName);
     const uuid = crypto.randomUUID();
     await file.save("hello world", {
       metadata: {
-        contentType: "text/plain",
+        contentType: 'text/plain',
         metadata: {
           firebaseStorageDownloadTokens: uuid
         }
       }
     });
-    console.log("Saved.");
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-    console.log("URL:", url);
-  } catch (e) {
-    console.error("Error", e);
+    console.log(`URL: https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`);
+  } catch (err: any) {
+    console.error("Upload error:", err.message);
   }
 }
 run();

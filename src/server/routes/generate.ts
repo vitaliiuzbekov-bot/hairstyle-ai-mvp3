@@ -665,10 +665,12 @@ Instructions:
 
       // Ensure we have the buffer of the swapped image to send to telegram or save
       let imageBuffer: Buffer | null = null;
+      let contentType = 'image/jpeg';
       try {
         const imageRes = await fetch(swappedImageUrl);
         if (imageRes.ok) {
            imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+           contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         }
       } catch (e) {
         console.warn("Failed to fetch swappedImage for storage:", e);
@@ -691,27 +693,32 @@ Instructions:
          try {
              const bucket = adminStorage.bucket();
              if (bucket.name) {
-                 const fileName = `generations/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                 const ext = contentType.includes('webp') ? '.webp' : contentType.includes('png') ? '.png' : '.jpg';
+                 const fileName = `generations/${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
                  const file = bucket.file(fileName);
                  const uuid = crypto.randomUUID();
                  await file.save(imageBuffer, {
                      metadata: { 
-                       contentType: "image/jpeg",
+                       contentType: contentType,
                        metadata: {
                          firebaseStorageDownloadTokens: uuid
                        }
                      }
                  });
                  swappedImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-             } else {
-                 swappedImageUrl = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
              }
          } catch (storageErr: any) {
-             console.warn("Storage upload skipped. Using base64 data URL.");
-             swappedImageUrl = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+             console.warn("Storage upload skipped. Using fallback URL.");
+             if (tgFileId) {
+                 swappedImageUrl = `/api/tg/${tgFileId}`;
+             } else if (imageBuffer && imageBuffer.length > 0) {
+                 swappedImageUrl = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
+             }
          }
-      } else if (imageBuffer) {
-          swappedImageUrl = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+      } else if (tgFileId) {
+          swappedImageUrl = `/api/tg/${tgFileId}`;
+      } else if (imageBuffer && imageBuffer.length > 0) {
+          swappedImageUrl = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
       }
 
       // Final success
