@@ -20,6 +20,7 @@ tgStorageRouter.get("/:fileId", async (req, res) => {
 
     res.set("Content-Type", imageRes.headers.get("content-type") || "image/jpeg");
     res.set("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
+    res.set("Access-Control-Allow-Origin", "*"); // Allow canvas cross-origin
     
     // Read the arrayBuffer and send it, since native fetch body is not a Node stream
     const arrayBuffer = await imageRes.arrayBuffer();

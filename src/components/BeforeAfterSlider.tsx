@@ -14,9 +14,11 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
   const handleRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [isAfterLoaded, setIsAfterLoaded] = React.useState(false);
+  const [hasError, setHasError] = React.useState(false);
 
   React.useEffect(() => {
     setIsAfterLoaded(false);
+    setHasError(false);
   }, [afterImage]);
 
   const updateSliderPosition = (percentage: number) => {
@@ -65,9 +67,14 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
     >
       {/* Background Image (Shows on the Right) - After Result */}
       <div className="absolute inset-0 w-full h-full pointer-events-none z-0 bg-black/5">
-        {!isAfterLoaded && (
+        {!isAfterLoaded && !hasError && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+        {hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-black/40 text-white z-20">
+            <span className="text-xs text-center px-4">Ошибка загрузки.<br/>Попробуйте перегенерировать.</span>
           </div>
         )}
         <img
@@ -75,7 +82,12 @@ const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeIm
           alt="ИИ-Результат" 
           draggable={false}
           onLoad={() => setIsAfterLoaded(true)}
-          className={`absolute inset-0 w-full h-full object-cover object-center pointer-events-none transition-opacity duration-300 ${isAfterLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onError={() => {
+            console.error("BeforeAfterSlider: Failed to load afterImage:", afterImage);
+            setHasError(true);
+            setIsAfterLoaded(true); // Stop spinning
+          }}
+          className={`absolute inset-0 w-full h-full object-cover object-center pointer-events-none transition-opacity duration-300 ${isAfterLoaded && !hasError ? 'opacity-100' : 'opacity-0'}`}
         />
       </div>
       <div className="absolute top-4 left-[75%] -translate-x-1/2 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide whitespace-nowrap">
