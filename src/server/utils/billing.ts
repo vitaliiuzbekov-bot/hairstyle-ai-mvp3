@@ -6,7 +6,7 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
     return { ok: false, error: "Missing userId" };
   }
   if (!adminDb) {
-    return { ok: true }; // Firebase admin not configured, allow
+    return { ok: false, error: "Сервис временно недоступен. Попробуйте позже." }; // Firebase admin not configured, reject
   }
   
   if (isDeveloper) {
@@ -83,8 +83,8 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
     return { ok: true };
   } catch (err: any) {
     if (err.code === 7 || (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('Missing or insufficient permissions')))) {
-      console.warn("Firebase permission denied. Bypassing billing check.");
-      return { ok: true };
+      console.warn("Firebase permission denied. Blocking request.");
+      return { ok: false, error: "Сервис временно недоступен. Попробуйте позже." };
     }
     console.error("Failed to check billing:", err);
     if (err.message === "AUTHORIZATION_ERROR") {

@@ -1,3 +1,4 @@
+import { isAuthorizedDeveloper } from "../utils/tgAuth";
 import { createRateLimiter } from "../utils/rateLimiter";
 import { FEMALE_LIBRARY, MALE_LIBRARY } from "../../data/haircutLibrary";
 import { Router, Request, Response } from "express";
@@ -54,7 +55,7 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
     if (isLibrary) {
       const library = gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
       const existsInLibrary = library.some(item => item.name === req.body.haircutName || item.name === keyword);
-      const isDeveloper = req.header("x-developer-mode") === "true" || req.body.isDeveloper === true;
+      const isDeveloper = isAuthorizedDeveloper(req.header('x-telegram-init-data'));
       if (!existsInLibrary && !isDeveloper) {
         console.warn(`Unauthorized library reference generation attempt for keyword: ${keyword}`);
         res.status(400).json({ error: "Invalid library keyword" });

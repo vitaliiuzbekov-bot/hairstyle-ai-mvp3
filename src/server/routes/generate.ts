@@ -33,6 +33,7 @@ import {
 
 import { checkAndDeductGeneration, refundGeneration } from "../utils/billing";
 import { uploadImageToFal } from "../services/falClient";
+import { isAuthorizedDeveloper } from "../utils/tgAuth";
 
 
 
@@ -310,7 +311,7 @@ generateRouter.post("/generate-full", async (req, res) => {
       }
 
       // 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨
-      const isDeveloper = req.header('x-developer-mode') === 'true' || req.body?.isDeveloper === 'true';
+      const isDeveloper = isAuthorizedDeveloper(req.header('x-telegram-init-data'));
       const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey, req.body.tgUserId, cacheKey, isDeveloper);
       if (!billingCheck.ok) {
         return res.status(400).json({ error: billingCheck.error });
@@ -914,7 +915,7 @@ generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
     if (!userId) {
         return res.status(401).json({ error: "Missing userId" });
     }
-    const isDeveloper = req.header('x-developer-mode') === 'true' || req.body?.isDeveloper === 'true';
+    const isDeveloper = isAuthorizedDeveloper(req.header('x-telegram-init-data'));
     const billingCheck = await checkAndDeductGeneration(userId, 'load-more-' + Date.now(), req.body.tgUserId, 'load-more-' + Date.now(), isDeveloper);
     if (!billingCheck.ok) {
         return res.status(400).json({ error: billingCheck.error });

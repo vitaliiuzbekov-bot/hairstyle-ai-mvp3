@@ -99,6 +99,11 @@ authRouter.post('/create-invoice', async (req: Request, res: Response) => {
 });
 
 authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => {
+  const adminSecret = req.headers["x-admin-secret"];
+  if (!process.env.ADMIN_SETUP_SECRET || adminSecret !== process.env.ADMIN_SETUP_SECRET) {
+    return res.status(403).json({ error: "Forbidden: Invalid or missing x-admin-secret" });
+  }
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not configured" });
