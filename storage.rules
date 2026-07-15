@@ -5,6 +5,10 @@ service firebase.storage {
       allow read: if true;
       allow write: if true;
     }
+    match /generations/{allPaths=**} {
+      allow read: if true; // publicly readable
+      allow write: if false; // only admin (server) writes
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }

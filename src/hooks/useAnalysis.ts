@@ -46,7 +46,7 @@ export const useAnalysis = ({
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [results, setResultsState] = useState<AnalysisResult | null>(() => {
         try {
-            const cached = localStorage.getItem("persistent_analysisResults");
+            const cached = localStorage.getItem("persistent_analysisResults_v2");
             return cached ? JSON.parse(cached) : null;
         } catch {
             return null;
@@ -57,8 +57,8 @@ export const useAnalysis = ({
         setResultsState((prev) => {
             const nextVal = typeof val === 'function' ? (val as Function)(prev) : val;
             try {
-                if (nextVal) localStorage.setItem("persistent_analysisResults", JSON.stringify(nextVal));
-                else localStorage.removeItem("persistent_analysisResults");
+                if (nextVal) localStorage.setItem("persistent_analysisResults_v2", JSON.stringify(nextVal));
+                else localStorage.removeItem("persistent_analysisResults_v2");
             } catch (e) {
                 console.error("Failed to save results to localStorage", e);
             }
@@ -155,8 +155,8 @@ export const useAnalysis = ({
         setIsAnalyzing(true);
         setError(null);
 
-        // Simple client-side cache check
-        const cacheKey = imageBase64 ? `analysis_${imageBase64.length}_${imageBase64.slice(-100)}_${preferredStyle}` : null;
+        // Simple client-side cache check (updated cache key to v2 to invalidate old buggy localStats cache)
+        const cacheKey = imageBase64 ? `analysis_v2_${imageBase64.length}_${imageBase64.slice(-100)}_${preferredStyle}` : null;
         if (cacheKey) {
             const cached = sessionStorage.getItem(cacheKey);
             if (cached) {
@@ -209,12 +209,9 @@ export const useAnalysis = ({
           }
 
           let parsedResults: AnalysisResult;
-          if (localStats) {
-              console.log("Skipping server analysis, using fast local analysis to speed up.");
-              parsedResults = localStats;
-          } else {
-              parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
-          }
+          // We always rely on the powerful server-side AI (Gemini/YandexGPT) for accurate analysis.
+          // Local stats (face-api) are too inaccurate for gender/age and were causing major issues.
+          parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
 
           // Only inject initial library styles if this is a fresh analysis.
           // Otherwise, we keep the previously generated or assigned styles.

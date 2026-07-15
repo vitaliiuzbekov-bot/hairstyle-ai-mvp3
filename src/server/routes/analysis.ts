@@ -63,7 +63,7 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
 
     const { getCacheKey, getCachedValue, setCachedValue } = await import("../services/cache");
     const cacheKeyParams = {
-      route: "analyze",
+      route: "analyze-v2",
       imageHash: getCacheKey(targetBase64),
       preferredStyle: preferredStyle || "Любой",
       faceApiGender, faceApiShape, faceApiAge
@@ -77,17 +77,7 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
         return;
     }
 
-    const jobId = req.body.idempotencyKey || crypto.randomUUID();
-    if (analyzeJobMap.has(jobId) && analyzeJobMap.get(jobId).status === 'processing') {
-      res.json({ jobId });
-      return;
-    }
     
-    analyzeJobMap.set(jobId, { status: 'processing' });
-    
-    // Start background task
-    (async () => {
-      try {
 
     let visualDescription = "";
 
@@ -98,22 +88,22 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
     
     // If the frontend did a local analysis, it can optionally pass the local detected colors to avoid Vision entirely
     const skipVision = req.body.skipVision === true || req.body.skipVision === 'true';
-
-    const preDetectedFacts = faceApiGender ? `[PRE-DETECTED FACTS BY FACE-API: Gender is STRICTLY ${faceApiGender === 'male' ? 'MALE' : 'FEMALE'}. Age is approx ${faceApiAge}. Face shape is EXACTLY ${faceApiShape}. ${req.body.localSkinTone ? `Skin tone: ${req.body.localSkinTone}.` : ''} ${req.body.localHairColor ? `Hair color: ${req.body.localHairColor}.` : ''}]` : "";
+    const preDetectedFacts = faceApiGender ? `[HINTS FROM LOCAL AI (MAY BE INACCURATE): Suggested Gender: ${faceApiGender === 'male' ? 'MALE' : 'FEMALE'}. Age is approx ${faceApiAge}. Face shape: ${faceApiShape}. ${req.body.localSkinTone ? `Skin tone: ${req.body.localSkinTone}.` : ''} ${req.body.localHairColor ? `Hair color: ${req.body.localHairColor}.` : ''}]` : "";
     
     if (skipVision && preDetectedFacts) {
         console.log("Skipping Vision API, using frontend provided parameters only.");
         visualDescription = preDetectedFacts 
-          + "\nAssume short to medium hair length, medium density by default unless otherwise specified. Generate creative recommendations strictly matching the pre-detected facts.";
+          + "\nAssume short to medium hair length, medium density by default unless otherwise specified. Generate creative recommendations matching the hints.";
     } else {
         const visionPrompt = `You are an expert trichologist, physiognomist and master hair stylist. Analyze this person's face and hair with ultimate precision from the photo. Provide a very detailed clinical description: 
 ${preDetectedFacts} 
-1) EXACT gender and estimated age. (USE PRE-DETECTED FACTS IF AVAILABLE)
-2) Precise face shape. (USE PRE-DETECTED FACTS IF AVAILABLE)
+
+1) EXACT gender and estimated age. CRITICAL: If a gender is suggested in the hints, you MUST use that exact gender, even if the person has long hair or features you might otherwise misinterpret. Do NOT guess the gender differently from the hint.
+2) Precise face shape.
 3) EXACT hair length in cm and category (bald, buzz, short, medium, long). 
 4) EXACT hair density (thick, medium, thin, sparse, balding) and exact status of the hairline (is there a receding hairline, temporal thinning, bald spots?). 
 5) Hair texture (straight, wavy, curly, coily). 
-6) Current true hair color. CRITICAL: Closely examine the roots and overall tone! Brown hair can look yellowish under lighting glare, do NOT mistake light brown / chestnut hair for blonde due to lighting. (USE PRE-DETECTED FACTS IF AVAILABLE)
+6) Current true hair color. CRITICAL: Closely examine the roots and overall tone! Brown hair can look yellowish under lighting glare, do NOT mistake light brown / chestnut hair for blonde due to lighting.
 7) Skin tone and facial hair style (beard, mustache, clean shaven). 
 8) ONLY a concise description of clothing (exact color, type) and background (color/setting). Evaluate hair quality objectively. Be brutally honest.`;
 
@@ -178,7 +168,7 @@ ${preDetectedFacts}
 Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable JSON).
 
 Сначала выдели характеристики в соответствии со следующими правилами:
-- gender ("male" или "female", строго соответствуй полу из описания!)
+- gender ("male" или "female", строго соответствуй полу из описания! Если в описании указано MALE или FEMALE, используй это.)
 - faceShape (например, "Овальная", "Квадратная" - НА РУССКОМ)
 - hairLength (ОБЯЗАТЕЛЬНО проанализируй длину из описания и выбери одну из: "Лысый", "Ежик/Очень короткие", "Короткие", "Средние", "Длинные" - НА РУССКОМ)
 - hairDensity (ОБЯЗАТЕЛЬНО: "Редкие/Тонкие", "Средние", "Густые" - НА РУССКОМ)
@@ -235,7 +225,7 @@ Return ONLY the raw JSON string matching this schema:
 
     logToTelegram(`🔍 <b>Анализ лица (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
     
-    analyzeJobMap.set(jobId, { status: 'completed', result: parsedResults });
+    res.json(parsedResults);
   } catch (err: any) {
     console.error(err);
     let errorMsg = err.message || "Ошибка при анализе фото";
@@ -247,12 +237,6 @@ Return ONLY the raw JSON string matching this schema:
     }
     if (typeof errorMsg === "object") errorMsg = JSON.stringify(errorMsg);
     logToTelegram(`❌ <b>Ошибка Анализа Лица (${req.body.userId || 'unknown'})</b>\n<code>${errorMsg}</code>`).catch(console.error);
-    analyzeJobMap.set(jobId, { status: 'error', error: errorMsg });
-  }
-    })(); // end IIFE
-
-    res.json({ jobId });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || "Pipeline error" });
+    if (!res.headersSent) res.status(500).json({ error: errorMsg });
   }
 });

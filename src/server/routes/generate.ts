@@ -7,7 +7,7 @@ import { exec } from "child_process";
 import { logToTelegram } from "../services/logger";
 import { callYandexGPT, callYandexGPTChat, getYandexIamToken, extractFolderId } from "../services/yandex";
 import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
-import { adminApp, adminStorage } from "../firebase";
+import { adminApp, adminStorage, adminDb } from "../firebase";
 import crypto from "crypto";
 import { sendPhotoToTelegramUser } from "../services/telegramBot";
 import { safeParseJSON } from "../utils/json";
@@ -34,6 +34,82 @@ import {
 import { checkAndDeductGeneration, refundGeneration } from "../utils/billing";
 import { uploadImageToFal } from "../services/falClient";
 
+
+
+async function resolveImageToBase64(imageUrl: string | undefined): Promise<string | undefined> {
+    if (!imageUrl) return undefined;
+    if (imageUrl.startsWith('data:')) return imageUrl;
+    
+    // If it's already a fal.media URL, FAL can definitely access it
+    if (imageUrl.includes('fal.media') || imageUrl.includes('fal.run')) {
+        return imageUrl;
+    }
+
+    if (!imageUrl.startsWith('http') && !imageUrl.startsWith('/') && imageUrl.length > 1000) {
+        return `data:image/jpeg;base64,${imageUrl}`;
+    }
+    
+    let isLocalUrl = false;
+    let parsedPath = imageUrl;
+    if (imageUrl.startsWith('http')) {
+        try {
+            const urlObj = new URL(imageUrl);
+            if (urlObj.hostname.includes('localhost') || urlObj.hostname.includes('127.0.0.1') || urlObj.hostname.includes('0.0.0.0')) {
+                parsedPath = urlObj.pathname + urlObj.search;
+                isLocalUrl = true; 
+            }
+        } catch(e) {}
+    } else if (imageUrl.startsWith('/')) {
+        isLocalUrl = true;
+    }
+    
+    if (isLocalUrl) {
+        const normalizePath = parsedPath.startsWith('/') ? parsedPath : '/' + parsedPath;
+        const cleanPath = normalizePath.split('?')[0];
+        try {
+            const localUrl = `http://0.0.0.0:3000${normalizePath}`;
+            const imgRes = await fetch(localUrl);
+            if (imgRes.ok) {
+                const arrayBuffer = await imgRes.arrayBuffer();
+                const buf = Buffer.from(arrayBuffer);
+                let mime = imgRes.headers.get('content-type') || 'image/jpeg';
+                if (!mime.startsWith('image/')) mime = 'image/jpeg';
+                return `data:${mime};base64,${buf.toString('base64')}`;
+            }
+        } catch (e) {}
+        
+        const path = await import('path');
+        const safePath = cleanPath.replace(/^\/+/, '');
+        let localPath = path.join(process.cwd(), 'dist', safePath);
+        if (!fs.existsSync(localPath)) localPath = path.join(process.cwd(), 'public', safePath);
+        if (!fs.existsSync(localPath) && cleanPath.startsWith('/src/')) localPath = path.join(process.cwd(), safePath);
+        
+        if (fs.existsSync(localPath)) {
+            const buf = fs.readFileSync(localPath);
+            const ext = path.extname(localPath).toLowerCase();
+            const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+            return `data:${mime};base64,${buf.toString('base64')}`;
+        }
+        return imageUrl;
+    }
+    
+    // For all other remote URLs, download them to base64 to prevent FAL "file_download_error"
+    try {
+        const imgRes = await fetch(imageUrl);
+        if (imgRes.ok) {
+            const arrayBuffer = await imgRes.arrayBuffer();
+            const buf = Buffer.from(arrayBuffer);
+            let mime = imgRes.headers.get('content-type') || 'image/jpeg';
+            if (!mime.startsWith('image/')) mime = 'image/jpeg';
+            return `data:${mime};base64,${buf.toString('base64')}`;
+        }
+    } catch (e) {
+        console.warn(`[resolveImage] Could not download remote image ${imageUrl} to base64:`, e.message);
+    }
+
+    return imageUrl;
+}
+
 export const generateRouter = Router();
 
 generateRouter.get("/proxy-image", async (req, res) => {
@@ -54,16 +130,6 @@ generateRouter.get("/proxy-image", async (req, res) => {
 });
 
 
-
-const jobMap = new Map<string, { status: 'processing' | 'completed' | 'error', result?: any, error?: string }>();
-
-generateRouter.get("/job/:jobId", (req, res) => {
-  const jobId = req.params.jobId;
-  if (!jobMap.has(jobId)) {
-    return res.status(404).json({ error: "Job not found" });
-  }
-  res.json(jobMap.get(jobId));
-});
 
 const customBlueprintCache = new Map<string, string>();
 
@@ -199,6 +265,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
   
 generateRouter.post("/generate-full", async (req, res) => {
     const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 5m")), 5 * 60 * 1000);
     try {
       const { 
         userId, gender, faceShape, hairLength, hairDensity, hairType, skinTone, 
@@ -210,9 +277,7 @@ generateRouter.post("/generate-full", async (req, res) => {
       
       const jobId = idempotencyKey || crypto.randomUUID();
       
-      if (jobMap.has(jobId) && jobMap.get(jobId).status === 'processing') {
-          return res.json({ jobId, status: 'processing' });
-      }
+
       
       const keyword = decodeURIComponent(req.body.keyword || "");
       const description = decodeURIComponent(req.body.description || "");
@@ -227,71 +292,7 @@ generateRouter.post("/generate-full", async (req, res) => {
         return res.status(400).json({ error: "Missing parameters: keyword and selfieImage are required." });
       }
 
-      let finalTargetImageUrl = targetImageUrl;
-      if (finalTargetImageUrl) {
-        let isLocalUrl = false;
-        let parsedPath = finalTargetImageUrl;
-        
-        if (finalTargetImageUrl.startsWith('http')) {
-            try {
-                const urlObj = new URL(finalTargetImageUrl);
-                if (urlObj.hostname.includes('localhost') || urlObj.hostname.includes('127.0.0.1') || urlObj.hostname.includes('0.0.0.0')) {
-                    parsedPath = urlObj.pathname;
-                    isLocalUrl = true; 
-                }
-            } catch(e) {}
-        } else if (finalTargetImageUrl.startsWith('/') || finalTargetImageUrl.startsWith('golden_base/')) {
-            isLocalUrl = true;
-        }
-
-        let normalizePath = parsedPath;
-        if (isLocalUrl && (parsedPath.startsWith('/') || parsedPath.startsWith('golden_base/'))) {
-            normalizePath = parsedPath.startsWith('/') ? parsedPath : '/' + parsedPath;
-            if (normalizePath.includes('?')) {
-                normalizePath = normalizePath.split('?')[0];
-            }
-            
-            const safePath = normalizePath.replace(/^\/+/, '');
-            const path = await import('path');
-            let localPath = path.join(process.cwd(), 'dist', safePath);
-            
-            if (!fs.existsSync(localPath)) {
-                localPath = path.join(process.cwd(), 'public', safePath);
-            }
-            if (!fs.existsSync(localPath) && normalizePath.startsWith('/src/')) {
-                localPath = path.join(process.cwd(), safePath);
-            }
-
-            if (fs.existsSync(localPath)) {
-                const buf = fs.readFileSync(localPath);
-                const ext = path.extname(localPath).toLowerCase();
-                const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-                finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
-                console.log(`[generate-full] Successfully loaded local target image ${localPath}`);
-            } else {
-                try {
-                    const localUrl = `http://0.0.0.0:3000${normalizePath}`;
-                    console.log(`[generate-full] Fetching target image from local dev server: ${localUrl}`);
-                    const imgRes = await fetch(localUrl);
-                    if (imgRes.ok) {
-                        const arrayBuffer = await imgRes.arrayBuffer();
-                        const buf = Buffer.from(arrayBuffer);
-                        const ext = path.extname(normalizePath).toLowerCase();
-                        const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-                        finalTargetImageUrl = `data:${mime};base64,${buf.toString('base64')}`;
-                        console.log(`[generate-full] Successfully loaded local target image from dev server: ${normalizePath}`);
-                    } else {
-                        console.log(`[generate-full] WARNING: Could not fetch local target image from dev server. Status: ${imgRes.status}`);
-                    }
-                } catch (e) {
-                    console.error(`[generate-full] Error fetching local target image from dev server:`, e);
-                }
-            }
-        }
-        if (!finalTargetImageUrl.startsWith('data:') && !finalTargetImageUrl.startsWith('http')) {
-            console.log(`[generate-full] CRITICAL WARNING: targetImageUrl could not be resolved to base64. Using original path: ${normalizePath}`);
-        }
-      }
+      let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
 
       // Check cache first (Cache for 30 days)
       const cacheKey = getCacheKey({ 
@@ -315,13 +316,7 @@ generateRouter.post("/generate-full", async (req, res) => {
         return res.status(400).json({ error: billingCheck.error });
       }
 
-      // Set job processing
-      jobMap.set(jobId, { status: 'processing' });
-      res.json({ jobId, status: 'processing' });
 
-      // Run background
-      (async () => {
-        try {
 
       const falKey = process.env.FAL_KEY;
       if (!falKey) {
@@ -331,7 +326,8 @@ generateRouter.post("/generate-full", async (req, res) => {
       let finalImageUrl = "";
       let lastError = "";
       let swappedImageUrl = "";
-      const selfieImageFull = selfieImage.startsWith('http') || selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`;
+      const resolvedSelfie = await resolveImageToBase64(selfieImage);
+      const selfieImageFull = resolvedSelfie || (selfieImage.startsWith('http') || selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`);
 
       const translateColor = (val: string) => {
         val = val.toLowerCase().trim();
@@ -420,7 +416,7 @@ Instructions:
 7. IMPORTANT: Do NOT alter the facial features. If the person is bald in the source image and you are adding hair, ensure the face strictly matches the source.
 8. The clothing/background instructions should be incorporated if present.
 9. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
-10. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters.`;
+10. CRITICAL: The entire response MUST be entirely in ENGLISH. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters. DO NOT translate to Russian under any circumstances.`;
 
         let contentsPayload: any = [{ text: systemInstruction }];
 
@@ -508,7 +504,7 @@ Instructions:
             finalImageUrl = customBlueprintCache.get(blueprintCacheKey)!;
         } else {
           try {
-            console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
+                  console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
             let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
             
             const fluxBaseImageUrl = baseImageForFlux.startsWith('data:') ? await uploadImageToFal(baseImageForFlux) : baseImageForFlux;
@@ -578,7 +574,7 @@ Instructions:
 
       // Always run FaceSwap to ensure 100% facial feature retention
       try {
-         console.log("Starting Virtual Try-On FaceSwap via FAL.AI... finalImageUrl:", finalImageUrl);
+            console.log("Starting Virtual Try-On FaceSwap via FAL.AI... finalImageUrl:", finalImageUrl);
          
          const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
          const swapImageUrlForFal = selfieImageFull.startsWith('data:') ? await uploadImageToFal(selfieImageFull) : selfieImageFull;
@@ -667,11 +663,14 @@ Instructions:
       let imageBuffer: Buffer | null = null;
       let contentType = 'image/jpeg';
       try {
-        const imageRes = await fetch(swappedImageUrl);
+        const imageRes = await fetch(swappedImageUrl, { signal: controller.signal });
         if (imageRes.ok) {
            imageBuffer = Buffer.from(await imageRes.arrayBuffer());
            contentType = imageRes.headers.get('content-type') || 'image/jpeg';
-        }
+           if (!contentType.startsWith('image/') || imageBuffer.byteLength < 5000) {
+               throw new Error("FAL вернул невалидный файл (слишком маленький размер или неверный формат).");
+           }
+             }
       } catch (e) {
         console.warn("Failed to fetch swappedImage for storage:", e);
       }
@@ -681,11 +680,13 @@ Instructions:
         tgFileId = await sendPhotoToTelegramUser(
           req.body.tgUserId, 
           imageBuffer, 
-          `💇 Твоя стрижка готова!\n\n<i>${keyword || 'Примерка'}</i>`
+          `💇 Твоя стрижка готова!\n\n<i>${keyword || 'Примерка'}</i>`,
+          controller.signal
         );
         if (tgFileId) {
           sentViaTelegram = true;
-        }
+            } else {
+            }
       }
 
       // Upload to Firebase Storage for a reliable CDN URL
@@ -706,21 +707,23 @@ Instructions:
                      }
                  });
                  swappedImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-             }
+                        }
          } catch (storageErr: any) {
-             console.warn("Storage upload failed, keeping original URL.", storageErr.message);
+             const errMsg = storageErr?.error?.message || storageErr?.message || "Unknown storage error";
+             console.warn("Firebase Storage upload failed, using fallback URL. Reason:", errMsg);
+             // swappedImageUrl remains the fal.ai URL, which is valid for 24 hours.
          }
       }
 
       // Final success
-      logToTelegram(`🎨 <b>Генерация (${req.body.userId || 'unknown'})</b>\nУспешно.`).catch(console.error);
+      logToTelegram(`🎨 <b>Генерация (${req.body.userId || 'unknown'})</b>
+Успешно.`).catch(console.error);
       
       // Save to cache for 30 days
       await setCachedValue(cacheKey, swappedImageUrl, 30 * 24 * 60 * 60);
 
-      jobMap.set(jobId, { status: 'completed', result: { imageUrl: swappedImageUrl, referenceImage: finalImageUrl, debugError: lastError } });
-      setTimeout(() => jobMap.delete(jobId), 5 * 60 * 1000); // Clear from memory after 5 minutes
-
+      res.json({ imageUrl: swappedImageUrl, referenceImage: finalImageUrl, debugError: lastError });
+      clearTimeout(timeoutId);
     } catch (err: any) {
       console.error("Full pipeline error:", err);
       logToTelegram(`❌ <b>Ошибка Генерации (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Pipeline error'}</code>`).catch(console.error);
@@ -731,13 +734,9 @@ Instructions:
 
       // 🚨 REFUND THE GENERATION SINCE IT FAILED 🚨
       await refundGeneration(req.body.userId);
-      
-       jobMap.set(jobId, { status: 'error', error: err.message || "Pipeline error" });
-       setTimeout(() => jobMap.delete(jobId), 5 * 60 * 1000); // Clear from memory after 5 minutes
-        }
-      })();
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
+       
+      res.status(500).json({ error: err.message || "Pipeline error" });
+      clearTimeout(timeoutId);
     }
   });
 

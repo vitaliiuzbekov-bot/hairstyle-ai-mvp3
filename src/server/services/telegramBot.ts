@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-export async function sendPhotoToTelegramUser(userId: string, imageBuffer: Buffer, caption: string = ""): Promise<string | null> {
+export async function sendPhotoToTelegramUser(userId: string, imageBuffer: Buffer, caption: string = "", signal?: AbortSignal): Promise<string | null> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken || botToken === "MY_TELEGRAM_BOT_TOKEN") return null;
 
@@ -22,7 +22,8 @@ export async function sendPhotoToTelegramUser(userId: string, imageBuffer: Buffe
 
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
       method: "POST",
-      body: formData
+      body: formData,
+      ...(signal ? { signal } : {})
     });
 
     const data: any = await res.json();

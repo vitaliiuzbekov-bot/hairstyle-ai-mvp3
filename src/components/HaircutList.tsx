@@ -43,6 +43,13 @@ export const HaircutList = React.memo(
     
     const [cropperFileSrc, setCropperFileSrc] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<HaircutCategory>("short");
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleCustomUploadClick = () => {
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    };
 
     const handleCustomUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -53,6 +60,7 @@ export const HaircutList = React.memo(
         };
         reader.readAsDataURL(file);
       }
+      e.target.value = '';
     };
 
     return (
@@ -106,11 +114,14 @@ export const HaircutList = React.memo(
         </div>
 
         <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
-          <label className={`cursor-pointer flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm" : "text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]"}`}>
+          <button 
+            onClick={handleCustomUploadClick}
+            className={`relative overflow-hidden cursor-pointer flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm" : "text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]"}`}
+          >
             <Upload size={16} />
-            Свое фото
-            <input type="file" className="hidden" accept="image/*" onChange={handleCustomUpload} />
-          </label>
+            <span>Свое фото</span>
+            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleCustomUpload} />
+          </button>
           <button
             onClick={() => window.dispatchEvent(new Event('open-library'))}
             className={`flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-sm" : "text-amber-100 bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30 shadow-[0_8px_32px_rgba(245,158,11,0.15)]"}`}

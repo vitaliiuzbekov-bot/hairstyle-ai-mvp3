@@ -35,10 +35,7 @@ export async function withRetry<T>(
 
 // Gemini API Queue: Free tier is 15 RPM.
 export const geminiQueue = new PQueue({ 
-  concurrency: 2, 
-  intervalCap: 15, 
-  interval: 60 * 1000, 
-  carryoverConcurrencyCount: true 
+  concurrency: 5 
 });
 
 // Yandex API Queue (or general default queue)

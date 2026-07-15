@@ -20,6 +20,7 @@ export async function generateWithInpainting(input: GenerateImageInput): Promise
     console.warn("FAL_KEY is missing, returning a fallback image for inpainting.");
     return "https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=600&auto=format&fit=crop&q=60";
   }
+
   const result = await fal.subscribe('fal-ai/flux-lora/inpainting', {
     input: {
       image_url: input.imageUrl,
@@ -33,6 +34,7 @@ export async function generateWithInpainting(input: GenerateImageInput): Promise
     },
     logs: false,
   });
+
   return (result as any).images[0].url;
 }
 
@@ -41,12 +43,19 @@ export async function uploadImageToFal(base64DataUri: string): Promise<string> {
     return base64DataUri; // Cannot upload, fallback to base64
   }
   try {
-    const response = await fetch(base64DataUri);
-    const blob = await response.blob();
+    const matches = base64DataUri.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      // Not a valid base64 data URI? Maybe it's already an uploaded URL?
+      if (base64DataUri.startsWith("http")) return base64DataUri;
+      throw new Error('Invalid base64 data URI');
+    }
+    const type = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const blob = new Blob([buffer], { type });
     const uploadedUrl = await fal.storage.upload(blob);
     return uploadedUrl;
-  } catch (err) {
-    console.warn("Failed to upload to FAL storage, returning base64", err);
+  } catch (err: any) {
+    console.warn("Failed to upload to FAL storage, returning base64", err.message);
     return base64DataUri;
   }
 }
@@ -56,6 +65,7 @@ export async function generateReference(prompt: string): Promise<string> {
     console.warn("FAL_KEY is missing, returning a fallback image for reference.");
     return "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=600&auto=format&fit=crop&q=60";
   }
+
   const result = await fal.subscribe('fal-ai/flux/schnell', {
     input: {
       prompt: prompt,
@@ -66,5 +76,6 @@ export async function generateReference(prompt: string): Promise<string> {
     },
     logs: false,
   });
+
   return (result as any).images[0].url;
 }
