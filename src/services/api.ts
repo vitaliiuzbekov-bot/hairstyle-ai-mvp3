@@ -158,7 +158,7 @@ export const generateFullApi = async (
   }
   let response: Response;
   try {
-    response = await fetchWithRetry("/api/generate-full", {
+    response = await fetchWithRetry("/api/generate-full/start", {
       method: "POST",
       headers: {
         ...(telegramInitData ? { "X-Telegram-Init-Data": telegramInitData } : {}),
@@ -187,8 +187,41 @@ export const generateFullApi = async (
   }
 
   if (!response.ok) {
-    throw new Error(data.error || "Ошибка от сервера при генерации детального отчета.");
+    throw new Error(data.error || "Ошибка от сервера при инициализации генерации.");
   }
 
-  return data;
+  if (data.imageUrl) {
+    return data;
+  }
+
+  const jobId = data.jobId;
+  if (!jobId) {
+    throw new Error("Не удалось получить ID задачи от сервера.");
+  }
+
+  // Poll for status
+  let attempts = 0;
+  while (attempts < 60) {
+    if (signal?.aborted) throw new Error("Aborted");
+    await new Promise(r => setTimeout(r, 3000)); // 3 seconds interval
+    attempts++;
+    
+    try {
+      const statusRes = await fetch(`/api/generate-full/status?jobId=${jobId}`, { signal });
+      if (!statusRes.ok) continue;
+      const statusData = await statusRes.json();
+      
+      if (statusData.status === "done") {
+        return { imageUrl: statusData.imageUrl, referenceImage: statusData.referenceImage };
+      } else if (statusData.status === "error") {
+        throw new Error(statusData.error || "Ошибка генерации на сервере.");
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') throw err;
+      console.warn("Polling error:", err);
+    }
+  }
+  
+  throw new Error("Превышено время ожидания генерации (таймаут 3 мин).");
 };
+
