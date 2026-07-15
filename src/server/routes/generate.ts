@@ -32,7 +32,7 @@ import {
 } from "../utils/promptGenerator";
 
 import { checkAndDeductGeneration, refundGeneration } from "../utils/billing";
-import fetch from "node-fetch";
+
 import { uploadImageToFal } from "../services/falClient";
 import { isAuthorizedDeveloper } from "../utils/tgAuth";
 
