@@ -68,7 +68,7 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
     if (!isLibrary && hairColor) {
       cacheKeyParams.hairColor = hairColor;
     }
-    const cacheKey = getCacheKey(cacheKeyParams);
+    const cacheKey = "v2_" + getCacheKey(cacheKeyParams);
     const cachedImage = await getCachedValue<string>(cacheKey);
     
     if (cachedImage) {
@@ -92,8 +92,8 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
       const isMale = !isFemale && (lowerGender.includes("муж") || lowerGender.includes("male") || lowerGender.includes("man") || lowerGender.includes("пар") || lowerGender.includes("boy"));
       
       const kwLower = (keyword || "").toLowerCase();
-      const isBaldStyle = kwLower.includes("bald") || kwLower.includes("shave") || kwLower.includes("shorn") || kwLower.includes("shaven") || kwLower.includes("zero hair") || kwLower.includes("no hair") || kwLower.includes("лыс") || kwLower.includes("налысо") || kwLower.includes("брит") || kwLower.includes("бритая") || kwLower.includes("без волос");
-      const isBuzzStyle = !isBaldStyle && (kwLower.includes("buzz") || kwLower.includes("ежик") || kwLower.includes("бокс") || kwLower.includes("под машинку") || kwLower.includes("под ноль") || kwLower.includes("ultra-short"));
+      const isBaldStyle = kwLower.includes("bald") || kwLower.includes("shaved head") || kwLower.includes("zero hair") || kwLower.includes("no hair") || kwLower.includes("налысо") || kwLower.includes("лысый") || kwLower.includes("лысая") || kwLower.includes("без волос");
+      const isBuzzStyle = !isBaldStyle && (kwLower.includes("buzz") || kwLower.includes("ежик") || (kwLower.includes("бокс") && !kwLower.includes("полубокс")) || kwLower.includes("под машинку") || kwLower.includes("под ноль") || kwLower.includes("ultra-short"));
       const ageProps = "beautiful young adult around 25 years old, flawless glowing skin, perfect complexion, studio lighting, photorealistic, attractive";
       const faceProps = "Symmetrical, highly attractive beautiful face. ";
       const beardProps = isMale ? "Clean shaven face. " : "";

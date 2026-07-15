@@ -155,7 +155,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       }
 
       // Check cache first (Cache for 30 days)
-      const cacheKey = getCacheKey({ 
+      const cacheKey = "v2_" + getCacheKey({ 
         route: "generate-reference-v28-gender-fixed", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
         hairDensity, hairType, hairLength, hairlineStatus, hairQuality, idempotencyKey, clothingContext
@@ -268,7 +268,24 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
   });
 
   
-generateRouter.post("/generate-full", async (req, res) => {
+
+generateRouter.get("/generate-full/status", async (req, res) => {
+  try {
+    const { jobId } = req.query;
+    if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
+    if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
+    
+    const doc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    res.json(doc.data());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+generateRouter.post("/generate-full/start", async (req, res) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 5m")), 5 * 60 * 1000);
     try {
@@ -300,7 +317,7 @@ generateRouter.post("/generate-full", async (req, res) => {
       let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
 
       // Check cache first (Cache for 30 days)
-      const cacheKey = getCacheKey({ 
+      const cacheKey = "v2_" + getCacheKey({ 
         route: "generate-full-v9-reference-vision", 
         userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
         // using string truncation or full string to hash the selfie.
@@ -320,6 +337,20 @@ generateRouter.post("/generate-full", async (req, res) => {
       if (!billingCheck.ok) {
         return res.status(400).json({ error: billingCheck.error });
       }
+      
+      if (adminDb) {
+         await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
+      }
+      res.json({ jobId, status: 'processing' }); // RETURN IMMEDIATELY!
+
+      // RUN IN BACKGROUND
+      (async () => {
+        let jobStatus = "done";
+        let jobErrorMsg = "";
+        let finalImageUrlForJob = "";
+        let swappedImageUrlForJob = "";
+        try {
+
 
 
 
@@ -739,9 +770,9 @@ Instructions:
       
       // Save to cache for 30 days
       await setCachedValue(cacheKey, swappedImageUrl, 30 * 24 * 60 * 60);
+      finalImageUrlForJob = finalImageUrl;
+      swappedImageUrlForJob = swappedImageUrl;
 
-      res.json({ imageUrl: swappedImageUrl, referenceImage: finalImageUrl, debugError: lastError });
-      clearTimeout(timeoutId);
     } catch (err: any) {
       console.error("Full pipeline error:", err);
       logToTelegram(`❌ <b>Ошибка Генерации (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Pipeline error'}</code>`).catch(console.error);
@@ -749,13 +780,33 @@ Instructions:
       try {
         fs.appendFileSync('/app/applet/pipeline_error.log', new Date().toISOString() + ': ' + (err.message || err.toString()) + '\n');
       } catch(e) {}
-
+      
       // 🚨 REFUND THE GENERATION SINCE IT FAILED 🚨
       await refundGeneration(req.body.userId);
        
-      res.status(500).json({ error: err.message || "Pipeline error" });
+      jobStatus = "error";
+      jobErrorMsg = err.message || "Pipeline error";
+    } finally {
       clearTimeout(timeoutId);
+      console.log('[generate-full] Saving job status to jobMap/Firestore, jobId:', jobId);
+      if (adminDb) {
+         try {
+           if (jobStatus === "done") {
+             await adminDb.collection("jobs").doc(jobId).update({ status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob });
+           } else {
+             await adminDb.collection("jobs").doc(jobId).update({ status: "error", error: jobErrorMsg });
+           }
+         } catch (dbErr: any) {
+           console.error("[generate-full] Failed to save job status to Firestore:", dbErr);
+         }
+      }
     }
+  })();
+  } catch (outerErr: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: outerErr.message || "Pipeline error" });
+    }
+  }
   });
 
   
@@ -773,7 +824,7 @@ generateRouter.post("/generate-ar", freeModelsLimiter, async (req, res) => {
       const faceDescription = features ? JSON.stringify(pureFeatures1) : "Нет данных о лице (ошибка)";
 
       // Check cache for this exact consultation
-      const cacheKey = getCacheKey({
+      const cacheKey = "v2_" + getCacheKey({
         route: "generate-ar-consultation",
         styleKeyword,
         styleName,
@@ -1045,5 +1096,22 @@ generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
   } catch (err: any) {
     console.error("Load more error:", err);
     res.status(500).json({ error: err.message || "Ошибка генерации новых вариантов." });
+  }
+});
+
+generateRouter.get("/clear-cache", async (req, res) => {
+  try {
+    
+    
+    
+    const snapshot = await adminDb!.collection("generation_cache").get();
+    let count = 0;
+    for (const doc of snapshot.docs) {
+      await doc.ref.delete();
+      count++;
+    }
+    res.json({ success: true, count });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });

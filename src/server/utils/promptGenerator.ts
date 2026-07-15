@@ -104,7 +104,7 @@ export function translateHairlineStatusToEng(hairlineStatus: string, selectedSty
   
   // If the haircut selected is a shaved head / bald look
   const style = (selectedStyleKeyword || "").toLowerCase();
-  const isBaldStyle = style.includes("bald") || style.includes("shave") || style.includes("лыс") || style.includes("брит") || style.includes("shorn") || style.includes("shaven");
+  const isBaldStyle = style.includes("bald") || style.includes("shaved head") || style.includes("налысо") || style.includes("лысый") || style.includes("лысая") || style.includes("без волос");
   
   if (isBaldStyle) {
     return "clean shaved head, neat smooth scalp style. ";

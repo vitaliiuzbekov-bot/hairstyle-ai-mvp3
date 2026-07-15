@@ -68,7 +68,7 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
       preferredStyle: preferredStyle || "Любой",
       faceApiGender, faceApiShape, faceApiAge
     };
-    const cacheKey = getCacheKey(cacheKeyParams);
+    const cacheKey = "v2_" + getCacheKey(cacheKeyParams);
     
     const cachedAnalysis = await getCachedValue<any>(cacheKey);
     if (cachedAnalysis) {
