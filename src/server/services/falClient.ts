@@ -43,20 +43,13 @@ export async function uploadImageToFal(base64DataUri: string): Promise<string> {
     return base64DataUri; // Cannot upload, fallback to base64
   }
   try {
-    const matches = base64DataUri.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      // Not a valid base64 data URI? Maybe it's already an uploaded URL?
-      if (base64DataUri.startsWith("http")) return base64DataUri;
-      throw new Error('Invalid base64 data URI');
-    }
-    const type = matches[1];
-    const buffer = Buffer.from(matches[2], 'base64');
-    const blob = new Blob([buffer], { type });
+    const response = await fetch(base64DataUri);
+    const blob = await response.blob();
     const uploadedUrl = await fal.storage.upload(blob);
     return uploadedUrl;
   } catch (err: any) {
-    console.warn("Failed to upload to FAL storage, returning base64", err.message);
-    return base64DataUri;
+    console.error("[falClient] CRITICAL ERROR: Failed to upload image to FAL storage. This prevents image generation.", err.message, err.stack);
+    throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
   }
 }
 

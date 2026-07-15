@@ -509,6 +509,10 @@ Instructions:
             let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
             
             const fluxBaseImageUrl = baseImageForFlux.startsWith('data:') ? await uploadImageToFal(baseImageForFlux) : baseImageForFlux;
+            if (fluxBaseImageUrl.startsWith('data:')) {
+                console.error("[generate-full] Error: fluxBaseImageUrl is a data URI, meaning Fal.storage upload failed.");
+                throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
+            }
 
             const bodyPayload: any = {
                prompt: promptEng,
@@ -579,6 +583,11 @@ Instructions:
          
          const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
          const swapImageUrlForFal = selfieImageFull.startsWith('data:') ? await uploadImageToFal(selfieImageFull) : selfieImageFull;
+         
+         if (baseImageUrlForFal.startsWith('data:') || swapImageUrlForFal.startsWith('data:')) {
+             console.error("[generate-full] Error: Fal.storage upload failed during FaceSwap prep.");
+             throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
+         }
 
          const faceSwapPayload = {
            base_image_url: baseImageUrlForFal,
