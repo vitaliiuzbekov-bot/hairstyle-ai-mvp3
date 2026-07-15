@@ -32,6 +32,7 @@ import {
 } from "../utils/promptGenerator";
 
 import { checkAndDeductGeneration, refundGeneration } from "../utils/billing";
+import fetch from "node-fetch";
 import { uploadImageToFal } from "../services/falClient";
 import { isAuthorizedDeveloper } from "../utils/tgAuth";
 
@@ -96,6 +97,7 @@ async function resolveImageToBase64(imageUrl: string | undefined): Promise<strin
     
     // For all other remote URLs, download them to base64 to prevent FAL "file_download_error"
     try {
+        console.log("[resolveImageToBase64] Attempting to download remote URL:", imageUrl);
         const imgRes = await fetch(imageUrl);
         if (imgRes.ok) {
             const arrayBuffer = await imgRes.arrayBuffer();
@@ -103,12 +105,14 @@ async function resolveImageToBase64(imageUrl: string | undefined): Promise<strin
             let mime = imgRes.headers.get('content-type') || 'image/jpeg';
             if (!mime.startsWith('image/')) mime = 'image/jpeg';
             return `data:${mime};base64,${buf.toString('base64')}`;
+        } else {
+            console.error("[resolveImageToBase64] HTTP Error downloading image:", imgRes.status);
+            throw new Error(`Не удалось загрузить изображение по ссылке (HTTP ${imgRes.status})`);
         }
-    } catch (e) {
-        console.warn(`[resolveImage] Could not download remote image ${imageUrl} to base64:`, e.message);
+    } catch (e: any) {
+        console.error(`[resolveImage] Could not download remote image to base64:`, e.message);
+        throw new Error(`Ошибка загрузки изображения: ${e.message}`);
     }
-
-    return imageUrl;
 }
 
 export const generateRouter = Router();
@@ -582,7 +586,11 @@ Instructions:
             console.log("Starting Virtual Try-On FaceSwap via FAL.AI... finalImageUrl:", finalImageUrl);
          
          const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
-         const swapImageUrlForFal = selfieImageFull.startsWith('data:') ? await uploadImageToFal(selfieImageFull) : selfieImageFull;
+         let normalizedSelfie = selfieImageFull;
+         if (typeof normalizedSelfie === 'string' && !normalizedSelfie.startsWith('data:') && !normalizedSelfie.startsWith('http')) {
+             normalizedSelfie = 'data:image/jpeg;base64,' + normalizedSelfie;
+         }
+         const swapImageUrlForFal = normalizedSelfie.startsWith('data:') ? await uploadImageToFal(normalizedSelfie) : normalizedSelfie;
          
          if (baseImageUrlForFal.startsWith('data:') || swapImageUrlForFal.startsWith('data:')) {
              console.error("[generate-full] Error: Fal.storage upload failed during FaceSwap prep.");

@@ -39,11 +39,15 @@ export async function generateWithInpainting(input: GenerateImageInput): Promise
 }
 
 export async function uploadImageToFal(base64DataUri: string): Promise<string> {
+  let finalUri = base64DataUri;
+  if (typeof finalUri === 'string' && !finalUri.startsWith('data:') && !finalUri.startsWith('http')) {
+      finalUri = 'data:image/jpeg;base64,' + finalUri;
+  }
   if (!API_KEY || API_KEY === 'mock-key') {
-    return base64DataUri; // Cannot upload, fallback to base64
+    return finalUri; // Cannot upload, fallback to base64
   }
   try {
-    const response = await fetch(base64DataUri);
+    const response = await fetch(finalUri);
     const blob = await response.blob();
     const uploadedUrl = await fal.storage.upload(blob);
     return uploadedUrl;
