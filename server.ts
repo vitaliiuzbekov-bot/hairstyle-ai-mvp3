@@ -255,7 +255,12 @@ if (process.env.NODE_ENV !== "production") {
     });
   }
 
-    // Global error handler to prevent HTML proxy errors on API routes
+    // Catch all unhandled API routes
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: "API route not found (unhandled)" });
+  });
+
+  // Global error handler to prevent HTML proxy errors on API routes
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("Global Error Handler:", err.message || err);
     if (req.originalUrl.startsWith('/api/')) {

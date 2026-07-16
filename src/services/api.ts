@@ -201,9 +201,9 @@ export const generateFullApi = async (
 
   // Poll for status
   let attempts = 0;
-  while (attempts < 60) {
+  while (attempts < 72) {
     if (signal?.aborted) throw new Error("Aborted");
-    await new Promise(r => setTimeout(r, 3000)); // 3 seconds interval
+    await new Promise(r => setTimeout(r, 5000)); // 5 seconds interval
     attempts++;
     
     try {
@@ -222,6 +222,6 @@ export const generateFullApi = async (
     }
   }
   
-  throw new Error("Превышено время ожидания генерации (таймаут 3 мин).");
+  throw new Error("Превышено время ожидания генерации (таймаут 6 мин).");
 };
 

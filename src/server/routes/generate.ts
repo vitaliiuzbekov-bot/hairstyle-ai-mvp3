@@ -285,7 +285,7 @@ generateRouter.get("/generate-full/status", async (req, res) => {
   }
 });
 
-generateRouter.post("/generate-full/start", async (req, res) => {
+const handleGenerateFull = async (req, res) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 5m")), 5 * 60 * 1000);
     try {
@@ -807,7 +807,10 @@ Instructions:
       res.status(500).json({ error: outerErr.message || "Pipeline error" });
     }
   }
-  });
+};
+generateRouter.post("/generate-full/start", handleGenerateFull);
+generateRouter.post("/generate-full", handleGenerateFull); // Backward compatibility
+
 
   
 generateRouter.post("/generate-ar", freeModelsLimiter, async (req, res) => {
