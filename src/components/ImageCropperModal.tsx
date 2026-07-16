@@ -90,7 +90,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
           } else {
             resolve(imageSrc);
           }
-        }, "image/jpeg", 0.85);
+        }, "image/webp", 0.85);
       });
     }
 
@@ -103,7 +103,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
         } else {
           resolve(imageSrc);
         }
-      }, "image/jpeg", 0.85);
+      }, "image/webp", 0.85);
     });
   };
 

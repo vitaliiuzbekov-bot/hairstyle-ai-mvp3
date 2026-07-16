@@ -48,7 +48,7 @@ export const useImageProcessor = () => {
                    setIsProcessing(false);
                    resolve(dataUrl.split(",")[1]); // fallback
                  }
-               }, "image/jpeg", 0.8);
+               }, "image/webp", 0.8);
              } else {
                setIsProcessing(false);
                resolve(dataUrl.split(",")[1]);
@@ -91,7 +91,7 @@ export const useImageProcessor = () => {
           file: file,
           maxDim: 1024,
           quality: 0.8,
-          mimeType: "image/jpeg"
+          mimeType: "image/webp"
         });
       } catch (err) {
         // Fallback if worker fails to initialize

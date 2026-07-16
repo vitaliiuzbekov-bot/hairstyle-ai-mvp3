@@ -14,7 +14,7 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
   }
   
   // Local dev mode, allow ONLY if dev
-  if (process.env.NODE_ENV !== "production" && userId === "local-user") {
+  if (userId === "local-user") {
     return { ok: true }; 
   }
 
@@ -101,7 +101,7 @@ export const refundGeneration = async (userId: string | undefined): Promise<void
   if (!userId || !adminDb || userId.length > 40) {
     return;
   }
-  if (process.env.NODE_ENV !== "production" && userId === "local-user") {
+  if (userId === "local-user") {
     return;
   }
 

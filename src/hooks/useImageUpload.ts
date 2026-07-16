@@ -50,9 +50,9 @@ export const useImageUpload = () => {
 
     const [mimeType, setMimeTypeState] = useState<string>(() => {
         try {
-            return localStorage.getItem("persistent_mimeType") || "image/jpeg";
+            return localStorage.getItem("persistent_mimeType") || "image/webp";
         } catch {
-            return "image/jpeg";
+            return "image/webp";
         }
     });
 
@@ -127,7 +127,7 @@ export const useImageUpload = () => {
         const localPreviewUrl = URL.createObjectURL(file);
         setImageUrl(localPreviewUrl);
 
-        setMimeType("image/jpeg");
+        setMimeType("image/webp");
         setIsUploadingImage(true);
 
         try {
@@ -175,7 +175,7 @@ export const useImageUpload = () => {
             const cropResult = await Promise.race([
                 (async () => {
                     const { smartCropFace } = await import('../services/fallbackAnalysis');
-                    return await smartCropFace(finalBase64, "image/jpeg");
+                    return await smartCropFace(finalBase64, "image/webp");
                 })(),
                 new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout importing or cropping face")), 12000))
             ]);

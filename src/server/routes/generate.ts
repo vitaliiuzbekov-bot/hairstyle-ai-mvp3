@@ -117,6 +117,9 @@ async function resolveImageToBase64(imageUrl: string | undefined): Promise<strin
 
 export const generateRouter = Router();
 
+const jobMap = new Map<string, any>();
+
+
 generateRouter.get("/proxy-image", async (req, res) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) return res.status(400).send("No URL provided");
@@ -139,7 +142,7 @@ generateRouter.get("/proxy-image", async (req, res) => {
 const customBlueprintCache = new Map<string, string>();
 
 // Stricter limits for heavy text models and logic
-const freeModelsLimiter = createRateLimiter(5 * 60 * 1000, 10); // 10 per 5 min
+const freeModelsLimiter = createRateLimiter(10 * 60 * 1000, 10); // 10 per 5 min
 const heavyImageLimiter = createRateLimiter(10 * 60 * 1000, 5); // 5 per 10 min
 
 generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) => {
@@ -206,7 +209,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
                         prompt: finalPrompt,
                         image_size: "portrait_4_3",
                         seed: seedValue,
-                        num_inference_steps: 28
+                        num_inference_steps: 20
                     })
                 });
 
@@ -273,6 +276,7 @@ generateRouter.get("/generate-full/status", async (req, res) => {
   try {
     const { jobId } = req.query;
     if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
+    if (jobMap.has(jobId)) { return res.json(jobMap.get(jobId)); }
     if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
     
     const doc = await adminDb.collection("jobs").doc(jobId).get();
@@ -287,7 +291,7 @@ generateRouter.get("/generate-full/status", async (req, res) => {
 
 const handleGenerateFull = async (req, res) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 5m")), 5 * 60 * 1000);
+    const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 10m")), 10 * 60 * 1000);
     try {
       const { 
         userId, gender, faceShape, hairLength, hairDensity, hairType, skinTone, 
@@ -338,8 +342,13 @@ const handleGenerateFull = async (req, res) => {
         return res.status(400).json({ error: billingCheck.error });
       }
       
+      jobMap.set(jobId, { status: "processing", createdAt: Date.now() });
       if (adminDb) {
-         await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
+         try {
+           await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
+         } catch (dbErr) {
+           console.error("[generate-full] Warning: Failed to set job status in Firestore (using in-memory map instead):", dbErr.message);
+         }
       }
       res.json({ jobId, status: 'processing' }); // RETURN IMMEDIATELY!
 
@@ -404,6 +413,15 @@ const handleGenerateFull = async (req, res) => {
       const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
       
       let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
+      
+      // PARALLEL: Start Fal uploads immediately
+      let fluxBaseImageUrlPromise = baseImageForFlux.startsWith('data:') ? uploadImageToFal(baseImageForFlux) : Promise.resolve(baseImageForFlux);
+      let normalizedSelfie = selfieImageFull;
+      if (typeof normalizedSelfie === 'string' && !normalizedSelfie.startsWith('data:') && !normalizedSelfie.startsWith('http')) {
+          normalizedSelfie = 'data:image/jpeg;base64,' + normalizedSelfie;
+      }
+      let swapImageUrlForFalPromise = normalizedSelfie.startsWith('data:') ? uploadImageToFal(normalizedSelfie) : Promise.resolve(normalizedSelfie);
+
       
       let uiStrength = Number(vtonStrength) || 45; 
       let fluxStrength = 0.95;
@@ -543,7 +561,7 @@ Instructions:
                   console.log("Generating target blueprint via FAL.AI (Flux Dev Image-to-Image)... strength:", fluxStrength);
             let endpoint = "https://fal.run/fal-ai/flux/dev/image-to-image";
             
-            const fluxBaseImageUrl = baseImageForFlux.startsWith('data:') ? await uploadImageToFal(baseImageForFlux) : baseImageForFlux;
+            const fluxBaseImageUrl = await fluxBaseImageUrlPromise;
             if (fluxBaseImageUrl.startsWith('data:')) {
                 console.error("[generate-full] Error: fluxBaseImageUrl is a data URI, meaning Fal.storage upload failed.");
                 throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
@@ -553,7 +571,7 @@ Instructions:
                prompt: promptEng,
                image_url: fluxBaseImageUrl,
                strength: fluxStrength,
-               num_inference_steps: 28
+               num_inference_steps: 20
             };
             
             let fluxRes: globalThis.Response | null = null;
@@ -617,11 +635,7 @@ Instructions:
             console.log("Starting Virtual Try-On FaceSwap via FAL.AI... finalImageUrl:", finalImageUrl);
          
          const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
-         let normalizedSelfie = selfieImageFull;
-         if (typeof normalizedSelfie === 'string' && !normalizedSelfie.startsWith('data:') && !normalizedSelfie.startsWith('http')) {
-             normalizedSelfie = 'data:image/jpeg;base64,' + normalizedSelfie;
-         }
-         const swapImageUrlForFal = normalizedSelfie.startsWith('data:') ? await uploadImageToFal(normalizedSelfie) : normalizedSelfie;
+         const swapImageUrlForFal = await swapImageUrlForFalPromise;
          
          if (baseImageUrlForFal.startsWith('data:') || swapImageUrlForFal.startsWith('data:')) {
              console.error("[generate-full] Error: Fal.storage upload failed during FaceSwap prep.");
@@ -724,45 +738,9 @@ Instructions:
         console.warn("Failed to fetch swappedImage for storage:", e);
       }
 
-      // Try sending to Telegram
-      if (imageBuffer && req.body.tgUserId) {
-        tgFileId = await sendPhotoToTelegramUser(
-          req.body.tgUserId, 
-          imageBuffer, 
-          `💇 Твоя стрижка готова!\n\n<i>${keyword || 'Примерка'}</i>`,
-          controller.signal
-        );
-        if (tgFileId) {
-          sentViaTelegram = true;
-            } else {
-            }
-      }
 
-      // Upload to Firebase Storage for a reliable CDN URL
-      if (adminStorage && imageBuffer) {
-         try {
-             const bucket = adminStorage.bucket();
-             if (bucket.name) {
-                 const ext = contentType.includes('webp') ? '.webp' : contentType.includes('png') ? '.png' : '.jpg';
-                 const fileName = `generations/${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
-                 const file = bucket.file(fileName);
-                 const uuid = crypto.randomUUID();
-                 await file.save(imageBuffer, {
-                     metadata: { 
-                       contentType: contentType,
-                       metadata: {
-                         firebaseStorageDownloadTokens: uuid
-                       }
-                     }
-                 });
-                 swappedImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-                        }
-         } catch (storageErr: any) {
-             const errMsg = storageErr?.error?.message || storageErr?.message || "Unknown storage error";
-             console.warn("Firebase Storage upload failed, using fallback URL. Reason:", errMsg);
-             // swappedImageUrl remains the fal.ai URL, which is valid for 24 hours.
-         }
-      }
+
+
 
       // Final success
       logToTelegram(`🎨 <b>Генерация (${req.body.userId || 'unknown'})</b>
@@ -772,6 +750,46 @@ Instructions:
       await setCachedValue(cacheKey, swappedImageUrl, 30 * 24 * 60 * 60);
       finalImageUrlForJob = finalImageUrl;
       swappedImageUrlForJob = swappedImageUrl;
+
+      // ASYNC BACKGROUND: Do not block returning response
+      // Move Telegram & Firebase saving out of the critical path to speed up job status update
+      Promise.all([
+        (async () => {
+          if (imageBuffer && req.body.tgUserId) {
+            try {
+              const tgFileId = await sendPhotoToTelegramUser(
+                req.body.tgUserId, 
+                imageBuffer, 
+                `💇 Твоя стрижка готова!\n\n<i>${keyword || 'Примерка'}</i>`,
+                controller.signal
+              );
+              console.log("Telegram async send complete:", !!tgFileId);
+            } catch (e) { console.error("Async telegram error", e); }
+          }
+        })(),
+        (async () => {
+          if (adminStorage && imageBuffer) {
+             try {
+                 const bucket = adminStorage.bucket();
+                 if (bucket.name) {
+                     const ext = contentType.includes('webp') ? '.webp' : contentType.includes('png') ? '.png' : '.jpg';
+                     const fileName = `generations/${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
+                     const file = bucket.file(fileName);
+                     const uuid = crypto.randomUUID();
+                     await file.save(imageBuffer, {
+                         metadata: { 
+                           contentType: contentType,
+                           metadata: { firebaseStorageDownloadTokens: uuid }
+                         }
+                     });
+                     console.log("Firebase async storage complete");
+                 }
+             } catch (storageErr: any) {
+                 console.warn("Async firebase storage error", storageErr?.message);
+             }
+          }
+        })()
+      ]).catch(console.error);
 
     } catch (err: any) {
       console.error("Full pipeline error:", err);
@@ -789,6 +807,12 @@ Instructions:
     } finally {
       clearTimeout(timeoutId);
       console.log('[generate-full] Saving job status to jobMap/Firestore, jobId:', jobId);
+      if (jobStatus === "done") {
+        jobMap.set(jobId, { status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob });
+      } else {
+        jobMap.set(jobId, { status: "error", error: jobErrorMsg });
+      }
+      
       if (adminDb) {
          try {
            if (jobStatus === "done") {
@@ -797,7 +821,7 @@ Instructions:
              await adminDb.collection("jobs").doc(jobId).update({ status: "error", error: jobErrorMsg });
            }
          } catch (dbErr: any) {
-           console.error("[generate-full] Failed to save job status to Firestore:", dbErr);
+           console.error("[generate-full] Failed to save job status to Firestore (in-memory map updated successfully):", dbErr.message);
          }
       }
     }

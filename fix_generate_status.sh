@@ -1,0 +1,1 @@
+sed -i 's/if (!adminDb) return res.status(500).json({ error: "DB not initialized" });/if (jobMap.has(jobId)) { return res.json(jobMap.get(jobId)); }\n    if (!adminDb) return res.status(500).json({ error: "DB not initialized" });/' src/server/routes/generate.ts
