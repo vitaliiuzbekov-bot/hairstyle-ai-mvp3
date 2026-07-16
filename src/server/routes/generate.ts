@@ -276,14 +276,14 @@ generateRouter.get("/generate-full/status", async (req, res) => {
   try {
     const { jobId } = req.query;
     if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
-    if (jobMap.has(jobId)) { return res.json(jobMap.get(jobId)); }
+    if (jobMap.has(jobId)) { res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); return res.json(jobMap.get(jobId)); }
     if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
     
     const doc = await adminDb.collection("jobs").doc(jobId).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Job not found" });
     }
-    res.json(doc.data());
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); res.json(doc.data());
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

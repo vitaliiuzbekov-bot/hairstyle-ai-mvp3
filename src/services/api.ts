@@ -207,7 +207,7 @@ export const generateFullApi = async (
     attempts++;
     
     try {
-      const statusRes = await fetch(`/api/generate-full/status?jobId=${jobId}`, { signal });
+      const statusRes = await fetch(`/api/generate-full/status?jobId=${jobId}&t=${Date.now()}`, { signal, cache: "no-store" });
       if (!statusRes.ok) continue;
       const statusData = await statusRes.json();
       
