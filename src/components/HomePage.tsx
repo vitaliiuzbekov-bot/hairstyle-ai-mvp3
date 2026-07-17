@@ -40,6 +40,7 @@ interface HomePageProps {
   telegramInitData: string;
   isLightMode: boolean;
   isDeveloper: boolean;
+  resultImage?: string | null;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -55,7 +56,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   history,
   telegramInitData,
   isLightMode,
-  isDeveloper
+  isDeveloper,
+  resultImage
 }) => {
   const { consentGiven, setConsentGiven, consentError, setConsentError, userRole, salonName } = useUser();
   const { addToast, chatStyleName, setChatStyleName, isChatOpen, setIsChatOpen } = useUI();
@@ -214,7 +216,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </h2>
             
             <div className="flex justify-center mb-6 w-full max-w-[400px] mx-auto">
-              <ImageSlider isLightMode={isLightMode} />
+              <ImageSlider isLightMode={isLightMode} resultImage={resultImage} history={history} />
             </div>
 
             <p className={`leading-relaxed max-w-lg mx-auto font-light text-sm sm:text-base px-2 ${isLightMode ? 'text-gray-600' : 'text-white/60'}`}>

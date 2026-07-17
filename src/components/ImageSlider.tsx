@@ -1,14 +1,18 @@
 import React, { useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { leftImage, rightImage } from "../assets/slider-images";
+import { leftImage as defaultLeft, rightImage as defaultRight } from "../assets/slider-images";
 
 
-export const ImageSlider = ({ isLightMode }: { isLightMode?: boolean }) => {
+export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode?: boolean, resultImage?: string | null, history?: any[] }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const beforeContainerRef = useRef<HTMLDivElement>(null);
   const beforeImageRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  // Find matching original image in history if resultImage is provided
+  const matchingHistory = history?.find((h) => h.url === resultImage);
+  const leftImage = matchingHistory?.originalUrl || matchingHistory?.blobDataUrl || defaultLeft;
+  const rightImage = resultImage || defaultRight;
 
   const updateSliderPosition = (percentage: number) => {
     // Prevent division by zero and going out of bounds

@@ -100,8 +100,16 @@ function App() {
   } = useTokenManager();
 
   const { deleteHistoryItem } = useHistoryHandlers(history, setHistory, userId);
-
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+
+  const [resultImage, setResultImage] = React.useState<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const img = params.get('image');
+    if (img) {
+      setResultImage(img);
+    }
+  }, []);
 
   useEffect(() => {
     const handleOpenLibrary = () => setIsLibraryOpen(true);
@@ -200,6 +208,8 @@ function App() {
             telegramInitData={telegramInitData}
             isLightMode={isLightMode}
             isDeveloper={isDeveloper}
+            resultImage={resultImage}
+            
           />
         } />
         <Route path="/faq" element={

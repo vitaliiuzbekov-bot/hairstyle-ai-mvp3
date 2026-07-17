@@ -400,6 +400,13 @@ export const useAnalysis = ({
             }));
           }
 
+          if (data.isAsync) {
+             consumeToken();
+             addToast("Фото обрабатывается. Мы пришлем результат в Telegram!", "info");
+             hapticNotification('success');
+             return;
+          }
+
           if (data.imageUrl) {
             let watermarkedUrl = data.imageUrl;
             try {
