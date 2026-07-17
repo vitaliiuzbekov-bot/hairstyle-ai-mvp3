@@ -201,16 +201,33 @@ export const generateFullApi = async (
 
   // Poll for status
   let attempts = 0;
+  let consecutiveErrors = 0;
   while (attempts < 120) {
     if (signal?.aborted) throw new Error("Aborted");
     await new Promise(r => setTimeout(r, 5000)); // 5 seconds interval
     attempts++;
-    
+        
     try {
-      const statusRes = await fetch(`/api/generate-full/status?jobId=${jobId}&t=${Date.now()}`, { signal, cache: "no-store" });
-      if (!statusRes.ok) continue;
-      const statusData = await statusRes.json();
+      const urlWithCacheBust = `/api/generate-full/status?t=${Date.now()}`;
+      const statusRes = await fetch(urlWithCacheBust, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ jobId }), 
+        signal, 
+        cache: "no-store" 
+      });
       
+      if (!statusRes.ok) {
+        consecutiveErrors++;
+        if (consecutiveErrors > 15) {
+            throw new Error(`Сервер не отвечает на запросы статуса (Код ${statusRes.status}). Попробуйте позже.`);
+        }
+        continue;
+      }
+      consecutiveErrors = 0; // reset on success
+      
+      const statusData = await statusRes.json();
+            
       if (statusData.status === "done") {
         return { imageUrl: statusData.imageUrl, referenceImage: statusData.referenceImage };
       } else if (statusData.status === "error") {
@@ -218,6 +235,10 @@ export const generateFullApi = async (
       }
     } catch (err: any) {
       if (err.name === 'AbortError') throw err;
+      consecutiveErrors++;
+      if (consecutiveErrors > 15 && !err.message.includes("Aborted") && !err.message.includes("таймаут")) {
+         throw new Error(err.message || "Многократная ошибка сети при проверке статуса.");
+      }
       console.warn("Polling error:", err);
     }
   }

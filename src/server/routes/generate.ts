@@ -272,9 +272,9 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
 
   
 
-generateRouter.get("/generate-full/status", async (req, res) => {
+generateRouter.post("/generate-full/status", async (req, res) => {
   try {
-    const { jobId } = req.query;
+    const { jobId } = req.body;
     if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
     if (jobMap.has(jobId)) { res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); return res.json(jobMap.get(jobId)); }
     if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
