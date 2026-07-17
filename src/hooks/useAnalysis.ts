@@ -98,6 +98,18 @@ export const useAnalysis = ({
     const [vtonStrength, setVtonStrength] = useState<number>(45);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+    useEffect(() => {
+        const handler = ((e: CustomEvent) => {
+            const { imageUrl, originalUrl } = e.detail || {};
+            if (imageUrl) {
+                setVtonResultUrl(imageUrl);
+                // History update could be done here if needed
+            }
+        }) as EventListener;
+        window.addEventListener('showGenerationResult', handler);
+        return () => window.removeEventListener('showGenerationResult', handler);
+    }, []);
+
     const fallbackFaceApiWrapper = async (targetBase64: string | null, targetMimeType: string | null) => {
         const { fallbackFaceApi } = await import('../services/fallbackAnalysis');
         return fallbackFaceApi(targetBase64, targetMimeType || "image/jpeg", preferredStyle);

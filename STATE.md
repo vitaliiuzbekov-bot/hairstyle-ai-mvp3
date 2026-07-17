@@ -4,7 +4,8 @@
 - In `src/hooks/useAnalysis.ts`, we now write the response directly to `localStorage.setItem('lastGeneratedImage', data.imageUrl)` and `lastOriginalImage`.
 - In `src/components/HomePage.tsx`, `useEffect` reads `lastGeneratedImage` on mount and restores the UI state (sets `vtonResultUrl` and `imageUrl`).
 - In `src/App.tsx` and `src/components/ImageSlider.tsx`, we unconditionally try to read from `localStorage` to fallback or override `resultImage` so the slider always has the latest images when opening the app.
-- No polling, no URL-dependent logic inside Telegram WebView.
+- Added `showGenerationResult` CustomEvent that `useAnalysis` listens to, ensuring that if the app is opened with `lastGenerationResult`, the slider updates automatically.
+- Telegram URL in `generate.ts` now sends `?imageUrl=...&originalUrl=...` to ensure context is passed when opening from chat.
 
 # Known Issues
 - Because generation is now synchronous, the HTTP connection could time out if it exceeds the Telegram WebView / Cloud Run timeout (around 60s usually, but sometimes less). The user must keep the WebApp open.

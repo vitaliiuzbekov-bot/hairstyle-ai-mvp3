@@ -819,7 +819,8 @@ Instructions:
         (async () => {
           if (req.body.tgUserId && imageBuffer) {
             try {
-              const resultUrl = `${process.env.VITE_FRONTEND_URL}/#/?image=${encodeURIComponent(swappedImageUrl)}`;
+              const originalImageUrl = req.body.imageUrl;
+              const resultUrl = `${process.env.VITE_FRONTEND_URL}/#/?imageUrl=${encodeURIComponent(swappedImageUrl)}&originalUrl=${encodeURIComponent(originalImageUrl || '')}`;
               await sendPhotoToTelegramUser(req.body.tgUserId, imageBuffer, "✅ Результат готов!", undefined, resultUrl);
               console.log("Telegram WebApp message with photo send complete");
             } catch (e) { console.error("Async telegram error", e); }

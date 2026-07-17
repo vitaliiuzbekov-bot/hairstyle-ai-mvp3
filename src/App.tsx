@@ -65,7 +65,6 @@ function App() {
     userRole, setUserRole,
     salonName, setSalonName,
     consentGiven, setConsentGiven,
-    loadLastGeneration
   } = useUser();
 
   const {
@@ -101,9 +100,20 @@ function App() {
   } = useTokenManager();
 
   const { deleteHistoryItem } = useHistoryHandlers(history, setHistory, userId);
+
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
 
   const [resultImage, setResultImage] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('lastGenerationResult') || localStorage.getItem('lastResult');
+      if (saved) {
+        const data = JSON.parse(saved);
+        window.dispatchEvent(new CustomEvent('showGenerationResult', { detail: data }));
+      }
+    } catch(e) {}
+  }, []);
 
   useEffect(() => {
     if (userId && !resultImage && window.location.pathname === '/' && !window.location.hash.includes('image=')) {
@@ -122,24 +132,26 @@ function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const img = params.get('image');
-    console.log("App mounted. Window location:", window.location.href);
-    console.log("Search params:", window.location.search);
-    console.log("Image param:", img);
+    let img = params.get('image') || params.get('imageUrl');
+    let orig = params.get('originalUrl');
     
     // Also try to extract from hash if telegram messed it up
-    let imgFromHash = null;
-    if (window.location.hash.includes('image=')) {
+    if (window.location.hash.includes('image=') || window.location.hash.includes('imageUrl=')) {
         const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || window.location.hash.replace('#/', '').replace('#', ''));
-        imgFromHash = hashParams.get('image');
-        console.log("Image from hash:", imgFromHash);
+        img = img || hashParams.get('image') || hashParams.get('imageUrl');
+        orig = orig || hashParams.get('originalUrl');
     }
     
-    const finalImg = img || imgFromHash;
-    if (finalImg) {
-      console.log("Setting result image to:", finalImg);
-      setResultImage(finalImg);
-      // We will show a toast in HomePage instead
+    if (img) {
+      console.log("Setting result image to:", img);
+      setResultImage(img);
+      localStorage.setItem('lastGeneratedImage', img);
+      if (orig) {
+         localStorage.setItem('lastOriginalImage', orig);
+      }
+      try {
+         localStorage.setItem('lastResult', JSON.stringify({ imageUrl: img, originalUrl: orig }));
+      } catch(e) {}
     } else {
       const saved = localStorage.getItem('lastGeneratedImage');
       if (saved) {
@@ -158,9 +170,6 @@ function App() {
         }
       }
     }
-    
-    // Store debug info
-    (window as any).debugUrlInfo = window.location.href;
   }, []);
 
   useEffect(() => {
@@ -246,7 +255,7 @@ function App() {
       {/* Main Content */}
       <Routes>
         <Route path="/" element={
-          <HomePage 
+          <HomePage resultImage={resultImage} 
             isInitializing={isInitializing}
             generationsLeft={generationsLeft}
             userId={userId}
@@ -260,8 +269,6 @@ function App() {
             telegramInitData={telegramInitData}
             isLightMode={isLightMode}
             isDeveloper={isDeveloper}
-            resultImage={resultImage}
-            
           />
         } />
         <Route path="/faq" element={
