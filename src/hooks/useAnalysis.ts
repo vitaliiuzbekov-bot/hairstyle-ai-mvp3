@@ -388,7 +388,10 @@ export const useAnalysis = ({
             .join("");
           formData.append("idempotencyKey", idempotencyKey);
 
+          console.log('[useAnalysis] Начало генерации');
+          console.log('[useAnalysis] Starting generateFullApi (which polls internally)');
           const data = await generateFullApi(formData, telegramInitData, signal);
+          console.log('[useAnalysis] Результат получен:', data);
           
           if (data.referenceImage) {
             setArGeneratedImageUrl((prev) => ({

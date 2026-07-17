@@ -21,6 +21,15 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
       await new Promise(r => setTimeout(r, backoff));
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }
+    fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 'error',
+          message: `[fetchWithRetry] Network error (${url}): ${err.message}`,
+          userId: localStorage.getItem('userId') || 'unknown'
+        })
+    }).catch(() => {});
     throw err;
   }
 }
@@ -189,6 +198,9 @@ export const generateFullApi = async (
   if (!response.ok) {
     throw new Error(data.error || "Ошибка от сервера при инициализации генерации.");
   }
+  
+  console.log('[api] Generation response:', data);
+  console.log('[api] JobId from response:', data.jobId);
 
   if (data.imageUrl) {
     return data;
@@ -235,19 +247,49 @@ export const generateFullApi = async (
       if (statusData.status === "done") {
         return { imageUrl: statusData.imageUrl, referenceImage: statusData.referenceImage };
       } else if (statusData.status === "error") {
-        throw new Error(statusData.error || "Ошибка генерации на сервере.");
+        const errorMsg = statusData.error || "Ошибка генерации на сервере.";
+        await fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              level: 'error',
+              message: `[pollJob] Ошибка: ${errorMsg}`,
+              userId: localStorage.getItem('userId') || 'unknown'
+            })
+        }).catch(() => {});
+        throw new Error(errorMsg);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') throw err;
       consecutiveErrors++;
       if (consecutiveErrors > 15 && !err.message.includes("Aborted") && !err.message.includes("таймаут")) {
-         throw new Error(err.message || "Многократная ошибка сети при проверке статуса.");
+         const errorMessage = err.message || "Многократная ошибка сети при проверке статуса.";
+         await fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              level: 'error',
+              message: `[pollJob] Ошибка: ${errorMessage}`,
+              userId: localStorage.getItem('userId') || 'unknown'
+            })
+         }).catch(() => {});
+         throw new Error(errorMessage);
       }
       console.warn("Polling error:", err);
     }
   }
   
-  throw new Error("Превышено время ожидания генерации (таймаут 10 мин).");
+  const timeoutMsg = "Превышено время ожидания генерации (таймаут 10 мин).";
+  await fetch('/api/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      level: 'error',
+      message: `[pollJob] Ошибка: ${timeoutMsg}`,
+      userId: localStorage.getItem('userId') || 'unknown'
+    })
+  }).catch(() => {});
+  throw new Error(timeoutMsg);
 };
 
 
