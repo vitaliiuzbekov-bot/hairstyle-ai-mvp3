@@ -60,6 +60,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   resultImage
 }) => {
   const { consentGiven, setConsentGiven, consentError, setConsentError, userRole, salonName } = useUser();
+
   const { addToast, chatStyleName, setChatStyleName, isChatOpen, setIsChatOpen } = useUI();
   const { tryOnStyle, setTryOnStyle, preferredStyle, setPreferredStyle } = useAnalysisContext();
 
@@ -127,6 +128,15 @@ export const HomePage: React.FC<HomePageProps> = ({
       setError,
       addToast
   });
+
+  useEffect(() => {
+    const saved = localStorage.getItem('lastGeneratedImage');
+    if (saved) {
+      setVtonResultUrl(saved);
+      const original = localStorage.getItem('lastOriginalImage');
+      if (original) setImageUrl(original);
+    }
+  }, [setVtonResultUrl, setImageUrl]);
 
   const handleFileUploadWrapper = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       originalHandleFileUpload(e, () => {

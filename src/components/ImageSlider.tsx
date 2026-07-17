@@ -14,9 +14,15 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
   
   let localResult = null;
   try {
-    const lastResultStr = localStorage.getItem('lastResult');
-    if (lastResultStr) {
-      localResult = JSON.parse(lastResultStr);
+    const gen = localStorage.getItem('lastGeneratedImage');
+    const orig = localStorage.getItem('lastOriginalImage');
+    if (gen && orig) {
+      localResult = { imageUrl: gen, originalUrl: orig };
+    } else {
+      const lastResultStr = localStorage.getItem('lastResult');
+      if (lastResultStr) {
+        localResult = JSON.parse(lastResultStr);
+      }
     }
   } catch(e) {}
 

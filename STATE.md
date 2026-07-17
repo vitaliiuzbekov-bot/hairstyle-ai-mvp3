@@ -1,8 +1,9 @@
 # Current State
 - Bypassed polling and async Telegram logic completely for generation results.
 - `generate-full/start` is now completely synchronous: it waits for the generation to finish and then returns `{ status: 'completed', result: { imageUrl, originalUrl, referenceImage } }`.
-- In `src/hooks/useAnalysis.ts`, we now write the response directly to `localStorage.setItem('lastResult', ...)`.
-- In `src/App.tsx` and `src/components/ImageSlider.tsx`, we unconditionally try to read from `localStorage.getItem('lastResult')` to fallback or override `resultImage`.
+- In `src/hooks/useAnalysis.ts`, we now write the response directly to `localStorage.setItem('lastGeneratedImage', data.imageUrl)` and `lastOriginalImage`.
+- In `src/components/HomePage.tsx`, `useEffect` reads `lastGeneratedImage` on mount and restores the UI state (sets `vtonResultUrl` and `imageUrl`).
+- In `src/App.tsx` and `src/components/ImageSlider.tsx`, we unconditionally try to read from `localStorage` to fallback or override `resultImage` so the slider always has the latest images when opening the app.
 - No polling, no URL-dependent logic inside Telegram WebView.
 
 # Known Issues

@@ -141,15 +141,21 @@ function App() {
       setResultImage(finalImg);
       // We will show a toast in HomePage instead
     } else {
-      const lastResultStr = localStorage.getItem('lastResult');
-      if (lastResultStr) {
-        try {
-          const lastResult = JSON.parse(lastResultStr);
-          if (lastResult.imageUrl) {
-            console.log("Setting result image from localStorage:", lastResult.imageUrl);
-            setResultImage(lastResult.imageUrl);
-          }
-        } catch(e) {}
+      const saved = localStorage.getItem('lastGeneratedImage');
+      if (saved) {
+        console.log("Setting result image from lastGeneratedImage:", saved);
+        setResultImage(saved);
+      } else {
+        const lastResultStr = localStorage.getItem('lastResult');
+        if (lastResultStr) {
+          try {
+            const lastResult = JSON.parse(lastResultStr);
+            if (lastResult.imageUrl) {
+              console.log("Setting result image from localStorage:", lastResult.imageUrl);
+              setResultImage(lastResult.imageUrl);
+            }
+          } catch(e) {}
+        }
       }
     }
     

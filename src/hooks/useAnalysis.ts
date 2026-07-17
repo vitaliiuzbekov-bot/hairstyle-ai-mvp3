@@ -412,6 +412,8 @@ export const useAnalysis = ({
               imageUrl: data.imageUrl, 
               originalUrl: data.originalUrl 
             }));
+            localStorage.setItem('lastGeneratedImage', data.imageUrl);
+            localStorage.setItem('lastOriginalImage', imageBase64);
           }
 
           if (data.imageUrl) {
