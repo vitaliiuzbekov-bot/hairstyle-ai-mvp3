@@ -1,24 +1,9 @@
-# Описание проекта: AI-стилист (MVP-3) - Production Ready
+# Current State
+- Bypassed polling and async Telegram logic completely for generation results.
+- `generate-full/start` is now completely synchronous: it waits for the generation to finish and then returns `{ status: 'completed', result: { imageUrl, originalUrl, referenceImage } }`.
+- In `src/hooks/useAnalysis.ts`, we now write the response directly to `localStorage.setItem('lastResult', ...)`.
+- In `src/App.tsx` and `src/components/ImageSlider.tsx`, we unconditionally try to read from `localStorage.getItem('lastResult')` to fallback or override `resultImage`.
+- No polling, no URL-dependent logic inside Telegram WebView.
 
-## 💡 Текущий статус
-- Приложение полностью готово к выгрузке (MVP-3 готов).
-- Реализован асинхронный процесс генерации (Push):
-  - Клиент отправляет запрос и не ждет завершения (избегаем таймаутов Telegram WebView).
-  - Сервер выполняет генерацию в фоне.
-  - По завершении сервер отправляет push-уведомление в Telegram с кнопкой "📸 Открыть результат".
-- Добавлена обработка URL параметра `?image=...`:
-  - Если приложение открыто с параметром, полученный результат сразу отображается на главном слайдере.
-  - При наличии истории, в слайдере будет показано также исходное фото.
-- Удален неэффективный GET-опрос (pull) статуса.
-- Добавлено Telegram-логирование при сбоях генерации на клиенте.
-- Развернута локальная история в IndexedDB / localStorage / Telegram CloudStorage.
-- Подготовлены скрипты сборки для Render (vite build && esbuild).
-
-## 🛠️ Что было сделано только что
-1. **Обновлен App.tsx**: добавлена логика чтения `new URLSearchParams(window.location.search)` на монтировании, извлечение `image` параметра и передача его в HomePage.
-2. **Обновлен HomePage.tsx**: добавлен пропс `resultImage` и передача его в `ImageSlider`.
-3. **Обновлен ImageSlider.tsx**: слайдер теперь принимает `resultImage` и заменяет стандартную правую картинку. Также пытается найти оригинальное фото в локальной истории (для показа "До" вместо стандартной фото).
-4. Проверена компиляция (lint / build успешно пройдены).
-
-## ⚠️ Известные нюансы
-- При открытии результата по ссылке из Telegram, приложение может не найти оригинальное фото в локальной истории (так как клиент мог закрыть mini-app еще до того как генерация завершилась, а добавление истории было синхронным). В этом случае в качестве "До" будет показана стандартная фотография (defaultLeft). Это приемлемый UX компромисс.
+# Known Issues
+- Because generation is now synchronous, the HTTP connection could time out if it exceeds the Telegram WebView / Cloud Run timeout (around 60s usually, but sometimes less). The user must keep the WebApp open.

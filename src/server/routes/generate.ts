@@ -415,10 +415,7 @@ const handleGenerateFull = async (req, res) => {
            console.error("[generate-full] Warning: Failed to set job status in Firestore (using in-memory map instead):", dbErr.message);
          }
       }
-      res.json({ jobId, status: 'processing' }); // RETURN IMMEDIATELY!
-
-      // RUN IN BACKGROUND
-      (async () => {
+      
         let jobStatus = "done";
         let jobErrorMsg = "";
         let finalImageUrlForJob = "";
@@ -911,8 +908,22 @@ Instructions:
            console.error("[generate-full] Failed to save job status to Firestore (in-memory map updated successfully):", dbErr.message);
          }
       }
+      
+      if (!res.headersSent) {
+          if (jobStatus === "done") {
+             res.json({ 
+                status: 'completed', 
+                result: { 
+                  imageUrl: swappedImageUrlForJob,
+                  originalUrl: originalImageUrl,
+                  referenceImage: finalImageUrlForJob
+                } 
+             });
+          } else {
+             res.status(500).json({ error: jobErrorMsg });
+          }
+      }
     }
-  })();
   } catch (outerErr: any) {
     if (!res.headersSent) {
       res.status(500).json({ error: outerErr.message || "Pipeline error" });

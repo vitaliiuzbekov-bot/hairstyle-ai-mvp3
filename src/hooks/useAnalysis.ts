@@ -406,6 +406,13 @@ export const useAnalysis = ({
              hapticNotification('success');
              return;
           }
+          
+          if (data.originalUrl && data.imageUrl) {
+            localStorage.setItem('lastResult', JSON.stringify({ 
+              imageUrl: data.imageUrl, 
+              originalUrl: data.originalUrl 
+            }));
+          }
 
           if (data.imageUrl) {
             let watermarkedUrl = data.imageUrl;

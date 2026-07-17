@@ -205,10 +205,14 @@ export const generateFullApi = async (
   if (data.imageUrl) {
     return data;
   }
+  
+  if (data.status === 'completed' && data.result) {
+    return data.result;
+  }
 
   const jobId = data.jobId;
   if (!jobId) {
-    throw new Error("Не удалось получить ID задачи от сервера.");
+    throw new Error("Не удалось получить результат генерации от сервера.");
   }
 
   return { isAsync: true, jobId };

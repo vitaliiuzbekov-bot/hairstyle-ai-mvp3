@@ -11,8 +11,17 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
   const isDragging = useRef(false);
   // Find matching original image in history if resultImage is provided
   const matchingHistory = history?.find((h) => h.url === resultImage);
-  const leftImage = matchingHistory?.originalUrl || matchingHistory?.blobDataUrl || defaultLeft;
-  const rightImage = resultImage || defaultRight;
+  
+  let localResult = null;
+  try {
+    const lastResultStr = localStorage.getItem('lastResult');
+    if (lastResultStr) {
+      localResult = JSON.parse(lastResultStr);
+    }
+  } catch(e) {}
+
+  const leftImage = matchingHistory?.originalUrl || matchingHistory?.blobDataUrl || localResult?.originalUrl || defaultLeft;
+  const rightImage = resultImage || localResult?.imageUrl || defaultRight;
 
   const updateSliderPosition = (percentage: number) => {
     // Prevent division by zero and going out of bounds

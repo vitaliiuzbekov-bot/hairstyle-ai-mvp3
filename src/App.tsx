@@ -123,6 +123,17 @@ function App() {
       console.log("Setting result image to:", finalImg);
       setResultImage(finalImg);
       // We will show a toast in HomePage instead
+    } else {
+      const lastResultStr = localStorage.getItem('lastResult');
+      if (lastResultStr) {
+        try {
+          const lastResult = JSON.parse(lastResultStr);
+          if (lastResult.imageUrl) {
+            console.log("Setting result image from localStorage:", lastResult.imageUrl);
+            setResultImage(lastResult.imageUrl);
+          }
+        } catch(e) {}
+      }
     }
     
     // Store debug info
