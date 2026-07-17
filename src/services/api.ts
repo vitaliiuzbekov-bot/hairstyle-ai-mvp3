@@ -200,6 +200,7 @@ export const generateFullApi = async (
   }
 
   // Poll for status
+  console.log('[pollJob] Начинаю опрос, jobId:', jobId);
   let attempts = 0;
   let consecutiveErrors = 0;
   while (attempts < 120) {
