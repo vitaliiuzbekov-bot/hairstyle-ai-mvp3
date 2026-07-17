@@ -210,7 +210,7 @@ export const generateFullApi = async (
         
     try {
       const urlWithCacheBust = `/api/generate-full/status?t=${Date.now()}`;
-      console.log('[pollJob] Request URL:', urlWithCacheBust);
+      console.log('[pollJob] Sending POST to:', urlWithCacheBust);
       const statusRes = await fetch(urlWithCacheBust, { 
         method: "POST", 
         headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" }, 
@@ -249,4 +249,5 @@ export const generateFullApi = async (
   
   throw new Error("Превышено время ожидания генерации (таймаут 10 мин).");
 };
+
 
