@@ -14,6 +14,7 @@ interface UserContextType {
 
   userId: string | null;
   setUserId: (val: string | null) => void;
+  loadLastGeneration: () => Promise<any>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -25,6 +26,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentError, setConsentError] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+
+  const loadLastGeneration = async () => {
+    if (!userId) return null;
+    try {
+      const res = await fetch(`/api/user/last-generation?userId=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.result;
+      }
+    } catch(e) {
+      console.error("loadLastGeneration error", e);
+    }
+    return null;
+  };
 
   useEffect(() => {
     const welcomeShown = localStorage.getItem("welcomeShown");
@@ -50,7 +65,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         consentError,
         setConsentError,
         userId,
-        setUserId
+        setUserId,
+        loadLastGeneration
       }}
     >
       {children}

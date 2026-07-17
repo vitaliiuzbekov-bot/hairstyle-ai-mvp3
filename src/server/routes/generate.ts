@@ -1240,3 +1240,29 @@ generateRouter.get("/clear-cache", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+generateRouter.get('/user/last-generation', async (req, res) => {
+  try {
+     const userId = req.query.userId;
+     if (!userId) {
+         return res.status(400).json({ error: "No userId" });
+     }
+     if (!adminDb) {
+         return res.status(500).json({ error: "DB not initialized" });
+     }
+     const userDoc = await adminDb.collection('users').doc(userId as string).get();
+     if (!userDoc.exists) {
+         return res.json({ result: null });
+     }
+     const data = userDoc.data();
+     let history = [];
+     if (data?.historyCache) {
+         history = JSON.parse(data.historyCache);
+     }
+     const last = history[0] || null;
+     res.json({ result: last });
+  } catch (err: any) {
+     console.error("last-generation error:", err);
+     res.status(500).json({ error: err.message });
+  }
+});

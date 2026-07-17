@@ -65,6 +65,7 @@ function App() {
     userRole, setUserRole,
     salonName, setSalonName,
     consentGiven, setConsentGiven,
+    loadLastGeneration
   } = useUser();
 
   const {
@@ -103,6 +104,22 @@ function App() {
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
 
   const [resultImage, setResultImage] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    if (userId && !resultImage && window.location.pathname === '/' && !window.location.hash.includes('image=')) {
+      loadLastGeneration().then(lastGen => {
+        if (lastGen && lastGen.url) {
+          console.log("Loaded last generation from API:", lastGen.url);
+          localStorage.setItem('lastResult', JSON.stringify({ 
+             imageUrl: lastGen.url, 
+             originalUrl: lastGen.originalUrl 
+          }));
+          setResultImage(lastGen.url);
+        }
+      });
+    }
+  }, [userId]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const img = params.get('image');
