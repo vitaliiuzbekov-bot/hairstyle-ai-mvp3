@@ -273,6 +273,9 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
   
 
 generateRouter.post("/generate-full/status", async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const { jobId } = req.body;
     if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
