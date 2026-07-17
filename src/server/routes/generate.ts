@@ -758,25 +758,11 @@ Instructions:
       // Move Telegram & Firebase saving out of the critical path to speed up job status update
       Promise.all([
         (async () => {
-          if (req.body.tgUserId) {
+          if (req.body.tgUserId && imageBuffer) {
             try {
-              const botToken = process.env.TELEGRAM_BOT_TOKEN;
-              if (botToken) {
-                const webApp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    chat_id: req.body.tgUserId,
-                    text: '✅ Результат готов!',
-                    reply_markup: {
-                      inline_keyboard: [[
-                        { text: '📸 Открыть результат', web_app: { url: `${process.env.VITE_FRONTEND_URL}/result?image=${encodeURIComponent(swappedImageUrl)}` } }
-                      ]]
-                    }
-                  })
-                });
-                console.log("Telegram WebApp message send complete:", webApp.ok);
-              }
+              const resultUrl = `${process.env.VITE_FRONTEND_URL}?image=${encodeURIComponent(swappedImageUrl)}`;
+              await sendPhotoToTelegramUser(req.body.tgUserId, imageBuffer, "✅ Результат готов!", undefined, resultUrl);
+              console.log("Telegram WebApp message with photo send complete");
             } catch (e) { console.error("Async telegram error", e); }
           }
         })(),
