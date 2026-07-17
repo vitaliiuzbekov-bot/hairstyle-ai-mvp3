@@ -218,6 +218,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="flex justify-center mb-6 w-full max-w-[400px] mx-auto">
               <ImageSlider isLightMode={isLightMode} resultImage={resultImage} history={history} />
             </div>
+            
+            <div className="text-xs text-white/50 break-all px-4 mt-2">
+              Debug URL: {(window as any).debugUrlInfo}
+            </div>
 
             <p className={`leading-relaxed max-w-lg mx-auto font-light text-sm sm:text-base px-2 ${isLightMode ? 'text-gray-600' : 'text-white/60'}`}>
               Загрузите селфи, и наш умный эксперт определит форму вашего лица

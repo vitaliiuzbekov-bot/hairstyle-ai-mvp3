@@ -292,6 +292,40 @@ generateRouter.post("/generate-full/status", async (req, res) => {
   }
 });
 
+
+// Re-added for backward compatibility with old cached clients
+generateRouter.get('/job/:jobId', async (req, res) => {
+  res.setHeader('Expires', '0');
+  try {
+    const { jobId } = req.params;
+    console.log("[GET /job/:jobId] Polling for jobId:", jobId);
+    if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
+
+    if (jobMap.has(jobId)) { 
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); 
+      const result = jobMap.get(jobId);
+      console.log("[GET /job/:jobId] Result from jobMap:", result);
+      return res.json(result); 
+    }
+    
+    if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
+    
+    const doc = await adminDb.collection("jobs").doc(jobId).get();
+    if (!doc.exists) {
+      console.log("[GET /job/:jobId] Job not found in Firestore:", jobId);
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); 
+    const result = doc.data();
+    console.log("[GET /job/:jobId] Result from Firestore:", result);
+    res.json(result);
+  } catch (err) {
+    console.error("[GET /job/:jobId] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const handleGenerateFull = async (req, res) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 10m")), 10 * 60 * 1000);
@@ -340,6 +374,34 @@ const handleGenerateFull = async (req, res) => {
 
       // 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨
       const isDeveloper = isAuthorizedDeveloper(req.header('x-telegram-init-data'));
+      
+      // Upload the user's original selfie to Firebase Storage so we can show it in the slider
+      let originalImageUrl = "";
+      if (adminStorage && selfieImage) {
+        try {
+          const match = selfieImage.match(/^data:image\/(\w+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+            const buffer = Buffer.from(match[2], 'base64');
+            const bucket = adminStorage.bucket();
+            if (bucket.name) {
+              const fileName = `originals/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+              const file = bucket.file(fileName);
+              const uuid = crypto.randomUUID();
+              await file.save(buffer, {
+                metadata: {
+                  contentType: `image/${match[1]}`,
+                  metadata: { firebaseStorageDownloadTokens: uuid }
+                }
+              });
+              originalImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to upload original selfie", e);
+        }
+      }
+      
       const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey, req.body.tgUserId, cacheKey, isDeveloper);
       if (!billingCheck.ok) {
         return res.status(400).json({ error: billingCheck.error });
@@ -760,7 +822,7 @@ Instructions:
         (async () => {
           if (req.body.tgUserId && imageBuffer) {
             try {
-              const resultUrl = `${process.env.VITE_FRONTEND_URL}?image=${encodeURIComponent(swappedImageUrl)}`;
+              const resultUrl = `${process.env.VITE_FRONTEND_URL}/#/?image=${encodeURIComponent(swappedImageUrl)}`;
               await sendPhotoToTelegramUser(req.body.tgUserId, imageBuffer, "✅ Результат готов!", undefined, resultUrl);
               console.log("Telegram WebApp message with photo send complete");
             } catch (e) { console.error("Async telegram error", e); }
@@ -816,6 +878,32 @@ Instructions:
          try {
            if (jobStatus === "done") {
              await adminDb.collection("jobs").doc(jobId).update({ status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob });
+             
+             // Update user historyCache so the slider can find the original image
+             if (userId) {
+               try {
+                 const userRef = adminDb.collection("users").doc(userId);
+                 const userDoc = await userRef.get();
+                 if (userDoc.exists) {
+                   const data = userDoc.data();
+                   let historyCache = [];
+                   if (data.historyCache) {
+                     historyCache = JSON.parse(data.historyCache);
+                   }
+                   historyCache.unshift({
+                     url: swappedImageUrlForJob,
+                     originalUrl: originalImageUrl, // Saved URL
+                     keyword: "Стиль",
+                     timestamp: Date.now()
+                   });
+                   await userRef.update({ historyCache: JSON.stringify(historyCache) });
+                   console.log("Updated user historyCache for", userId);
+                 }
+               } catch (histErr) {
+                 console.error("Failed to update user historyCache:", histErr);
+               }
+             }
+             
            } else {
              await adminDb.collection("jobs").doc(jobId).update({ status: "error", error: jobErrorMsg });
            }

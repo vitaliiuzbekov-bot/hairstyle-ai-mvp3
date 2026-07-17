@@ -106,9 +106,27 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const img = params.get('image');
-    if (img) {
-      setResultImage(img);
+    console.log("App mounted. Window location:", window.location.href);
+    console.log("Search params:", window.location.search);
+    console.log("Image param:", img);
+    
+    // Also try to extract from hash if telegram messed it up
+    let imgFromHash = null;
+    if (window.location.hash.includes('image=')) {
+        const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || window.location.hash.replace('#/', '').replace('#', ''));
+        imgFromHash = hashParams.get('image');
+        console.log("Image from hash:", imgFromHash);
     }
+    
+    const finalImg = img || imgFromHash;
+    if (finalImg) {
+      console.log("Setting result image to:", finalImg);
+      setResultImage(finalImg);
+      // We will show a toast in HomePage instead
+    }
+    
+    // Store debug info
+    (window as any).debugUrlInfo = window.location.href;
   }, []);
 
   useEffect(() => {
