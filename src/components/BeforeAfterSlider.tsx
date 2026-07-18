@@ -1,5 +1,4 @@
-import React, { useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useState, useEffect } from 'react';
 
 interface BeforeAfterSliderProps {
   beforeImage: string;
@@ -7,136 +6,125 @@ interface BeforeAfterSliderProps {
   isLightMode?: boolean;
 }
 
-const BeforeAfterSliderComponent: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afterImage, isLightMode }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const beforeContainerRef = useRef<HTMLDivElement>(null);
-  const beforeImageRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const [isAfterLoaded, setIsAfterLoaded] = React.useState(false);
-  const [hasError, setHasError] = React.useState(false);
+export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afterImage, isLightMode }) => {
+  const [sliderPosition, setSliderPosition] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const [imagesReady, setImagesReady] = useState({ before: false, after: false });
+  const [hasError, setHasError] = useState(false);
 
-  React.useEffect(() => {
-    setIsAfterLoaded(false);
-    setHasError(false);
-  }, [afterImage]);
-
-  const updateSliderPosition = (percentage: number) => {
-    // Prevent division by zero and going out of bounds
-    const safePercentage = Math.max(0.1, Math.min(percentage, 100));
-    
-    if (beforeContainerRef.current) {
-      beforeContainerRef.current.style.width = `${safePercentage}%`;
-    }
-    
-    if (beforeImageRef.current) {
-      beforeImageRef.current.style.width = `${10000 / safePercentage}%`;
-    }
-
-    if (handleRef.current) {
-      handleRef.current.style.left = `calc(${safePercentage}% - 1px)`;
-    }
-  };
-
-  const handleMove = (clientX: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    updateSliderPosition((x / rect.width) * 100);
-  };
-
+  // Эффект предзагрузки изображений в памяти для исключения Race Condition и черных экранов
   useEffect(() => {
-    const handleMouseUp = () => { isDragging.current = false; };
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchend', handleMouseUp);
-    return () => {
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchend', handleMouseUp);
-    };
-  }, []);
+    setImagesReady({ before: false, after: false });
+    setHasError(false);
+
+    const imgBefore = new Image();
+    const imgAfter = new Image();
+
+    // Защита от CORS ограничений для Canvas/Слайдеров
+    imgBefore.crossOrigin = "anonymous";
+    imgAfter.crossOrigin = "anonymous";
+
+    imgBefore.onload = () => setImagesReady(prev => ({ ...prev, before: true }));
+    imgBefore.onerror = () => setHasError(true);
+    imgBefore.src = beforeImage;
+
+    imgAfter.onload = () => setImagesReady(prev => ({ ...prev, after: true }));
+    imgAfter.onerror = () => setHasError(true);
+    imgAfter.src = afterImage;
+
+  }, [beforeImage, afterImage]);
+
+  const isReady = imagesReady.before && imagesReady.after;
+
+  if (hasError) {
+    return (
+      <div className="w-full h-[400px] bg-zinc-900 flex items-center justify-center text-red-400 p-4 text-center rounded-lg">
+        ⚠️ Не удалось загрузить результат. Пожалуйста, обновите страницу или попробуйте позже.
+      </div>
+    );
+  }
+
+  console.log("After URL:", afterImage);
 
   return (
-    <div 
-       ref={containerRef}
-      className={`relative w-full shadow-2xl aspect-[3/4] mx-auto rounded-2xl overflow-hidden cursor-ew-resize select-none border max-w-[400px] ${isLightMode ? 'border-gray-200 shadow-md' : 'border-white/10 bg-[#110e18]'}`}
-      onMouseDown={(e) => { isDragging.current = true; handleMove(e.clientX); }}
-      onMouseMove={(e) => isDragging.current && handleMove(e.clientX)}
-      onTouchStart={(e) => { isDragging.current = true; handleMove(e.touches[0].clientX); }}
-      onTouchMove={(e) => isDragging.current && handleMove(e.touches[0].clientX)}
-      style={{ transform: 'translateZ(0)' }}
-    >
-      {/* Background Image (Shows on the Right) - After Result */}
-      <div className="absolute inset-0 w-full h-full pointer-events-none z-0 bg-black/5">
-        {!isAfterLoaded && !hasError && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        )}
-        {hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-black/40 text-white z-20">
-            <span className="text-xs text-center px-4">Ошибка загрузки.<br/>Попробуйте перегенерировать.</span>
-          </div>
-        )}
-        <img
-          src={afterImage}
-          alt="ИИ-Результат" 
-          draggable={false}
-          onLoad={() => setIsAfterLoaded(true)}
-          onError={() => {
-            console.error("BeforeAfterSlider: Failed to load afterImage:", afterImage);
-            setHasError(true);
-            setIsAfterLoaded(true); // Stop spinning
-          }}
-          className={`absolute inset-0 w-full h-full object-cover object-center pointer-events-none transition-opacity duration-300 ${isAfterLoaded && !hasError ? 'opacity-100' : 'opacity-0'}`}
-        />
-      </div>
-      <div className="absolute top-4 left-[75%] -translate-x-1/2 px-3 py-1.5 bg-amber-500/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-white shadow-md pointer-events-none z-10 border border-amber-400 tracking-wide whitespace-nowrap">
-         ИИ-РЕЗУЛЬТАТ
-      </div>
-                  
-      {/* Foreground Image (Shows on the Left) - Before Result */}
-      <div 
-         ref={beforeContainerRef}
-        className="absolute top-0 bottom-0 left-0 pointer-events-none overflow-hidden"
-        style={{ width: '50%', transform: 'translateZ(0)' }}
-      >
-        <div 
-          ref={beforeImageRef} 
-          className="absolute top-0 bottom-0 left-0 pointer-events-none"
-          style={{ width: '200%', height: '100%' }}
-        >
-          <div className="absolute inset-0 w-full h-full pointer-events-none z-0 bg-black/5">
-            <img
-              src={beforeImage}
-              alt="Обычное фото" 
-              draggable={false}
-              className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
-            />
-          </div>
-          <div className="absolute top-4 left-[25%] -translate-x-1/2 px-3 py-1.5 bg-white/95 backdrop-blur-md rounded-md text-[11px] sm:text-xs font-bold text-gray-900 pointer-events-none shadow-md z-10 border border-gray-200 tracking-wide whitespace-nowrap">
-             ОБЫЧНОЕ ФОТО
-          </div>
+    <div className={`relative w-full shadow-2xl aspect-[3/4] mx-auto rounded-2xl overflow-hidden select-none max-w-[400px] ${isLightMode ? 'border border-gray-200 bg-white' : 'border border-white/10 bg-black'}`}>
+      {/* Спиннер загрузки, пока оба изображения физически не прогрузились в память */}
+      {!isReady && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-white">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500 mb-2"></div>
+          <p className="text-sm text-zinc-400">Нейросеть завершает обработку пикселей...</p>
         </div>
+      )}
+
+      {/* Контейнер «ПОСЛЕ» (Нижний слой) */}
+      <div className="absolute inset-0 w-full h-full">
+        <img 
+          src={afterImage} 
+          alt="After" 
+          className="w-full h-full object-cover"
+          draggable={false}
+        />
+        <span className="absolute top-4 right-4 bg-amber-500 text-black text-xs font-bold px-2 py-1 rounded">
+          ИИ-РЕЗУЛЬТАТ
+        </span>
+      </div>
+
+      {/* Контейнер «ДО» (Верхний слой с обрезкой по позиции слайдера) */}
+      <div 
+        className="absolute inset-0 w-full h-full overflow-hidden"
+        style={{ width: `${sliderPosition}%` }}
+      >
+        <img 
+          src={beforeImage} 
+          alt="Before" 
+          // Важно: ширина картинки должна оставаться фиксированной (100% от родителя слайдера), 
+          // чтобы при изменении ширины контейнера картинка не сжималась, а обрезалась
+          className="absolute inset-0 w-full h-full object-cover max-w-none"
+          style={{ width: '100%', height: '100%' }}
+          draggable={false}
+        />
+        <span className="absolute top-4 left-4 bg-white text-black text-xs font-bold px-2 py-1 rounded whitespace-nowrap">
+          ОБЫЧНОЕ ФОТО
+        </span>
       </div>
 
       {/* Watermark Hider (Retouch Stripe) */}
       <div className="absolute bottom-0 right-0 w-32 h-8 bg-black/40 backdrop-blur-md rounded-tl-xl pointer-events-none z-10"></div>
 
-      {/* Slider Line and Handle */}
+      {/* Разделительная линия и ползунок */}
       <div 
-         ref={handleRef}
-        className="absolute top-0 bottom-0 w-[2px] sm:w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0.3)] z-20 pointer-events-none"
-        style={{ left: `calc(50% - 1px)` }}
+        className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-40 shadow-[0_0_10px_rgba(0,0,0,0.3)]"
+        style={{ left: `${sliderPosition}%` }}
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 bg-amber-500 rounded-full flex items-center justify-center border-2 sm:border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white">
-            <div className="flex gap-0 sm:gap-1 items-center">
-              <ChevronLeft size={10} strokeWidth={4} />
-              <ChevronRight size={10} strokeWidth={4} />
-            </div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+          <span className="text-white font-bold text-xs">↔</span>
         </div>
       </div>
+
+      {/* Прозрачный слой для перехвата событий мыши/тача */}
+      <div 
+        className="absolute inset-0 z-40 cursor-ew-resize"
+        onMouseMove={(e) => {
+          if (!isDragging) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const position = Math.max(0, Math.min(100, (x / rect.width) * 100));
+          setSliderPosition(position);
+        }}
+        onTouchMove={(e) => {
+          if (!isDragging) return;
+          if (e.touches.length === 0) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.touches[0].clientX - rect.left;
+          const position = Math.max(0, Math.min(100, (x / rect.width) * 100));
+          setSliderPosition(position);
+        }}
+        onMouseDown={() => setIsDragging(true)}
+        onTouchStart={() => setIsDragging(true)}
+        onMouseUp={() => setIsDragging(false)}
+        onMouseLeave={() => setIsDragging(false)}
+        onTouchEnd={() => setIsDragging(false)}
+      />
     </div>
   );
 };
-
-export const BeforeAfterSlider = React.memo(BeforeAfterSliderComponent);
