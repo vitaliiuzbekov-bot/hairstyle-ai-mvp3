@@ -10,6 +10,6 @@ export interface FaceSwapOptions {
 }
 
 export interface ImageGenerationProvider {
-  generateBaseImage(options: FluxOptions): Promise<string>; // Returns URL of generated image
-  swapFace(options: FaceSwapOptions): Promise<string>;      // Returns URL of swapped image
+  generateBaseImage(options: FluxOptions): Promise<Buffer>; // Returns URL of generated image
+  swapFace(options: FaceSwapOptions): Promise<Buffer>;      // Returns URL of swapped image
 }

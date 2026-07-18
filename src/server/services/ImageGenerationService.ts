@@ -8,11 +8,11 @@ export class ImageGenerationService {
     this.provider = provider;
   }
 
-  async generateBaseImage(options: FluxOptions): Promise<string> {
+  async generateBaseImage(options: FluxOptions): Promise<Buffer> {
     return this.provider.generateBaseImage(options);
   }
 
-  async swapFace(options: FaceSwapOptions): Promise<string> {
+  async swapFace(options: FaceSwapOptions): Promise<Buffer> {
     return this.provider.swapFace(options);
   }
 }

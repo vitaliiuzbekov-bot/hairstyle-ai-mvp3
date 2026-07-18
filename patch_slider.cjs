@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+const fs = require('fs');
+
+const sliderCode = `import React, { useState, useEffect, useRef } from 'react';
 
 interface BeforeAfterSliderProps {
   beforeImage: string;
@@ -13,8 +15,8 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Пропускаем входящие URL через наш CORS-прокси на бэкенде
-  const proxyBeforeUrl = beforeImage ? `/api/proxy-image?url=${encodeURIComponent(beforeImage)}` : '';
-  const proxyAfterUrl = afterImage ? `/api/proxy-image?url=${encodeURIComponent(afterImage)}` : '';
+  const proxyBeforeUrl = beforeImage ? \`/api/proxy-image?url=\${encodeURIComponent(beforeImage)}\` : '';
+  const proxyAfterUrl = afterImage ? \`/api/proxy-image?url=\${encodeURIComponent(afterImage)}\` : '';
 
   useEffect(() => {
     if (!proxyBeforeUrl || !proxyAfterUrl) return;
@@ -46,7 +48,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
   return (
     <div 
       ref={containerRef}
-      className={`relative w-full aspect-[3/4] max-w-[400px] mx-auto overflow-hidden select-none rounded-2xl shadow-xl ${isLightMode ? 'bg-white border border-gray-200' : 'bg-zinc-900 border border-white/10'}`}
+      className={\`relative w-full aspect-[3/4] max-w-[400px] mx-auto overflow-hidden select-none rounded-2xl shadow-xl \${isLightMode ? 'bg-white border border-gray-200' : 'bg-zinc-900 border border-white/10'}\`}
     >
       {/* Спиннер предзагрузки */}
       {!isReady && (
@@ -67,7 +69,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
       {/* Слой «ДО» (Верхний слой с обрезкой контейнера без сжатия картинки) */}
       <div 
         className="absolute inset-0 h-full overflow-hidden z-20 pointer-events-none"
-        style={{ width: `${sliderPosition}%` }}
+        style={{ width: \`\${sliderPosition}%\` }}
       >
         <img 
           src={proxyBeforeUrl} 
@@ -81,7 +83,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
       </div>
 
       {/* Ползунок */}
-      <div className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-30" style={{ left: `${sliderPosition}%` }}>
+      <div className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-30" style={{ left: \`\${sliderPosition}%\` }}>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
           <span className="text-black font-bold text-xs">↔</span>
         </div>
@@ -101,3 +103,6 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/BeforeAfterSlider.tsx', sliderCode);

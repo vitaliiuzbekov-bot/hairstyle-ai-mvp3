@@ -1,73 +1,63 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import axios from 'axios';
 import { FalAdapter } from '../../src/server/adapters/FalAdapter';
+import * as fal from '@fal-ai/serverless-client';
 
-vi.mock('axios');
+// Мокаем официальный клиент
+vi.mock('@fal-ai/serverless-client', () => ({
+  subscribe: vi.fn()
+}));
+
 vi.mock('../../src/server/utils/queues', () => ({
   imageGenQueue: {
     add: vi.fn(async (fn) => fn())
   }
 }));
 
-describe('FalAdapter Integration', () => {
-  let adapter: FalAdapter;
+// Mock global fetch for downloading the image
+global.fetch = vi.fn();
 
+describe('FalAdapter SDK Regression Test Suite', () => {
   beforeEach(() => {
-    process.env.FAL_KEY = 'test-fal-key';
-    adapter = new FalAdapter();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    process.env.FAL_KEY = 'mock_sdk_key_123';
   });
 
-  it('should use correct endpoint and payload for face swap', async () => {
-    // Mock the initial POST request to return a status_url
-    vi.mocked(axios.post).mockResolvedValueOnce({
-      data: {
-        request_id: 'req_123',
-        status_url: 'https://queue.fal.run/fal-ai/face-swap/requests/req_123/status',
-      },
+  it('должен успешно вызывать fal.subscribe с валидными параметрами контракта face-swap', async () => {
+    const adapter = new FalAdapter();
+    
+    // Программируем поведение замоканного SDK
+    vi.mocked(fal.subscribe).mockResolvedValue({
+      data: { image: { url: 'https://cdn.fal.media/output.jpg' } },
+      requestId: 'req_123'
     } as any);
 
-    // Mock the GET request polling the status
-    vi.mocked(axios.get).mockResolvedValueOnce({
-      data: {
-        status: 'COMPLETED',
-        payload: {
-          image: {
-            url: 'https://result.fal.ai/swapped.jpg',
-          },
-        },
-      },
+    // Mock the image download fetch
+    const mockArrayBuffer = new ArrayBuffer(8);
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => mockArrayBuffer
     } as any);
 
     const result = await adapter.swapFace({
-      baseImageUrl: 'https://example.com/base.jpg',
-      swapImageUrl: 'https://example.com/swap.jpg',
+      baseImageUrl: 'https://test.com/base.jpg',
+      swapImageUrl: 'https://test.com/ref.jpg'
     });
 
-    // Verify axios.post was called with correct URL and payload
-    expect(axios.post).toHaveBeenCalledWith(
-      'https://queue.fal.run/fal-ai/face-swap',
-      {
-        base_image_url: 'https://example.com/base.jpg',
-        swap_image_url: 'https://example.com/swap.jpg',
-      },
+    expect(fal.subscribe).toHaveBeenCalledWith(
+      'fal-ai/face-swap',
       expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'Key test-fal-key',
-        }),
+        input: {
+          base_image_url: 'https://test.com/base.jpg',
+          swap_image_url: 'https://test.com/ref.jpg'
+        },
+        mode: 'streaming'
       })
     );
-
-    // Verify axios.get was called to poll status
-    expect(axios.get).toHaveBeenCalledWith(
-      'https://queue.fal.run/fal-ai/face-swap/requests/req_123/status',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'Authorization': 'Key test-fal-key',
-        }),
-      })
-    );
-
-    expect(result).toBe('https://result.fal.ai/swapped.jpg');
+    
+    expect(fetch).toHaveBeenCalledWith('https://cdn.fal.media/output.jpg');
+    
+    // Мы возвращаем Buffer, чтобы соблюсти новый контракт интерфейса
+    expect(result).toBeInstanceOf(Buffer);
+    expect(result.length).toBe(8);
   });
 });

@@ -167,7 +167,7 @@ async function startServer() {
     try {
       const url = req.query.url as string;
       if (!url) return res.status(400).send("No url provided");
-
+      
       const allowedDomains = [
         "fal.media",
         "v3.fal.media",
@@ -175,7 +175,7 @@ async function startServer() {
         "firebasestorage.googleapis.com",
         "images.unsplash.com"
       ];
-
+      
       try {
         const parsedUrl = new URL(url);
         if (parsedUrl.protocol !== "https:") {
@@ -187,21 +187,19 @@ async function startServer() {
       } catch (err) {
         return res.status(400).send("Invalid url");
       }
-
-      const response = await axios({
-        method: 'get',
-        url: url,
-        responseType: 'stream'
-      });
+      
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch remote image: ${response.statusText}`);
 
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Content-Type', (response.headers['content-type'] as string) || 'image/jpeg');
-      res.setHeader("Cache-Control", "public, max-age=31536000");
+      res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
       
-      response.data.pipe(res);
+      const arrayBuffer = await response.arrayBuffer();
+      res.send(Buffer.from(arrayBuffer));
     } catch (error: any) {
-      console.error('[Proxy Error] Не удалось проксировать изображение:', error.message);
-      res.status(500).send('Error proxying remote image');
+      console.error('[Proxy Error] Ошибка проксирования:', error.message);
+      res.status(500).send('Error proxying image');
     }
   });
 
