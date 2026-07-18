@@ -11,6 +11,26 @@ export class FalAdapter implements ImageGenerationProvider {
     }
   }
 
+  private extractUrl(res: any): string | null {
+    if (!res) return null;
+    const candidates = [
+      res.images?.[0]?.url,
+      res.data?.images?.[0]?.url,
+      res.image?.url,
+      res.data?.image?.url,
+      res.url,
+      res.data?.url,
+      res.data?.image_url,
+      res.image_url
+    ];
+    for (const url of candidates) {
+      if (typeof url === 'string' && url.startsWith('http')) {
+        return url;
+      }
+    }
+    return null;
+  }
+
   private async downloadToBuffer(url: string): Promise<Buffer> {
     const response = await fetch(url);
     if (!response.ok) {
@@ -32,9 +52,10 @@ export class FalAdapter implements ImageGenerationProvider {
         mode: "streaming",
       }));
 
-      const resultUrl = result.data?.images?.[0]?.url || result.data?.image?.url || result.data?.url;
+      const resultUrl = this.extractUrl(result);
       if (!resultUrl) {
-        throw new Error(`[FalAdapter] SDK не вернул URL результирующего изображения. Ответ: ${JSON.stringify(result.data)}`);
+        console.error("[FalAdapter] Missing URL. Full result:", JSON.stringify(result, null, 2));
+        throw new Error(`[FalAdapter] SDK не вернул URL результирующего изображения. Ответ: ${JSON.stringify(result)}`);
       }
 
       return await this.downloadToBuffer(resultUrl);
@@ -63,9 +84,10 @@ export class FalAdapter implements ImageGenerationProvider {
         mode: "streaming", 
       }));
 
-      const resultUrl = result.data?.image?.url || result.data?.image_url || result.data?.url;
+      const resultUrl = this.extractUrl(result);
       if (!resultUrl) {
-        throw new Error(`[FalAdapter] SDK не вернул URL результирующего изображения. Ответ: ${JSON.stringify(result.data)}`);
+        console.error("[FalAdapter] Missing URL. Full result:", JSON.stringify(result, null, 2));
+        throw new Error(`[FalAdapter] SDK не вернул URL результирующего изображения. Ответ: ${JSON.stringify(result)}`);
       }
 
       return await this.downloadToBuffer(resultUrl);
