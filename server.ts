@@ -1,4 +1,5 @@
 import express from "express";
+import axios from "axios";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -180,25 +181,27 @@ async function startServer() {
         if (parsedUrl.protocol !== "https:") {
           return res.status(403).send("Forbidden: Only HTTPS is allowed");
         }
-        if (!allowedDomains.includes(parsedUrl.hostname)) {
+        if (!allowedDomains.includes(parsedUrl.hostname) && !parsedUrl.hostname.endsWith('.fal.media') && !parsedUrl.hostname.endsWith('.fal.run')) {
           return res.status(403).send("Forbidden: Domain not allowed");
         }
       } catch (err) {
         return res.status(400).send("Invalid url");
       }
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Fetch failed");
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const mimeType = response.headers.get("content-type") || "image/jpeg";
-      res.setHeader("Content-Type", mimeType);
+      const response = await axios({
+        method: 'get',
+        url: url,
+        responseType: 'stream'
+      });
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Content-Type', (response.headers['content-type'] as string) || 'image/jpeg');
       res.setHeader("Cache-Control", "public, max-age=31536000");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.send(buffer);
-    } catch (e) {
-      console.error("Proxy error", e);
-      res.status(500).send("Failed to proxy image");
+      
+      response.data.pipe(res);
+    } catch (error: any) {
+      console.error('[Proxy Error] Не удалось проксировать изображение:', error.message);
+      res.status(500).send('Error proxying remote image');
     }
   });
 

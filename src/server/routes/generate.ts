@@ -37,6 +37,15 @@ import { uploadImageToFal } from "../services/falClient";
 import { defaultImageService } from "../services/ImageGenerationService";
 import { isAuthorizedDeveloper } from "../utils/tgAuth";
 
+function getProxiedUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    if (url.startsWith('http')) {
+        return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+}
+
+
 
 
 async function resolveImageToBase64(imageUrl: string | undefined): Promise<string | undefined> {
@@ -167,7 +176,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       const cachedImage = await getCachedValue<string>(cacheKey);
       if (cachedImage) {
         console.log("Returned reference from cache!");
-        return res.json({ imageUrl: cachedImage });
+        return res.json({ imageUrl: getProxiedUrl(cachedImage) });
       }
 
       let finalImageUrl = "";
@@ -264,7 +273,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
            await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
       }
 
-      res.json({ imageUrl: finalImageUrl, debugError: lastError });
+      res.json({ imageUrl: getProxiedUrl(finalImageUrl), debugError: lastError });
     } catch (err: any) {
       console.error("Reference gen error:", err);
       res.status(500).json({ error: err.message || "Ошибка генерации референса" });
@@ -370,7 +379,7 @@ const handleGenerateFull = async (req, res) => {
       const cachedImage = await getCachedValue<string>(cacheKey);
       if (cachedImage) {
         console.log("Returned VTON from cache!");
-        return res.json({ imageUrl: cachedImage });
+        return res.json({ imageUrl: getProxiedUrl(cachedImage) });
       }
 
       // 🚨 DEDUCT GENERATIONS ON THE BACKEND 🚨
@@ -814,9 +823,9 @@ Instructions:
              res.json({ 
                 status: 'completed', 
                 result: { 
-                  imageUrl: swappedImageUrlForJob,
-                  originalUrl: originalImageUrl,
-                  referenceImage: finalImageUrlForJob
+                  imageUrl: getProxiedUrl(swappedImageUrlForJob),
+                  originalUrl: getProxiedUrl(originalImageUrl),
+                  referenceImage: getProxiedUrl(finalImageUrlForJob)
                 } 
              });
           } else {

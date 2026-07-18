@@ -1,11 +1,30 @@
-# Current State
+# Состояние проекта: Hairstyle AI MVP 3
 
-- Implemented Ports & Adapters (Hexagonal Architecture) for image generation: `ImageGenerationProvider` interface, `FalAdapter` implementation, and `ImageGenerationService` injection.
-- Replaced direct `fetch` calls to Fal.ai in `generate.ts` with calls to `defaultImageService.generateBaseImage()` and `swapFace()`.
-- Implemented idempotency checks in `billing.ts` to prevent duplicate token deductions during retries or race conditions.
-- Improved error handling in `generate.ts` (removed silent catch blocks).
-- Cleaned up root directory from temporary `patch_*.cjs` and `.py` scripts.
-- Unit tests introduced using `vitest` (e.g. `billing.test.ts`).
+## Выполненные задачи
+1. **Безопасность и биллинг**:
+   - Устранен SSRF-уязвимость в `/api/proxy-image`.
+   - Режим разработчика (x-developer-mode) теперь проверяет Telegram User ID по `DEV_TELEGRAM_USER_IDS`.
+   - Защищен вебхук `/api/set-telegram-webhook`.
+   - Реализована строгая транзакционная система биллинга в Firestore (fail-closed).
+2. **Адаптеры генерации (FalAdapter)**:
+   - Исправлена критическая ошибка 404 (сгаллюцинированный endpoint). Базовый URL для face-swap заменен на `https://queue.fal.run/fal-ai/face-swap`.
+   - Payload face-swap приведен в соответствие со спецификацией: `base_image_url`, `swap_image_url`.
+   - Добавлен механизм поллинга по `status_url` для `queue.fal.run`.
+   - Внедрен `axios` и добавлено подробное оборонительное логирование в блок `catch` (вывод `error.response.status` и `data`).
+3. **CORS и отображение ИИ-результатов (BeforeAfterSlider)**:
+   - Внедрен `axios` в эндпоинт `/api/proxy-image` на сервере с поддержкой потоковой передачи (`responseType: 'stream'`) для обхода ограничений CORS Telegram WebView.
+   - Изменены возвращаемые URL в `generate.ts`: фронтенд получает проксированные ссылки.
+   - Слайдер `BeforeAfterSlider.tsx` полностью переписан:
+     - Интегрирована локальная обертка `getProxiedUrl` для 100% гарантии загрузки без CORS.
+     - Исправлена CSS-верстка: вместо изменения `width` контейнера (что вызывало сжатие изображения), используется CSS-свойство `clip-path: inset(...)`. Теперь изображения ДО и ПОСЛЕ идеально перекрывают друг друга в одних пропорциях.
+     - Добавлено явное ожидание загрузки изображений в память (`Image.onload`) перед их показом для предотвращения мерцаний и черных экранов.
+4. **Тестирование**:
+   - Настроен Vitest для интеграционного тестирования.
+   - Добавлен `tests/adapters/FalAdapter.test.ts` с моками `axios.post` и `axios.get` для фиксации контрактов API `queue.fal.run`.
 
-# Known Issues
-- Because generation is synchronous, the HTTP connection could time out if it exceeds the Telegram WebView / Cloud Run timeout (around 60s usually).
+## Готовность к выгрузке
+Приложение полностью стабилизировано, успешно собирается через `npm run build` и готово к деплою на Render / Cloud Run. Все зависимости зафиксированы в `package.json`, TypeScript компилируется без ошибок.
+
+## Запуск
+Для запуска необходимо задать `.env` файл на основе `.env.example`.
+Запуск сервера: `npm start` (запускает `node dist/server.cjs`).
