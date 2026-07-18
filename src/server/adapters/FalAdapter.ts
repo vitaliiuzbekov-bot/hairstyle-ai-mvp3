@@ -11,24 +11,15 @@ export class FalAdapter implements ImageGenerationProvider {
     }
   }
 
-  private extractUrl(res: any): string | null {
-    if (!res) return null;
-    const candidates = [
-      res.images?.[0]?.url,
-      res.data?.images?.[0]?.url,
-      res.image?.url,
-      res.data?.image?.url,
-      res.url,
-      res.data?.url,
-      res.data?.image_url,
-      res.image_url
+  private extractResultUrl(result: any): string | null {
+    const possiblePaths = [
+      result?.output?.images?.[0]?.url,
+      result?.images?.[0]?.url,
+      result?.image?.url,
+      result?.url
     ];
-    for (const url of candidates) {
-      if (typeof url === 'string' && url.startsWith('http')) {
-        return url;
-      }
-    }
-    return null;
+
+    return possiblePaths.find(url => typeof url === 'string') || null;
   }
 
   private async downloadToBuffer(url: string): Promise<Buffer> {
@@ -52,10 +43,10 @@ export class FalAdapter implements ImageGenerationProvider {
         mode: "streaming",
       }));
 
-      const resultUrl = this.extractUrl(result);
+      const resultUrl = this.extractResultUrl(result);
       if (!resultUrl) {
-        console.error("[FalAdapter] Missing URL. Full result:", JSON.stringify(result, null, 2));
-        throw new Error(`[FalAdapter] SDK не вернул URL результирующего изображения. Ответ: ${JSON.stringify(result)}`);
+        console.error("DEBUG: Fal SDK Response:", JSON.stringify(result, null, 2));
+        throw new Error(`[FalAdapter] Не удалось найти URL изображения в ответе.`);
       }
 
       return await this.downloadToBuffer(resultUrl);
@@ -84,10 +75,10 @@ export class FalAdapter implements ImageGenerationProvider {
         mode: "streaming", 
       }));
 
-      const resultUrl = this.extractUrl(result);
+      const resultUrl = this.extractResultUrl(result);
       if (!resultUrl) {
-        console.error("[FalAdapter] Missing URL. Full result:", JSON.stringify(result, null, 2));
-        throw new Error(`[FalAdapter] SDK не вернул URL результирующего изображения. Ответ: ${JSON.stringify(result)}`);
+        console.error("DEBUG: Fal SDK Response:", JSON.stringify(result, null, 2));
+        throw new Error(`[FalAdapter] Не удалось найти URL изображения в ответе.`);
       }
 
       return await this.downloadToBuffer(resultUrl);

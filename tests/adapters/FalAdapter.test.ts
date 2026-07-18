@@ -27,7 +27,7 @@ describe('FalAdapter SDK Regression Test Suite', () => {
     
     // Программируем поведение замоканного SDK
     vi.mocked(fal.subscribe).mockResolvedValue({
-      data: { image: { url: 'https://cdn.fal.media/output.jpg' } },
+      image: { url: 'https://cdn.fal.media/output.jpg' },
       requestId: 'req_123'
     } as any);
 
