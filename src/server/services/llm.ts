@@ -194,7 +194,30 @@ export async function callYandexART({
   return finalImageUrl;
 }
 
-export async function callYandexGPTChat(systemText: string, messages: {role: string, text: string}[]): Promise<string> {
+export async function callLLMChat(systemText: string, messages: {role: string, text: string}[]): Promise<string> {
+  const gemini = getGeminiClient();
+  if (gemini) {
+    try {
+      console.log("Using Gemini API for callLLMChat...");
+      
+      const geminiMessages = messages.map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.text }]
+      }));
+      
+      const res = await geminiQueue.add(() => withRetry(() => gemini.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: geminiMessages,
+        config: {
+            systemInstruction: systemText,
+            temperature: 0.85
+        }
+      })));
+      return res?.text || "";
+    } catch (e: any) {
+      console.error("Gemini failed in callLLMChat, falling back to Yandex:", e.message);
+    }
+  }
   try {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;
@@ -314,7 +337,24 @@ export async function callYandexVision(systemText: string, userText: string, ima
     return data.result.alternatives[0].message.text;
 }
 
-export async function callYandexGPT(systemText: string, userText: string): Promise<string> {
+export async function callLLM(systemText: string, userText: string): Promise<string> {
+  const gemini = getGeminiClient();
+  if (gemini) {
+    try {
+      console.log("Using Gemini API for callLLM...");
+      const res = await geminiQueue.add(() => withRetry(() => gemini.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: userText,
+        config: {
+            systemInstruction: systemText,
+            temperature: 0.85
+        }
+      })));
+      return res?.text || "";
+    } catch (e: any) {
+      console.error("Gemini failed in callLLM, falling back to Yandex:", e.message);
+    }
+  }
   try {
     const folderId = process.env.YANDEX_FOLDER_ID;
     const saKey = process.env.YANDEX_SERVICE_ACCOUNT_KEY;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AnalysisResult } from '../types';
 import { analyzeImageApi, generateArApi, generateFullApi, loadMoreApi } from '../services/api';
 // import { fallbackFaceApi } from '../services/fallbackAnalysis';

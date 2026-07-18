@@ -1,5 +1,5 @@
 import { HairParams } from './hairAnalyzer';
-import { getYandexIamToken, extractFolderId } from './yandex';
+import { getYandexIamToken, extractFolderId } from './llm';
 
 interface PromptInput {
   hairstyleName: string;

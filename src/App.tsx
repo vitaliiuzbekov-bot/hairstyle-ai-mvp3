@@ -65,6 +65,7 @@ function App() {
     userRole, setUserRole,
     salonName, setSalonName,
     consentGiven, setConsentGiven,
+    loadLastGeneration
   } = useUser();
 
   const {

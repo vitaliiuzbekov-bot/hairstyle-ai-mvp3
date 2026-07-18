@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Request, Response, Router } from "express";
 import { logToTelegram } from "../services/logger";
-import { callYandexGPT } from "../services/yandex";
+import { callLLM } from "../services/llm";
 import { safeParseJSON } from "../utils/json";
 import { geminiQueue, withRetry } from "../utils/queues";
 import { createRateLimiter } from "../utils/rateLimiter";
@@ -204,7 +204,7 @@ Return ONLY the raw JSON string matching this schema:
   "clothingContext": ""
 }`;
 
-    let textOutput = await callYandexGPT(systemText, `Visual description: ${visualDescription}`);
+    let textOutput = await callLLM(systemText, `Visual description: ${visualDescription}`);
     console.timeEnd("YandexGPT");
     
     const parsedResults = safeParseJSON(textOutput);

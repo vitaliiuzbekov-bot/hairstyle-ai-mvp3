@@ -5,7 +5,7 @@ import path from "path";
 import os from "os";
 import { exec } from "child_process";
 import { logToTelegram } from "../services/logger";
-import { callYandexGPT, callYandexGPTChat, getYandexIamToken, extractFolderId } from "../services/yandex";
+import { callLLM, callLLMChat, getYandexIamToken, extractFolderId } from "../services/llm";
 import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
 import { adminApp, adminStorage, adminDb } from "../firebase";
 import crypto from "crypto";
@@ -974,7 +974,7 @@ generateRouter.post("/generate-ar", freeModelsLimiter, async (req, res) => {
 Форматируй текст СТРОГО с помощью HTML-тегов (<p>, <strong>, <br>, <ul>, <li>).
 НЕ используй синтаксис markdown (никаких \`\`\`html или \`\`\`). Верни ТОЛЬКО готовый HTML код.`;
 
-      let consultationHtml = await callYandexGPT(systemInstruction, `Физические особенности клиента: ${faceDescription}`);
+      let consultationHtml = await callLLM(systemInstruction, `Физические особенности клиента: ${faceDescription}`);
       
       consultationHtml = consultationHtml.replace(/```html\s*/g, "").replace(/```\s*$/g, "").trim();
 
@@ -1042,7 +1042,7 @@ generateRouter.post("/chat-stylist", freeModelsLimiter, async (req, res) => {
 
       const trimmedMessages = messages.length > 6 ? messages.slice(-6) : messages;
 
-      const responseHtml = await callYandexGPTChat(systemInstruction, trimmedMessages);
+      const responseHtml = await callLLMChat(systemInstruction, trimmedMessages);
       
       let finalHtml = responseHtml.replace(/```html\s*/g, "").replace(/```\s*$/g, "").trim();
 
@@ -1147,7 +1147,7 @@ generateRouter.post("/load-more", freeModelsLimiter, async (req, res) => {
 
     let data: any = null;
     try {
-        const responseText = await callYandexGPT(systemInstruction, prompt);
+        const responseText = await callLLM(systemInstruction, prompt);
         data = safeParseJSON(responseText);
     } catch (err: any) {
         console.warn("YandexGPT / JSON Parse failed in /load-more, trying Gemini with JSON schema fallback:", err.message);

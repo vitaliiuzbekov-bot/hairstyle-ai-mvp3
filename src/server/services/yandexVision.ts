@@ -1,4 +1,4 @@
-import { getYandexIamToken, extractFolderId } from './yandex';
+import { getYandexIamToken, extractFolderId } from './llm';
 
 export interface HairlineCoords {
   topCenter: { x: number; y: number };
