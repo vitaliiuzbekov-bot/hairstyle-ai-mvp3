@@ -100,6 +100,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       vtonResultUrl,
       setVtonResultUrl,
       isTeaserResult,
+      setIsTeaserResult,
       vtonError,
       setVtonError,
       customHairColor,
@@ -143,8 +144,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           setResults(null);
           setArGeneratedImageUrl({});
           setTryOnStyle(null);
+          setVtonResultUrl(null);
+          setIsTeaserResult(false);
+          setVtonError(null);
       });
-  }, [originalHandleFileUpload, setResults, setArGeneratedImageUrl, setTryOnStyle]);
+  }, [originalHandleFileUpload, setResults, setArGeneratedImageUrl, setTryOnStyle, setVtonResultUrl, setIsTeaserResult, setVtonError]);
 
   useEffect(() => {
     const handleSelectStyle = (e: any) => {
@@ -174,6 +178,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     setResults(null);
     setArError(null);
     setArGeneratedImageUrl({});
+    setTryOnStyle(null);
+    setVtonResultUrl(null);
+    setIsTeaserResult(false);
+    setVtonError(null);
   };
 
   const {

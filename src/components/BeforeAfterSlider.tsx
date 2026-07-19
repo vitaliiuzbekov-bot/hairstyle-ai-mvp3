@@ -13,8 +13,13 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Пропускаем входящие URL через наш CORS-прокси на бэкенде
-  const proxyBeforeUrl = beforeImage ? `/api/proxy-image?url=${encodeURIComponent(beforeImage)}` : '';
-  const proxyAfterUrl = afterImage ? `/api/proxy-image?url=${encodeURIComponent(afterImage)}` : '';
+  const getProxyUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  };
+  const proxyBeforeUrl = getProxyUrl(beforeImage);
+  const proxyAfterUrl = getProxyUrl(afterImage);
 
   useEffect(() => {
     if (!proxyBeforeUrl || !proxyAfterUrl) return;
@@ -66,18 +71,22 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
 
       {/* Слой «ДО» (Верхний слой с обрезкой контейнера без сжатия картинки) */}
       <div 
-        className="absolute inset-0 h-full overflow-hidden z-20 pointer-events-none"
-        style={{ width: `${sliderPosition}%` }}
+        className="absolute top-0 bottom-0 left-0 overflow-hidden z-20 pointer-events-none"
+        style={{ width: `${Math.max(0.1, sliderPosition)}%` }}
       >
-        <img 
-          src={proxyBeforeUrl} 
-          alt="Before" 
-          className="absolute inset-0 h-full object-cover max-w-none pointer-events-none"
-          style={{ width: containerRef.current?.getBoundingClientRect().width || '100vw' }}
-        />
-        <span className="absolute top-4 left-4 bg-white text-black text-xs font-bold px-2 py-1 rounded shadow-md z-20">
-          ОБЫЧНОЕ ФОТО
-        </span>
+        <div 
+          className="absolute top-0 bottom-0 left-0 pointer-events-none"
+          style={{ width: `${10000 / Math.max(0.1, sliderPosition)}%`, height: '100%' }}
+        >
+          <img 
+            src={proxyBeforeUrl} 
+            alt="Before" 
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          />
+          <span className="absolute top-4 left-4 bg-white text-black text-xs font-bold px-2 py-1 rounded shadow-md z-20">
+            ОБЫЧНОЕ ФОТО
+          </span>
+        </div>
       </div>
 
       {/* Ползунок */}

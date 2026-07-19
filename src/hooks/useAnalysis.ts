@@ -567,6 +567,7 @@ export const useAnalysis = ({
         vtonResultUrl,
         setVtonResultUrl,
         isTeaserResult,
+        setIsTeaserResult,
         vtonError,
         setVtonError,
         customHairColor,

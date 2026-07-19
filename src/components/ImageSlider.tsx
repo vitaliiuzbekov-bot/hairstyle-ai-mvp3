@@ -26,8 +26,24 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
     }
   } catch(e) {}
 
-  const leftImage = matchingHistory?.originalUrl || matchingHistory?.blobDataUrl || localResult?.originalUrl || defaultLeft;
-  const rightImage = resultImage || localResult?.imageUrl || defaultRight;
+  let leftImage = defaultLeft;
+  let rightImage = defaultRight;
+
+  if (resultImage) {
+    if (matchingHistory?.originalUrl || matchingHistory?.blobDataUrl) {
+      leftImage = matchingHistory.originalUrl || matchingHistory.blobDataUrl;
+      rightImage = resultImage;
+    } else if (localResult?.imageUrl === resultImage && localResult?.originalUrl) {
+      leftImage = localResult.originalUrl;
+      rightImage = resultImage;
+    } else {
+      leftImage = defaultLeft;
+      rightImage = defaultRight;
+    }
+  } else if (localResult?.imageUrl && localResult?.originalUrl) {
+      leftImage = localResult.originalUrl;
+      rightImage = localResult.imageUrl;
+  }
 
   const updateSliderPosition = (percentage: number) => {
     // Prevent division by zero and going out of bounds

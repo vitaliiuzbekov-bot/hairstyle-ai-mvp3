@@ -1,51 +1,22 @@
 const fs = require('fs');
-let code = fs.readFileSync('server.ts', 'utf-8');
+let code = fs.readFileSync('src/components/BeforeAfterSlider.tsx', 'utf8');
 
-const proxyStart = code.indexOf('app.get("/api/proxy-image"');
-const proxyEnd = code.indexOf('});', proxyStart) + 3;
+const target = `  // Пропускаем входящие URL через наш CORS-прокси на бэкенде
+  const proxyBeforeUrl = beforeImage ? \`/api/proxy-image?url=\${encodeURIComponent(beforeImage)}\` : '';
+  const proxyAfterUrl = afterImage ? \`/api/proxy-image?url=\${encodeURIComponent(afterImage)}\` : '';`;
 
-const oldProxy = code.substring(proxyStart, proxyEnd);
+const replacement = `  // Пропускаем входящие URL через наш CORS-прокси на бэкенде
+  const getProxyUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    return \`/api/proxy-image?url=\${encodeURIComponent(url)}\`;
+  };
+  const proxyBeforeUrl = getProxyUrl(beforeImage);
+  const proxyAfterUrl = getProxyUrl(afterImage);`;
 
-const newProxy = `app.get("/api/proxy-image", async (req, res) => {
-    try {
-      const url = req.query.url as string;
-      if (!url) return res.status(400).send("No url provided");
-      
-      const allowedDomains = [
-        "fal.media",
-        "v3.fal.media",
-        "storage.yandexcloud.net",
-        "firebasestorage.googleapis.com",
-        "images.unsplash.com"
-      ];
-      
-      try {
-        const parsedUrl = new URL(url);
-        if (parsedUrl.protocol !== "https:") {
-          return res.status(403).send("Forbidden: Only HTTPS is allowed");
-        }
-        if (!allowedDomains.includes(parsedUrl.hostname) && !parsedUrl.hostname.endsWith('.fal.media') && !parsedUrl.hostname.endsWith('.fal.run')) {
-          return res.status(403).send("Forbidden: Domain not allowed");
-        }
-      } catch (err) {
-        return res.status(400).send("Invalid url");
-      }
-      
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(\`Failed to fetch remote image: \${response.statusText}\`);
-
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      
-      const arrayBuffer = await response.arrayBuffer();
-      res.send(Buffer.from(arrayBuffer));
-    } catch (error: any) {
-      console.error('[Proxy Error] Ошибка проксирования:', error.message);
-      res.status(500).send('Error proxying image');
-    }
-  });`;
-
-code = code.replace(oldProxy, newProxy);
-fs.writeFileSync('server.ts', code);
-console.log("Done");
+if (code.includes(target)) {
+  fs.writeFileSync('src/components/BeforeAfterSlider.tsx', code.replace(target, replacement));
+  console.log('Patched proxy in BeforeAfterSlider successfully');
+} else {
+  console.log('Target not found in BeforeAfterSlider for proxy');
+}
