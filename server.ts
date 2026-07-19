@@ -1,5 +1,4 @@
 import express from "express";
-import axios from "axios";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
