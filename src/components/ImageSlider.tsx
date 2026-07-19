@@ -45,6 +45,15 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
       rightImage = localResult.imageUrl;
   }
 
+  const getProxyUrl = (url: string | null | undefined) => {
+    if (!url) return "";
+    if (url.startsWith("data:") || url.startsWith("blob:") || url.startsWith("/")) return url;
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  };
+
+  const proxyLeftImage = getProxyUrl(leftImage) || defaultLeft;
+  const proxyRightImage = getProxyUrl(rightImage) || defaultRight;
+
   const updateSliderPosition = (percentage: number) => {
     // Prevent division by zero and going out of bounds
     const safePercentage = Math.max(0.1, Math.min(percentage, 100));
@@ -118,7 +127,7 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
       {/* Background Image (Shows on the Right) - Pink Hair / AI Result */}
       <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
         <img
-          src={rightImage}
+          src={proxyRightImage}
           alt="AI Result"
           draggable={false}
           className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"
@@ -140,7 +149,7 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
           style={{ width: '200%', height: '100%' }}
         >
           <img
-            src={leftImage}
+            src={proxyLeftImage}
             alt="Before Result"
             draggable={false}
             className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none"

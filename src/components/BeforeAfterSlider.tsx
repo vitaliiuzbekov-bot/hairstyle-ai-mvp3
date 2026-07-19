@@ -13,9 +13,9 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImag
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Пропускаем входящие URL через наш CORS-прокси на бэкенде
-  const getProxyUrl = (url) => {
+  const getProxyUrl = (url: string | null | undefined) => {
     if (!url) return '';
-    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('/')) return url;
     return `/api/proxy-image?url=${encodeURIComponent(url)}`;
   };
   const proxyBeforeUrl = getProxyUrl(beforeImage);
