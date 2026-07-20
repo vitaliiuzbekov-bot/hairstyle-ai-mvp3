@@ -7,7 +7,7 @@ export async function logToTelegram(message: string) {
   
   try {
     
-    fs.appendFileSync('/app/applet/app.log', new Date().toISOString() + ': ' + message + '\n');
+    console.log( new Date().toISOString() + ': ' + message + '\n');
   } catch(e) {}
 
   if (!botToken || !adminChatId) return;

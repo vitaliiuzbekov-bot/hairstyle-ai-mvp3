@@ -1,9 +1,9 @@
+import * as fs from "fs";
 import * as fal from "@fal-ai/serverless-client";
 import { ImageGenerationProvider, FluxOptions, FaceSwapOptions } from "../ports/ImageGenerationProvider";
 import { imageGenQueue } from "../utils/queues";
 
 export class FalAdapter implements ImageGenerationProvider {
-  
   constructor() {
     // SDK автоматически подхватывает переменную окружения process.env.FAL_KEY
     if (!process.env.FAL_KEY) {
@@ -18,7 +18,6 @@ export class FalAdapter implements ImageGenerationProvider {
       result?.image?.url,
       result?.url
     ];
-
     return possiblePaths.find(url => typeof url === 'string') || null;
   }
 
@@ -33,14 +32,13 @@ export class FalAdapter implements ImageGenerationProvider {
 
   async generateBaseImage(options: FluxOptions): Promise<Buffer> {
     try {
-      const result = await imageGenQueue.add(() => fal.subscribe<any, any>("fal-ai/flux/dev/image-to-image", {
+      const result = await imageGenQueue.add(() => fal.run<any, any>("fal-ai/flux/dev", {
         input: {
           prompt: options.prompt,
           image_url: options.imageUrl,
           strength: options.strength,
-          num_inference_steps: 20
-        },
-        mode: "streaming",
+          num_inference_steps: 12
+        }
       }));
 
       const resultUrl = this.extractResultUrl(result);
@@ -64,16 +62,17 @@ export class FalAdapter implements ImageGenerationProvider {
    * Выполняет замену лица/прически через строго типизированный вызов SDK Fal
    */
   async swapFace(options: FaceSwapOptions): Promise<Buffer> {
+    
     try {
-      // ✅ ИСПОЛЬЗУЕМ ОФИЦИАЛЬНЫЙ SDK: Вызов синхронного шлюза fal.subscribe через очередь
-      const result = await imageGenQueue.add(() => fal.subscribe<any, any>("fal-ai/face-swap", {
+      const result = await imageGenQueue.add(async () => {
+        const res = await fal.run("fal-ai/face-swap", {
         input: {
           base_image_url: options.baseImageUrl,
           swap_image_url: options.swapImageUrl,
-        },
-        // Опционально: можно явно указать метод получения результата
-        mode: "streaming", 
-      }));
+        }
+        });
+        return res;
+      });
 
       const resultUrl = this.extractResultUrl(result);
       if (!resultUrl) {

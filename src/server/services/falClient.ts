@@ -43,18 +43,23 @@ export async function uploadImageToFal(base64DataUri: string): Promise<string> {
   if (typeof finalUri === 'string' && !finalUri.startsWith('data:') && !finalUri.startsWith('http')) {
       finalUri = 'data:image/jpeg;base64,' + finalUri;
   }
-  if (!API_KEY || API_KEY === 'mock-key') {
-    return finalUri; // Cannot upload, fallback to base64
+  
+  if (finalUri.startsWith('data:')) {
+    try {
+      const match = finalUri.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (match) {
+        const mimeType = `image/${match[1]}`;
+        const buffer = Buffer.from(match[2], 'base64');
+        const blob = new Blob([buffer], { type: mimeType });
+        const uploadedUrl = await fal.storage.upload(blob);
+        return uploadedUrl;
+      }
+    } catch (e) {
+      console.warn("Failed to upload to fal.storage:", e);
+    }
   }
-  try {
-    const response = await fetch(finalUri);
-    const blob = await response.blob();
-    const uploadedUrl = await fal.storage.upload(blob);
-    return uploadedUrl;
-  } catch (err: any) {
-    console.error("[falClient] CRITICAL ERROR: Failed to upload image to FAL storage. This prevents image generation.", err.message, err.stack);
-    throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
-  }
+
+  return finalUri;
 }
 
 export async function generateReference(prompt: string): Promise<string> {

@@ -335,7 +335,7 @@ export const useAnalysis = ({
         selectedColor: string | null = null,
         targetImageUrl: string | null = null,
     ) => {
-        if (!imageBase64) return;
+        if (!imageBase64 && !imageUrl) return;
 
         if (!isDeveloper && generationsLeft !== null && generationsLeft <= 0) {
            setShowBuyModal(true);

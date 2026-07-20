@@ -2,7 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { createRateLimiter } from "./src/server/utils/rateLimiter.js";
 import jwt from "jsonwebtoken";
 import helmet from "helmet";
 import compression from "compression";
@@ -82,7 +82,7 @@ async function startServer() {
   const PORT = 3000;
 
   // Enhance security with Helmet
-  app.use(helmet({
+  app.use((req,res,next)=>{console.log("GLOBAL MW", req.path); next();}); app.use(helmet({
     contentSecurityPolicy: false, // Disabled for dev with inline styles/scripts and third-party APIs
     crossOriginEmbedderPolicy: false
   }));
@@ -94,36 +94,7 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
 
   // Rate Limiter to prevent bankruptcy from GenAI usage overhead
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 60, // Limit each user/IP to 60 requests per windowMs
-    keyGenerator: (req, res) => {
-      if (req.body?.tgUserId) {
-        return `tg_${req.body.tgUserId}`;
-      }
-      if (req.body?.userId && req.body.userId !== "local-user") {
-        return `user_${req.body.userId}`;
-      }
-      const initData = req.headers['x-telegram-init-data'];
-      try {
-        if (initData && typeof initData === 'string') {
-          const params = new URLSearchParams(initData);
-          const userStr = params.get('user');
-          if (userStr) {
-            const userObj = JSON.parse(userStr);
-            if (userObj?.id) return `tg_${userObj.id}`;
-          }
-        }
-      } catch (e) {}
-      const ip = req.ip || req.socket.remoteAddress || "unknown"; return ipKeyGenerator(ip);
-    },
-    message: { 
-      error: "Слишком много запросов от вашего аккаунта. Пожалуйста, подождите немного.",
-      fallback: true
-    },
-    standardHeaders: true,
-    legacyHeaders: false
-  });
+  const apiLimiter = createRateLimiter(15 * 60 * 1000, 60);
 
   app.use("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -154,7 +125,7 @@ async function startServer() {
   app.use("/api/generate-reference", telegramValidationMiddleware, apiLimiter);
   app.use("/api/reference", telegramValidationMiddleware, apiLimiter);
   app.use("/api/send-pdf", telegramValidationMiddleware, apiLimiter);
-  app.use("/api/generate-full", apiLimiter, upload.single("image"), telegramValidationMiddleware);
+  app.use("/api/generate-full", (req,res,next)=>{console.log("BEFORE MULTER", req.headers["content-type"]); next();}); app.use("/api/generate-full", apiLimiter, telegramValidationMiddleware);
   app.use("/api/generate-ar", telegramValidationMiddleware, apiLimiter);
   app.use("/api/chat-stylist", telegramValidationMiddleware, apiLimiter);
   app.use("/api/transcribe", telegramValidationMiddleware, apiLimiter);

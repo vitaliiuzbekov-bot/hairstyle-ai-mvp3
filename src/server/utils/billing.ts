@@ -5,16 +5,17 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
   if (!userId) {
     return { ok: false, error: "Missing userId" };
   }
-  if (!adminDb) {
-    return { ok: false, error: "Сервис временно недоступен. Попробуйте позже." };
-  }
-  
+
   if (isDeveloper) {
     return { ok: true }; 
   }
-  
+
   if (userId === "local-user") {
     return { ok: true }; 
+  }
+
+  if (!adminDb) {
+    return { ok: false, error: "Сервис временно недоступен. Попробуйте позже." };
   }
 
   if (userId.length > 40) {
@@ -35,7 +36,6 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
           throw new Error("ALREADY_DEDUCTED"); 
         }
       }
-
       const doc = await t.get(userRef);
       if (!doc.exists) {
         t.set(userRef, {
@@ -68,13 +68,13 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
       if (deductionRef) {
         t.set(deductionRef, { timestamp: FieldValue.serverTimestamp(), cacheKey: cacheKey || null });
       }
-
       return true;
     });
 
     if (!success) {
       return { ok: false, error: "Закончились генерации. Пополните баланс." };
     }
+
     return { ok: true };
   } catch (err: any) {
     if (err.code === 7 || (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('Missing or insufficient permissions')))) {

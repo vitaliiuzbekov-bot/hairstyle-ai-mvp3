@@ -1,3 +1,6 @@
+import fs from "fs";
+import multer from "multer";
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, fieldSize: 15 * 1024 * 1024 } });
 
 import { Request, Response, Router } from "express";
 import fs from "fs";
@@ -108,13 +111,30 @@ async function resolveImageToBase64(imageUrl: string | undefined): Promise<strin
     
     // For all other remote URLs, download them to base64 to prevent FAL "file_download_error"
     try {
+        
         console.log("[resolveImageToBase64] Attempting to download remote URL:", imageUrl);
-        const imgRes = await fetch(imageUrl);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(new Error("Timeout downloading image")), 15000);
+        const imgRes = await fetch(imageUrl, {
+            signal: controller.signal,
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+        });
+        clearTimeout(timeout);
+
         if (imgRes.ok) {
             const arrayBuffer = await imgRes.arrayBuffer();
-            const buf = Buffer.from(arrayBuffer);
+            let buf = Buffer.from(arrayBuffer);
             let mime = imgRes.headers.get('content-type') || 'image/jpeg';
             if (!mime.startsWith('image/')) mime = 'image/jpeg';
+            try {
+                const sharp = (await import('sharp')).default;
+                buf = await sharp(buf).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+                mime = 'image/jpeg';
+            } catch (e) {
+                console.warn("[resolveImageToBase64] Failed to resize, using original:", e.message);
+            }
             return `data:${mime};base64,${buf.toString('base64')}`;
         } else {
             console.error("[resolveImageToBase64] HTTP Error downloading image:", imgRes.status);
@@ -131,22 +151,6 @@ export const generateRouter = Router();
 const jobMap = new Map<string, any>();
 
 
-generateRouter.get("/proxy-image", async (req, res) => {
-  const imageUrl = req.query.url as string;
-  if (!imageUrl) return res.status(400).send("No URL provided");
-  try {
-    const fetchRes = await fetch(imageUrl);
-    if (!fetchRes.ok) return res.status(fetchRes.status).send("Failed to fetch");
-    const buffer = await fetchRes.arrayBuffer();
-    const mime = fetchRes.headers.get("content-type") || "image/jpeg";
-    res.setHeader("Content-Type", mime);
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "public, max-age=31536000");
-    res.send(Buffer.from(buffer));
-  } catch (e) {
-    res.status(500).send("Proxy error");
-  }
-});
 
 
 
@@ -169,12 +173,16 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       }
 
       // Check cache first (Cache for 30 days)
-      const cacheKey = "v2_" + getCacheKey({ 
+        const cacheKey = "v2_" + getCacheKey({ 
         route: "generate-reference-v28-gender-fixed", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
         hairDensity, hairType, hairLength, hairlineStatus, hairQuality, idempotencyKey, clothingContext
       });
+      console.log("[generate-full] checking cache..."); 
+
       const cachedImage = await getCachedValue<string>(cacheKey);
+      
+ console.log("[generate-full] cache checked!");
       if (cachedImage) {
         console.log("Returned reference from cache!");
         return res.json({ imageUrl: getProxiedUrl(cachedImage) });
@@ -210,7 +218,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         let lastErrorText = "";
         while (retries >= 0) {
             try {
-                falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
+                falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
                     method: "POST",
                     headers: {
                         "Authorization": `Key ${falKey}`,
@@ -220,7 +228,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
                         prompt: finalPrompt,
                         image_size: "portrait_4_3",
                         seed: seedValue,
-                        num_inference_steps: 20
+                        num_inference_steps: 4
                     })
                 });
 
@@ -337,7 +345,7 @@ generateRouter.get('/job/:jobId', async (req, res) => {
   }
 });
 
-const handleGenerateFull = async (req, res) => {
+const handleGenerateFull = async (req, res) => { console.log("HITTING handleGenerateFull", req.body);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(new Error("Global timeout 10m")), 10 * 60 * 1000);
     try {
@@ -366,10 +374,12 @@ const handleGenerateFull = async (req, res) => {
         return res.status(400).json({ error: "Missing parameters: keyword and selfieImage are required." });
       }
 
-      let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
+      console.log("[generate-full] resolving target..."); 
+let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
+ console.log("[generate-full] target resolved!");
 
       // Check cache first (Cache for 30 days)
-      const cacheKey = "v2_" + getCacheKey({ 
+       const cacheKey = "v2_" + getCacheKey({ 
         route: "generate-full-v9-reference-vision", 
         userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
         // using string truncation or full string to hash the selfie.
@@ -421,7 +431,9 @@ const handleGenerateFull = async (req, res) => {
       jobMap.set(jobId, { status: "processing", createdAt: Date.now() });
       if (adminDb) {
          try {
+           
            await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
+           
          } catch (dbErr) {
            console.error("[generate-full] Warning: Failed to set job status in Firestore (using in-memory map instead):", dbErr.message);
          }
@@ -444,8 +456,25 @@ const handleGenerateFull = async (req, res) => {
       let finalImageUrl = "";
       let lastError = "";
       let swappedImageUrl = "";
-      const resolvedSelfie = await resolveImageToBase64(selfieImage);
-      const selfieImageFull = resolvedSelfie || (selfieImage.startsWith('http') || selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`);
+      console.log("[generate-full] resolving selfie..."); 
+const resolvedSelfie = await resolveImageToBase64(selfieImage);
+ console.log("[generate-full] selfie resolved!");
+      let selfieImageFull = resolvedSelfie || (selfieImage.startsWith('http') || selfieImage.startsWith('data:') ? selfieImage : `data:image/jpeg;base64,${selfieImage}`);
+      
+      // Global bounding box for selfie to prevent timeouts
+      if (selfieImageFull.startsWith('data:')) {
+          try {
+              const sharp = (await import('sharp')).default;
+              const rawB64 = selfieImageFull.split(',')[1];
+              let buf = Buffer.from(rawB64, 'base64');
+              // Resize to max 1024x1024 to prevent Fal upload timeouts (30s) and Gemini payload limits
+              buf = await sharp(buf).resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+              selfieImageFull = `data:image/jpeg;base64,${buf.toString('base64')}`;
+              console.log("[generate-full] resized selfieImageFull to bounded 1024x1024");
+          } catch (e) {
+              console.warn("[generate-full] Failed to bound selfie image resolution:", e.message);
+          }
+      }
 
       const translateColor = (val: string) => {
         val = val.toLowerCase().trim();
@@ -488,12 +517,14 @@ const handleGenerateFull = async (req, res) => {
       let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
       
       // PARALLEL: Start Fal uploads immediately
-      let fluxBaseImageUrlPromise = baseImageForFlux.startsWith('data:') ? uploadImageToFal(baseImageForFlux) : Promise.resolve(baseImageForFlux);
+       let fluxBaseImageUrlPromise = baseImageForFlux.startsWith('data:') ? uploadImageToFal(baseImageForFlux) : Promise.resolve(baseImageForFlux);
+      fluxBaseImageUrlPromise.catch(() => {}); // prevent unhandled rejection crash
       let normalizedSelfie = selfieImageFull;
       if (typeof normalizedSelfie === 'string' && !normalizedSelfie.startsWith('data:') && !normalizedSelfie.startsWith('http')) {
           normalizedSelfie = 'data:image/jpeg;base64,' + normalizedSelfie;
       }
       let swapImageUrlForFalPromise = normalizedSelfie.startsWith('data:') ? uploadImageToFal(normalizedSelfie) : Promise.resolve(normalizedSelfie);
+      swapImageUrlForFalPromise.catch(() => {}); // prevent unhandled rejection crash
 
       
       let uiStrength = Number(vtonStrength) || 45; 
@@ -547,10 +578,23 @@ Instructions:
 
         let contentsPayload: any = [{ text: systemInstruction }];
 
-        // Add the source selfie for deep analysis during prompt generation
+        // Resize the source selfie for faster Gemini processing
+        let selfieMime = "image/jpeg";
+        let selfieBase64 = "";
         if (selfieImageFull && selfieImageFull.startsWith("data:image/")) {
-            const selfieMime = selfieImageFull.split(';')[0].split(':')[1];
-            const selfieBase64 = selfieImageFull.split(',')[1];
+            selfieMime = selfieImageFull.split(';')[0].split(':')[1];
+            let rawBase64 = selfieImageFull.split(',')[1];
+            try {
+                const sharp = (await import('sharp')).default;
+                const buf = Buffer.from(rawBase64, 'base64');
+                const resized = await sharp(buf).resize(512, 512, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer();
+                selfieBase64 = resized.toString('base64');
+                selfieMime = 'image/jpeg';
+            } catch (e) {
+                console.error("Failed to resize image for Gemini, using original", e);
+                selfieBase64 = rawBase64;
+            }
+
             contentsPayload.push({
                inlineData: {
                   data: selfieBase64,
@@ -594,14 +638,38 @@ Instructions:
             }
         }
 
-        const promptRes = await geminiQueue.add(() => withRetry(() => ai.models.generateContent({
-             model: 'gemini-2.5-flash', // Flash to prevent quota limits
-             contents: { parts: contentsPayload },
-             config: {
-                 temperature: 0.7,
-                 maxOutputTokens: 500
-             }
-        })));
+        
+ 
+        const promptRes = await geminiQueue.add(async () => { 
+           return withRetry(async () => { 
+                
+               const controller = new AbortController();
+               const timeout = setTimeout(() => controller.abort(new Error("Gemini timeout")), 60000);
+               try {
+                   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({
+                           contents: [{ parts: contentsPayload }],
+                           generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
+                       }),
+                       signal: controller.signal
+                   });
+                   clearTimeout(timeout);
+                   if (!res.ok) {
+                       const errText = await res.text();
+                       throw new Error(`HTTP ${res.status}: ${errText}`);
+                   }
+                   const data = await res.json();
+                   
+                   return { text: data?.candidates?.[0]?.content?.parts?.[0]?.text };
+               } catch (e: any) {
+                   
+                   clearTimeout(timeout);
+                   throw e;
+               }
+           });
+        });
         promptEng = promptRes?.text?.trim() || "";
       } catch (err: any) {
         console.error("Gemini failed to generate prompt, falling back to basic prompt:", err?.message || err);
@@ -632,19 +700,16 @@ Instructions:
         } else {
           try {
                   console.log("Generating target blueprint via ImageGenerationService (Flux Dev Image-to-Image)... strength:", fluxStrength);
-            const fluxBaseImageUrl = await fluxBaseImageUrlPromise;
-            if (fluxBaseImageUrl.startsWith('data:')) {
-                console.error("[generate-full] Error: fluxBaseImageUrl is a data URI, meaning upload failed.");
-                throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
-            }
+             const fluxBaseImageUrl = await fluxBaseImageUrlPromise; 
+            // Removed data URI check because Fal supports data URIs
             
-            const generatedBuffer = await defaultImageService.generateBaseImage({
+             const generatedBuffer = await defaultImageService.generateBaseImage({
               prompt: promptEng,
               imageUrl: fluxBaseImageUrl,
               strength: fluxStrength
             });
             
-            if (generatedBuffer) {
+             if (generatedBuffer) {
                 const uploadedUrl = await uploadBufferToFirebase(generatedBuffer, 'image/jpeg');
                 finalImageUrl = uploadedUrl;
                 customBlueprintCache.set(blueprintCacheKey, uploadedUrl);
@@ -663,18 +728,15 @@ Instructions:
             console.log("Starting Virtual Try-On FaceSwap via ImageGenerationService... finalImageUrl:", finalImageUrl);
          
          const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
-         const swapImageUrlForFal = await swapImageUrlForFalPromise;
+          const swapImageUrlForFal = await swapImageUrlForFalPromise; 
          
-         if (baseImageUrlForFal.startsWith('data:') || swapImageUrlForFal.startsWith('data:')) {
-             console.error("[generate-full] Error: Fal.storage upload failed during FaceSwap prep.");
-             throw new Error("Не удалось загрузить изображение для обработки. Попробуйте ещё раз.");
-         }
+         // Removed check for baseImageUrlForFal or swapImageUrlForFal being data URIs
          
-         const swappedImageBuffer = await defaultImageService.swapFace({
+          const swappedImageBuffer = await defaultImageService.swapFace({
            baseImageUrl: baseImageUrlForFal,
            swapImageUrl: swapImageUrlForFal
          });
-         imageBuffer = swappedImageBuffer;
+          imageBuffer = swappedImageBuffer;
          swappedImageUrl = await uploadBufferToFirebase(swappedImageBuffer, 'image/jpeg');
       } catch (error: any) {
           if (error.name === 'AbortError') {
@@ -735,7 +797,7 @@ Instructions:
       logToTelegram(`❌ <b>Ошибка Генерации (${req.body.userId || 'unknown'})</b>\n<code>${err.message || 'Pipeline error'}</code>`).catch(console.error);
       
       try {
-        fs.appendFileSync('/app/applet/pipeline_error.log', new Date().toISOString() + ': ' + (err.message || err.toString()) + '\n');
+        console.error("[Pipeline Error]", err.message || err.toString());
       } catch(e) { console.error("Ignored error:", e); }
       
       // 🚨 REFUND THE GENERATION SINCE IT FAILED 🚨
@@ -811,8 +873,8 @@ Instructions:
     }
   }
 };
-generateRouter.post("/generate-full/start", handleGenerateFull);
-generateRouter.post("/generate-full", handleGenerateFull); // Backward compatibility
+generateRouter.post("/generate-full/start", upload.single("image"), (req,res,next)=>{console.log("AFTER MULTER", req.body); next();}, handleGenerateFull);
+generateRouter.post("/generate-full", upload.single("image"), (req,res,next)=>{console.log("AFTER MULTER", req.body); next();}, handleGenerateFull); // Backward compatibility
 
 
   
@@ -830,7 +892,7 @@ generateRouter.post("/generate-ar", freeModelsLimiter, async (req, res) => {
       const faceDescription = features ? JSON.stringify(pureFeatures1) : "Нет данных о лице (ошибка)";
 
       // Check cache for this exact consultation
-      const cacheKey = "v2_" + getCacheKey({
+       const cacheKey = "v2_" + getCacheKey({
         route: "generate-ar-consultation",
         styleKeyword,
         styleName,
