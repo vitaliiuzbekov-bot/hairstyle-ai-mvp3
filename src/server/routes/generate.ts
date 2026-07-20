@@ -3,7 +3,6 @@ import multer from "multer";
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, fieldSize: 15 * 1024 * 1024 } });
 
 import { Request, Response, Router } from "express";
-import fs from "fs";
 import path from "path";
 import os from "os";
 import { exec } from "child_process";
@@ -173,7 +172,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       }
 
       // Check cache first (Cache for 30 days)
-        const cacheKey = "v2_" + getCacheKey({ 
+        const cacheKey = "v3_force_update_" + getCacheKey({ 
         route: "generate-reference-v28-gender-fixed", 
         keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
         hairDensity, hairType, hairLength, hairlineStatus, hairQuality, idempotencyKey, clothingContext
@@ -379,7 +378,7 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
  console.log("[generate-full] target resolved!");
 
       // Check cache first (Cache for 30 days)
-       const cacheKey = "v2_" + getCacheKey({ 
+       const cacheKey = "v3_force_update_" + getCacheKey({ 
         route: "generate-full-v9-reference-vision", 
         userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
         // using string truncation or full string to hash the selfie.
@@ -892,7 +891,7 @@ generateRouter.post("/generate-ar", freeModelsLimiter, async (req, res) => {
       const faceDescription = features ? JSON.stringify(pureFeatures1) : "Нет данных о лице (ошибка)";
 
       // Check cache for this exact consultation
-       const cacheKey = "v2_" + getCacheKey({
+       const cacheKey = "v3_force_update_" + getCacheKey({
         route: "generate-ar-consultation",
         styleKeyword,
         styleName,

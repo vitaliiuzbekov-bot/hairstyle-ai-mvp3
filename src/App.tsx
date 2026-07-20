@@ -116,27 +116,13 @@ function App() {
     } catch(e) {}
   }, []);
 
-  useEffect(() => {
-    if (userId && !resultImage && window.location.pathname === '/' && !window.location.hash.includes('image=')) {
-      loadLastGeneration().then(lastGen => {
-        if (lastGen && lastGen.url) {
-          console.log("Loaded last generation from API:", lastGen.url);
-          localStorage.setItem('lastResult', JSON.stringify({ 
-             imageUrl: lastGen.url, 
-             originalUrl: lastGen.originalUrl 
-          }));
-          setResultImage(lastGen.url);
-        }
-      });
-    }
-  }, [userId]);
+  // Removed auto-loading last generation from backend API
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     let img = params.get('image') || params.get('imageUrl');
     let orig = params.get('originalUrl');
     
-    // Also try to extract from hash if telegram messed it up
     if (window.location.hash.includes('image=') || window.location.hash.includes('imageUrl=')) {
         const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || window.location.hash.replace('#/', '').replace('#', ''));
         img = img || hashParams.get('image') || hashParams.get('imageUrl');
@@ -153,23 +139,6 @@ function App() {
       try {
          localStorage.setItem('lastResult', JSON.stringify({ imageUrl: img, originalUrl: orig }));
       } catch(e) {}
-    } else {
-      const saved = localStorage.getItem('lastGeneratedImage');
-      if (saved) {
-        console.log("Setting result image from lastGeneratedImage:", saved);
-        setResultImage(saved);
-      } else {
-        const lastResultStr = localStorage.getItem('lastResult');
-        if (lastResultStr) {
-          try {
-            const lastResult = JSON.parse(lastResultStr);
-            if (lastResult.imageUrl) {
-              console.log("Setting result image from localStorage:", lastResult.imageUrl);
-              setResultImage(lastResult.imageUrl);
-            }
-          } catch(e) {}
-        }
-      }
     }
   }, []);
 

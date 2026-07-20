@@ -182,6 +182,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     setVtonResultUrl(null);
     setIsTeaserResult(false);
     setVtonError(null);
+    localStorage.removeItem('lastGeneratedImage');
+    localStorage.removeItem('lastOriginalImage');
+    localStorage.removeItem('lastStyleName');
+    localStorage.removeItem('lastMimeType');
   };
 
   const {

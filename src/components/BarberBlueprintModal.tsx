@@ -98,7 +98,9 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   }, [vtonResultUrl]);
 
   React.useEffect(() => {
-    setLoadedReferenceUrl(null);
+    if (!tryOnStyle) {
+      setLoadedReferenceUrl(null);
+    }
   }, [tryOnStyle]);
 
   useScrollLock(!!tryOnStyle);
