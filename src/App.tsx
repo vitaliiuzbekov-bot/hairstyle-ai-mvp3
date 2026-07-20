@@ -106,15 +106,7 @@ function App() {
 
   const [resultImage, setResultImage] = React.useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('lastGenerationResult') || localStorage.getItem('lastResult');
-      if (saved) {
-        const data = JSON.parse(saved);
-        window.dispatchEvent(new CustomEvent('showGenerationResult', { detail: data }));
-      }
-    } catch(e) {}
-  }, []);
+  
 
   // Removed auto-loading last generation from backend API
 

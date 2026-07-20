@@ -526,16 +526,16 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       swapImageUrlForFalPromise.catch(() => {}); // prevent unhandled rejection crash
 
       
-      let uiStrength = Number(vtonStrength) || 45; 
+            let uiStrength = Number(vtonStrength) || 45; 
       let fluxStrength = 0.95;
-      if (finalTargetImageUrl) {
-          fluxStrength = 0.20 + ((uiStrength - 50) / 50) * 0.15;
-          if (fluxStrength < 0.1) fluxStrength = 0.20;
-      } else {
-          fluxStrength = 0.40 + (uiStrength / 100) * 0.35;
-      }
+      
+      // Calculate fluxStrength (denoising strength)
+      // Higher strength = more deviation from the base image.
+      // We want high strength so the hair changes to match the prompt!
+      // If we use 0.20, Flux barely changes the image.
+      fluxStrength = 0.75 + (uiStrength / 100) * 0.20; // 0.75 to 0.95 range
       if (keyword && keyword.includes("same exact current hairstyle")) {
-          fluxStrength = 0.30; // keep original structure
+          fluxStrength = 0.35; // keep original structure
       }
 
       let promptEng = "";
@@ -577,32 +577,6 @@ Instructions:
 
         let contentsPayload: any = [{ text: systemInstruction }];
 
-        // Resize the source selfie for faster Gemini processing
-        let selfieMime = "image/jpeg";
-        let selfieBase64 = "";
-        if (selfieImageFull && selfieImageFull.startsWith("data:image/")) {
-            selfieMime = selfieImageFull.split(';')[0].split(':')[1];
-            let rawBase64 = selfieImageFull.split(',')[1];
-            try {
-                const sharp = (await import('sharp')).default;
-                const buf = Buffer.from(rawBase64, 'base64');
-                const resized = await sharp(buf).resize(512, 512, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer();
-                selfieBase64 = resized.toString('base64');
-                selfieMime = 'image/jpeg';
-            } catch (e) {
-                console.error("Failed to resize image for Gemini, using original", e);
-                selfieBase64 = rawBase64;
-            }
-
-            contentsPayload.push({ text: `[IMAGE 1: USER'S ORIGINAL PHOTO]\nCRITICAL INSTRUCTION FOR IMAGE 1: You MUST deeply analyze their exact gender, apparent age, face shape, skin tone, eye color, and facial hair. You MUST include these EXACT features in your final prompt to ensure their face remains completely unchanged! IMPORTANT: DO NOT describe the hair from this image. Ignore the hair completely.` });
-            contentsPayload.push({
-               inlineData: {
-                  data: selfieBase64,
-                  mimeType: selfieMime
-               }
-            });
-        }
-
         if (finalTargetImageUrl) {
             let base64Data = "";
             let mimeType = "image/jpeg";
@@ -627,7 +601,18 @@ Instructions:
             }
 
             if (base64Data) {
-                contentsPayload.push({ text: `[IMAGE 2: TARGET HAIRSTYLE REFERENCE]\nCRITICAL INSTRUCTION FOR IMAGE 2: You MUST deeply analyze this image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of THIS image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts! Focus heavily on ensuring the exact haircut structure is transferred.` });
+                // Resize reference image to save Gemini tokens and prevent OOM
+                try {
+                    const sharp = (await import('sharp')).default;
+                    const buf = Buffer.from(base64Data, 'base64');
+                    const resized = await sharp(buf).resize(512, 512, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer();
+                    base64Data = resized.toString('base64');
+                    mimeType = 'image/jpeg';
+                } catch (e) {
+                    console.error("Failed to resize reference image for Gemini", e);
+                }
+
+                contentsPayload.push({ text: `[IMAGE 1: TARGET HAIRSTYLE REFERENCE]\nCRITICAL INSTRUCTION: You MUST deeply analyze this image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, fade, and overall geometry). Use YOUR visual analysis of THIS image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts! Focus heavily on ensuring the exact haircut structure is transferred.` });
                 contentsPayload.push({
                    inlineData: {
                       data: base64Data,
@@ -637,8 +622,6 @@ Instructions:
             }
         }
 
-        
- 
         const promptRes = await geminiQueue.add(async () => { 
            return withRetry(async () => { 
                 

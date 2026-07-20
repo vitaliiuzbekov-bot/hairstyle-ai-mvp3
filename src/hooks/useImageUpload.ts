@@ -8,13 +8,7 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 export const useImageUpload = () => {
     const { processImage, isProcessing: isCompressing, error: compressError } = useImageProcessor();
     const { addToast } = useUI();
-    const [imageBase64, setImageBase64State] = useState<string | null>(() => {
-        try {
-            return localStorage.getItem("persistent_imageBase64") || null;
-        } catch {
-            return null;
-        }
-    });
+    const [imageBase64, setImageBase64State] = useState<string | null>(null);
     
     const setImageBase64 = (val: React.SetStateAction<string | null>) => {
         setImageBase64State((prev) => {
@@ -29,13 +23,7 @@ export const useImageUpload = () => {
         });
     };
 
-    const [imageUrl, setImageUrlState] = useState<string | null>(() => {
-        try {
-            return localStorage.getItem("persistent_imageUrl") || null;
-        } catch {
-            return null;
-        }
-    });
+    const [imageUrl, setImageUrlState] = useState<string | null>(null);
 
     const setImageUrl = (val: React.SetStateAction<string | null>) => {
         setImageUrlState((prev) => {
@@ -48,13 +36,7 @@ export const useImageUpload = () => {
         });
     };
 
-    const [mimeType, setMimeTypeState] = useState<string>(() => {
-        try {
-            return localStorage.getItem("persistent_mimeType") || "image/webp";
-        } catch {
-            return "image/webp";
-        }
-    });
+    const [mimeType, setMimeTypeState] = useState<string>("image/webp");
 
     const setMimeType = (val: React.SetStateAction<string>) => {
         setMimeTypeState((prev) => {
@@ -69,13 +51,7 @@ export const useImageUpload = () => {
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [rawImageBase64State, setRawImageBase64State] = useState<string | null>(() => {
-        try {
-            return localStorage.getItem("persistent_rawImageBase64") || null;
-        } catch {
-            return null;
-        }
-    });
+    const [rawImageBase64State, setRawImageBase64State] = useState<string | null>(null);
 
     const setRawImageBase64 = (val: React.SetStateAction<string | null>) => {
         setRawImageBase64State((prev) => {

@@ -44,14 +44,7 @@ export const useAnalysis = ({
     
     // States
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [results, setResultsState] = useState<AnalysisResult | null>(() => {
-        try {
-            const cached = localStorage.getItem("persistent_analysisResults_v2");
-            return cached ? JSON.parse(cached) : null;
-        } catch {
-            return null;
-        }
-    });
+    const [results, setResultsState] = useState<AnalysisResult | null>(null);
     
     const setResults = (val: React.SetStateAction<AnalysisResult | null>) => {
         setResultsState((prev) => {
@@ -68,13 +61,7 @@ export const useAnalysis = ({
     
     const [loadingARStyles, setLoadingARStyles] = useState<Record<string, boolean>>({});
     const [arGeneratedImageUrl, setArGeneratedImageUrl] = useState<Record<string, string>>({});
-    const [teaserUrlState, setTeaserUrlState] = useState<string | null>(() => {
-        try {
-            return localStorage.getItem("persistent_teaserUrl") || null;
-        } catch {
-            return null;
-        }
-    });
+    const [teaserUrlState, setTeaserUrlState] = useState<string | null>(null);
 
     const setTeaserUrl = (val: React.SetStateAction<string | null>) => {
         setTeaserUrlState((prev) => {

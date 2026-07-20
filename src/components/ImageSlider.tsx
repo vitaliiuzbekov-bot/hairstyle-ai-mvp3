@@ -13,18 +13,6 @@ export const ImageSlider = ({ isLightMode, resultImage, history }: { isLightMode
   const matchingHistory = history?.find((h) => h.url === resultImage);
   
   let localResult = null;
-  try {
-    const gen = localStorage.getItem('lastGeneratedImage');
-    const orig = localStorage.getItem('lastOriginalImage');
-    if (gen && orig) {
-      localResult = { imageUrl: gen, originalUrl: orig };
-    } else {
-      const lastResultStr = localStorage.getItem('lastResult');
-      if (lastResultStr) {
-        localResult = JSON.parse(lastResultStr);
-      }
-    }
-  } catch(e) {}
 
   let leftImage = defaultLeft;
   let rightImage = defaultRight;
