@@ -98,6 +98,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
 
           <button
             type="button"
+            disabled={!(tryOnStyle.customImageUrl || loadedReferenceUrl || (tryOnStyle as any).imageUrl)}
             onClick={async (e) => {
                 e.preventDefault();
                 generateVirtualTryOn(
@@ -109,7 +110,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                 );
               }
             }
-            className={`relative w-full max-w-xs font-bold py-4 sm:py-5 px-6 flex items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${isLightMode ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-[0.98]' : 'bg-white text-black hover:bg-gray-100 shadow-md active:scale-[0.98]'}`}
+            className={`relative w-full max-w-xs font-bold py-4 sm:py-5 px-6 flex items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${!(tryOnStyle.customImageUrl || loadedReferenceUrl || (tryOnStyle as any).imageUrl) ? 'opacity-50 cursor-not-allowed bg-gray-400 text-white' : isLightMode ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-[0.98]' : 'bg-white text-black hover:bg-gray-100 shadow-md active:scale-[0.98]'}`}
           >
              <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
              <span className="relative z-10 flex items-center gap-2">

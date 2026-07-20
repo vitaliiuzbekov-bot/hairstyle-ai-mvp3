@@ -514,7 +514,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       const targetHairColor = isCustomColorRequested ? customHairColor : hairColor;
       const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
       
-      let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
+      let baseImageForFlux = selfieImageFull;
       
       // PARALLEL: Start Fal uploads immediately
        let fluxBaseImageUrlPromise = baseImageForFlux.startsWith('data:') ? uploadImageToFal(baseImageForFlux) : Promise.resolve(baseImageForFlux);
@@ -595,13 +595,13 @@ Instructions:
                 selfieBase64 = rawBase64;
             }
 
+            contentsPayload.push({ text: `[IMAGE 1: USER'S ORIGINAL PHOTO]\nCRITICAL INSTRUCTION FOR IMAGE 1: You MUST deeply analyze their exact gender, apparent age, face shape, skin tone, eye color, and facial hair. You MUST include these EXACT features in your final prompt to ensure their face remains completely unchanged! IMPORTANT: DO NOT describe the hair from this image. Ignore the hair completely.` });
             contentsPayload.push({
                inlineData: {
                   data: selfieBase64,
                   mimeType: selfieMime
                }
             });
-            contentsPayload[0].text += `\n\n[CRITICAL SOURCE IMAGE]: The FIRST attached image is the user's original photo. You MUST deeply analyze their exact gender, apparent age, face shape, skin tone, eye color, and facial hair. You MUST include these EXACT features in your final prompt to ensure their face remains completely unchanged! IMPORTANT: DO NOT describe the hair from this first image. The hair description MUST come ONLY from the target style.`;
         }
 
         if (finalTargetImageUrl) {
@@ -628,13 +628,13 @@ Instructions:
             }
 
             if (base64Data) {
+                contentsPayload.push({ text: `[IMAGE 2: TARGET HAIRSTYLE REFERENCE]\nCRITICAL INSTRUCTION FOR IMAGE 2: You MUST deeply analyze this image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of THIS image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts! Focus heavily on ensuring the exact haircut structure is transferred.` });
                 contentsPayload.push({
                    inlineData: {
                       data: base64Data,
                       mimeType: mimeType
                    }
                 });
-                contentsPayload[0].text += `\n\n[CRITICAL VISUAL REFERENCE]: The SECOND attached image is the target hairstyle reference. You MUST deeply analyze the attached image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, waves/curls, fade, and overall geometry). Use YOUR visual analysis of this attached image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts! Focus heavily on ensuring the exact haircut structure is transferred.`;
             }
         }
 
