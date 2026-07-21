@@ -75,7 +75,7 @@ router.post("/send-to-telegram", async (req, res) => {
             fs.writeFileSync(afterPath, afterBuffer);
             
             // Wipe right transition for 3 seconds: 0.5s pause, 1s wipe, 1.5s pause
-            const ffmpegCmd = `"${ffmpegInstaller.path}" -y -loop 1 -t 3.5 -i "${beforePath}" -loop 1 -t 3.5 -i "${afterPath}" -filter_complex "[0:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v0];[1:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v1];[v0][v1]xfade=transition=wiperight:duration=1.5:offset=1.0,format=yuv420p" -c:v libx264 -pix_fmt yuv420p "${outPath}"`;
+            const ffmpegCmd = `"${ffmpegInstaller.path}" -y -loop 1 -t 3.5 -i "${beforePath}" -loop 1 -t 3.5 -i "${afterPath}" -filter_complex "[0:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v0];[1:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30,format=yuva420p,fade=t=in:st=1:d=1.5:alpha=1[v1];[v0][v1]overlay,format=yuv420p" -c:v libx264 -pix_fmt yuv420p "${outPath}"`;
             
             
             try {
