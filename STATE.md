@@ -69,3 +69,11 @@
   1. Из `VTONPreviewSection.tsx` удалены свойства и код, отвечающий за выбор цвета.
   2. Из `BarberBlueprintModal.tsx`, `HomePage.tsx`, `AnalysisContext.tsx`, `useAnalysis.ts` удалены пропсы, переменные состояния и параметры вызовов, касающиеся `customHairColor`.
   3. На сервере (`generate.ts` и `promptGenerator.ts`) логика обработки кастомного цвета (включая конструирование `colorDesc`) удалена.
+
+### Issue: Telegram Mini App Video Download
+- **Problem**: In Telegram Mini App (especially on iOS), `a.download` with `blob:` URLs does not work. This caused "Скачать Видео" to fail because it relied on `URL.createObjectURL(blob)`. Previously we used `send-to-telegram` to send the video to the bot chat, but users explicitly requested it to be downloadable directly to their device just like images ("как скачать референс").
+- **Solution**: 
+  - Changed the server endpoint to `/api/generate-video`. Instead of sending it to Telegram Bot API, the server saves the `mp4` in `tmp/` and returns its public URL: `res.json({ url: '/tmp/out_...mp4' })`.
+  - The Express server now serves `/tmp` statically using `app.use('/tmp', express.static(...))`.
+  - The client receives the URL, constructs the absolute URL (`window.location.origin + data.url`), and uses `tg.openLink(videoUrl)` if inside Telegram, or a fallback `a.href = videoUrl; a.target = '_blank'` otherwise. This forces the OS / Telegram to open the video in an external browser where the user can natively save it to Photos/Downloads.
+  - Replaced the failing `xfade` FFmpeg filter with `fade` + `overlay` which works universally on Render's `@ffmpeg-installer` build.

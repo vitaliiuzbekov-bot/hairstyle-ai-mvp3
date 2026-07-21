@@ -97,6 +97,7 @@ async function startServer() {
   // Rate Limiter to prevent bankruptcy from GenAI usage overhead
   const apiLimiter = createRateLimiter(15 * 60 * 1000, 60);
 
+  app.use('/tmp', express.static(path.join(process.cwd(), 'tmp')));
   app.use("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
@@ -220,6 +221,7 @@ if (process.env.NODE_ENV !== "production") {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
+    app.use('/tmp', express.static(path.join(process.cwd(), 'tmp')));
     app.get("*", (req, res) => {
       if (req.originalUrl.startsWith('/api/')) {
         return res.status(404).json({ error: "API route not found" });

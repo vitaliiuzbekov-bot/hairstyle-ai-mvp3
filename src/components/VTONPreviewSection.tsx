@@ -137,67 +137,44 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
            </div>
           <div className="flex flex-col gap-3 mt-4 w-full">
             <div className="flex flex-wrap gap-2 sm:gap-3 w-full">
-             <button 
-               onClick={async (e) => {
+             <button
+                  onClick={() => downloadImage(displayResultUrl || "", `hairstyle_result_${Date.now()}.jpg`)}
+                  className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100' : 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30'}`}
+               >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Скачать</span>
+             </button>
+             <button
+                onClick={async (e) => {
                   e.stopPropagation();
                   try {
                      const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
                      const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl, userRole === 'salon' ? salonName : undefined);
-                     
                      const messageText = "Привет! Смотри, какой стиль я подобрал(а) в нейросети. Хочу такую стрижку и цвет!\nСоздано в @neirostilist_bot";
-
+                     
                      if (navigator.share) {
                         try {
                            const res = await fetch(collageDataUrl);
                            const blob = await res.blob();
-                           const file = new File([blob], "neurostylist_collage.jpg", { type: "image/jpeg" });
+                           const file = new File([blob], 'collage.jpg', { type: 'image/jpeg' });
                            await navigator.share({
-                              title: "Мой новый стиль от НейроСтилиста",
-                              text: messageText,
-                              files: [file]
+                               files: [file],
+                               title: 'Мой новый стиль',
+                               text: messageText
                            });
                         } catch (e) {
-                           downloadImage(collageDataUrl, "ai_collage.jpg");
+                           downloadImage(collageDataUrl, `hairstyle_collage_${Date.now()}.jpg`);
                         }
                      } else {
-                        downloadImage(collageDataUrl, "ai_collage.jpg");
-                        shareToTelegram("https://t.me/neirostilist_bot", messageText);
+                         downloadImage(collageDataUrl, `hairstyle_collage_${Date.now()}.jpg`);
                      }
-                  } catch (err) {
-                     console.error("Collage error", err);
+                  } catch (e) {
+                      console.error("Collage err", e);
                   }
                }}
-               className={`flex-1 py-3 px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100' : 'bg-orange-500/20 text-orange-300 border-orange-500/30 hover:bg-orange-500/30'}`}
+               className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/30'}`}
              >
-                <Send size={16} />
-                <span>Отправить мастеру</span>
-             </button>
-             <button 
-               onClick={(e) => {
-                  e.stopPropagation();
-                  setChatStyleName(tryOnStyle?.name || tryOnStyle?.ru);
-                  setIsChatOpen(true);
-               }}
-               className={`flex-1 py-3 px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors ${isLightMode ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100' : 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30'}`}
-             >
-                <Sparkles size={16} />
-                <span>Спросить Стилиста</span>
-             </button>
-              <button 
-               onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                     const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
-                     const collageDataUrl = await generateCollage(beforeSrc, vtonResultUrl, userRole === 'salon' ? salonName : undefined);
-                     downloadImage(collageDataUrl, "ai_collage.jpg");
-                  } catch (err) {
-                     console.error("Collage download error", err);
-                  }
-               }}
-               className={`flex-1 py-3 px-2 sm:px-4 rounded-xl font-medium border flex items-center justify-center gap-2 transition-colors text-sm sm:text-base ${isLightMode ? 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100' : 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30'}`}
-               title="Скачать фото коллаж"
-             >
-                <FileDown size={16} />
+                <Grid2x2 size={16} />
                 <span className="hidden sm:inline">Коллаж</span>
              </button>
              <button
@@ -209,59 +186,59 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
                      const afterSrc = displayResultUrl || "";
                      
-                     // Генерируем видео локально
-                     
-
                      const tg = (window as any).Telegram?.WebApp;
-                     const tgUserId = tg?.initDataUnsafe?.user?.id;
                      
-                     if (tgUserId) {
-                        try {
-                            if (tg.showAlert) tg.showAlert("Генерируем видео на сервере и отправляем в чат, подождите 10-15 секунд..."); else alert("Генерируем видео на сервере и отправляем в чат, подождите 10-15 секунд...");
-                            const res = await fetch('/api/send-to-telegram', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    tgUserId: tgUserId.toString(),
-                                    type: 'video',
-                                    beforeImage: beforeSrc,
-                                    afterImage: afterSrc
-                                })
-                            });
-                            if (res.ok) {
-                                if (tg.showAlert) tg.showAlert("Готово! Видео отправлено вам в личные сообщения бота."); else alert("Готово! Видео отправлено вам в личные сообщения бота.");
-                                setToastIsError(false);
-                                setToastMessage(`Видео отправлено в чат!`);
-                                return;
-                            } else {
-                                const errText = await res.text();
-                                console.error("Сервер не смог сгенерировать видео", errText);
-                                if (tg.showAlert) tg.showAlert("Ошибка на сервере: " + errText); else alert("Ошибка на сервере: " + errText);
-                                // Fallback to local generation below
-                            }
-                        } catch(err) {
-                            console.error("Telegram send error", err);
-                        }
+                     if (tg && tg.showAlert) {
+                         setToastMessage("Генерируем видео на сервере (около 10 сек)...");
+                     } else {
+                         setToastMessage("Генерируем видео на сервере...");
                      }
                      
-                     // Local generation fallback
-                     const videoBlob = await generateBeforeAfterVideo(beforeSrc, afterSrc);
-                     const videoUrl = URL.createObjectURL(videoBlob);
+                     const res = await fetch('/api/generate-video', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({
+                             beforeImage: beforeSrc,
+                             afterImage: afterSrc
+                         })
+                     });
                      
-                     const a = document.createElement('a');
-                     a.href = videoUrl;
-                     a.target = '_blank';
-                     a.download = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-                     document.body.appendChild(a);
-                     a.click();
-                     document.body.removeChild(a);
-                     
-                     setTimeout(() => URL.revokeObjectURL(videoUrl), 10000);
-                     
-                     setToastIsError(false);
-                     setToastMessage(`Видео сохранено на ваше устройство.`);
-
-
+                     if (res.ok) {
+                         const data = await res.json();
+                         const videoUrl = window.location.origin + data.url;
+                         
+                         if (tg && tg.openLink) {
+                             tg.openLink(videoUrl);
+                         } else {
+                             const a = document.createElement('a');
+                             a.href = videoUrl;
+                             a.target = '_blank';
+                             a.download = `style_transformation_${Date.now()}.mp4`;
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                         }
+                         
+                         setToastIsError(false);
+                         setToastMessage(`Видео сохранено. Открываем!`);
+                     } else {
+                         console.warn("Server generation failed, falling back to local");
+                         const videoBlob = await generateBeforeAfterVideo(beforeSrc, afterSrc);
+                         const videoUrl = URL.createObjectURL(videoBlob);
+                         
+                         const a = document.createElement('a');
+                         a.href = videoUrl;
+                         a.target = '_blank';
+                         a.download = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+                         document.body.appendChild(a);
+                         a.click();
+                         document.body.removeChild(a);
+                         
+                         setTimeout(() => URL.revokeObjectURL(videoUrl), 10000);
+                         
+                         setToastIsError(false);
+                         setToastMessage(`Видео сохранено на ваше устройство.`);
+                     }
                   } catch (err) {
                      console.error("Video export failed", err);
                      setToastIsError(true);
