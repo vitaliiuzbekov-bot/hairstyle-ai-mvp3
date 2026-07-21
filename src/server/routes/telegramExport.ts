@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import FormData from "form-data";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
 const router = Router();
 
@@ -20,11 +21,11 @@ const ensureDataUriToBuffer = async (data: string): Promise<Buffer> => {
         const arrayBuffer = await res.arrayBuffer();
         return Buffer.from(arrayBuffer);
     }
-    const matches = data.match(/^data:.*base64,(.+)$/);
-    if (!matches || matches.length < 2) {
-        throw new Error('Invalid input string');
+    if (data.includes('base64,')) {
+        return Buffer.from(data.split('base64,')[1], 'base64');
     }
-    return Buffer.from(matches[1], 'base64');
+    // Assume it might just be raw base64 if it didn't match http or proxy
+    return Buffer.from(data, 'base64');
 };
 
 router.post("/send-to-telegram", async (req, res) => {
@@ -74,20 +75,31 @@ router.post("/send-to-telegram", async (req, res) => {
             fs.writeFileSync(afterPath, afterBuffer);
             
             // Wipe right transition for 3 seconds: 0.5s pause, 1s wipe, 1.5s pause
-            const ffmpegCmd = `ffmpeg -y -loop 1 -t 3.5 -i "${beforePath}" -loop 1 -t 3.5 -i "${afterPath}" -filter_complex "[0:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v0];[1:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v1];[v0][v1]xfade=transition=wiperight:duration=1.5:offset=1.0,format=yuv420p" -c:v libx264 -pix_fmt yuv420p "${outPath}"`;
+            const ffmpegCmd = `"${ffmpegInstaller.path}" -y -loop 1 -t 3.5 -i "${beforePath}" -loop 1 -t 3.5 -i "${afterPath}" -filter_complex "[0:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v0];[1:v]scale=720:960:force_original_aspect_ratio=increase,crop=720:960,fps=30[v1];[v0][v1]xfade=transition=wiperight:duration=1.5:offset=1.0,format=yuv420p" -c:v libx264 -pix_fmt yuv420p "${outPath}"`;
             
-            await new Promise((resolve, reject) => {
-                exec(ffmpegCmd, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error("FFmpeg Error: ", stderr);
-                        reject(error);
-                    } else {
-                        resolve(true);
-                    }
+            
+            try {
+                await new Promise((resolve, reject) => {
+                    exec(ffmpegCmd, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+                        if (error) {
+                            console.error("FFmpeg Error: ", stderr);
+                            reject(new Error("FFmpeg failed: " + stderr));
+                        } else {
+                            resolve(true);
+                        }
+                    });
                 });
-            });
-            
-            const videoBuffer = fs.readFileSync(outPath);
+            } catch (ffmpegErr) {
+                return res.status(500).json({ error: "FFmpeg generation failed: " + ffmpegErr.message });
+            }
+
+            let videoBuffer;
+            try {
+                videoBuffer = fs.readFileSync(outPath);
+            } catch (err) {
+                return res.status(500).json({ error: "Video output file not found" });
+            }
+
             
             const form = new FormData();
             form.append("chat_id", tgUserId);

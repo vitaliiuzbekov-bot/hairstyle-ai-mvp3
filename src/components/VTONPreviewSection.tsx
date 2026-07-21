@@ -161,8 +161,15 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      } else {
                         downloadImage(collageDataUrl, "ai_collage.jpg");
                         const tg = window.Telegram?.WebApp;
-                        if (tg && tg.openTelegramLink) {
-                          tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent("https://t.me/neirostilist_bot")}&text=${encodeURIComponent(messageText)}`);
+                        if (tg) {
+                          const shareUrl = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/neirostilist_bot")}&text=${encodeURIComponent(messageText)}`;
+                          try {
+                             if (tg.openTelegramLink) tg.openTelegramLink(shareUrl);
+                             else if (tg.openLink) tg.openLink(shareUrl);
+                             else window.open(shareUrl, "_blank");
+                          } catch(e) {
+                             window.open(shareUrl, "_blank");
+                          }
                         }
                      }
                   } catch (err) {
@@ -236,7 +243,9 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                                 setToastMessage(`Видео отправлено в чат!`);
                                 return;
                             } else {
-                                console.error("Сервер не смог сгенерировать видео", await res.text());
+                                const errText = await res.text();
+                                console.error("Сервер не смог сгенерировать видео", errText);
+                                tg.showAlert("Ошибка на сервере: " + errText);
                                 // Fallback to local generation below
                             }
                         } catch(err) {

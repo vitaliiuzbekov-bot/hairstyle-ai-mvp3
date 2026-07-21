@@ -59,14 +59,37 @@ export const ShareModal: React.FC = () => {
   const shareTextWithBot = `${defaultText}\n\nПопробуй тоже в @neirostilist_bot!`;
 
   const copyToClipboard = async (text: string, isAppUrl: boolean) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const handleSuccess = () => {
       if (isAppUrl) {
         setCopiedApp(true);
         setTimeout(() => setCopiedApp(false), 2000);
       } else {
         setCopiedImage(true);
         setTimeout(() => setCopiedImage(false), 2000);
+      }
+    };
+
+    try {
+      if (navigator?.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        handleSuccess();
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          textArea.remove();
+          handleSuccess();
+        } catch (error) {
+          console.error("Fallback copy execCommand failed", error);
+          textArea.remove();
+        }
       }
     } catch (err) {
       console.error("Не удалось скопировать", err);
@@ -77,10 +100,20 @@ export const ShareModal: React.FC = () => {
 const handleTelegramShare = () => {
     const url = shareUrl && !shareUrl.startsWith("data:") && !shareUrl.startsWith("blob:") ? shareUrl : botUrl;
     const shareLink = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareTextWithBot)}`;
-    
+        
     const tg = (window as any).Telegram?.WebApp;
-    if (tg && tg.openTelegramLink) {
-       tg.openTelegramLink(shareLink);
+    if (tg) {
+       try {
+           if (tg.openTelegramLink) {
+               tg.openTelegramLink(shareLink);
+           } else if (tg.openLink) {
+               tg.openLink(shareLink);
+           } else {
+               window.open(shareLink, "_blank");
+           }
+       } catch(e) {
+           window.open(shareLink, "_blank");
+       }
     } else {
        window.open(shareLink, "_blank");
     }

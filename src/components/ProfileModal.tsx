@@ -1,3 +1,4 @@
+import { shareToTelegram } from "../utils/telegram";
 import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React from "react";
 import { X, User, Share2, Sun, Moon, LogOut, ArrowDownToLine, Clock } from "lucide-react";
@@ -33,11 +34,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const botLink = "https://t.me/neirostilist_bot/app?startapp=ref_" + userId;
     const text = "Подбери себе идеальную стрижку с помощью ИИ!";
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent(botLink) + "&text=" + encodeURIComponent(text);
-    if (window.Telegram?.WebApp?.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(shareUrl);
-    } else {
-      window.open(shareUrl, "_blank");
-    }
+    shareToTelegram(botLink, text);
   };
 
   const [devClicks, setDevClicks] = React.useState(0);

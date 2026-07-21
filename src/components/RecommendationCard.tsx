@@ -1,3 +1,4 @@
+import { shareToTelegram } from "../utils/telegram";
 import React from "react";
 import { Sparkles, Lock, RefreshCw, Maximize2 } from "lucide-react";
 import { LazyImage } from "./LazyImage";
@@ -93,7 +94,7 @@ export const RecommendationCard = React.memo(({
                       const userId = tg.initDataUnsafe?.user?.id || "";
                       const url = `https://t.me/${botName}/app?startapp=ref_${userId}`;
                       const text = "Примерь новую стрижку с помощью ИИ!";
-                      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
+                      shareToTelegram(url, text);
                     }}
                     className="bg-transparent text-amber-400 text-[10px] sm:text-xs font-bold uppercase tracking-wide py-2 px-4 rounded-full hover:bg-white/5 active:bg-white/10 transition-all w-[95%] border border-amber-500/30"
                   >

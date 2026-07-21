@@ -1,3 +1,4 @@
+import { shareToTelegram } from "../utils/telegram";
 import React from "react";
 import { X, Star, Gift, Share2 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -103,14 +104,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({
             <button 
               onClick={() => {
                  const inviteLink = `https://t.me/neirostilist_bot/app?startapp=ref_${userId}`;
-                 // @ts-ignore
-                 if (window.Telegram?.WebApp?.openTelegramLink) {
-                    // @ts-ignore
-                    window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent("Смотри, какой крутой ИИ-стилист! Заходи по моей ссылке и получи бонусные генерации 🎁")}`);
-                 } else {
-                    navigator.clipboard.writeText(inviteLink);
-                    alert("Ссылка скопирована!");
-                 }
+                 shareToTelegram(inviteLink, "Смотри, какой крутой ИИ-стилист! Заходи по моей ссылке и получи бонусные генерации 🎁");
               }}
               className={`w-full text-sm font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${isLightMode ? 'bg-white text-purple-700 shadow-sm hover:shadow-md' : 'bg-purple-500/30 text-white hover:bg-purple-500/40'}`}
             >
