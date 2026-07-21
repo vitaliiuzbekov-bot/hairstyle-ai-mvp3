@@ -1,12 +1,6 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/components/ColorChangeOnlyCard.tsx', 'utf8');
-
-content = content.replace(/  onGenerationSuccess,[\s\S]*?  setShowBuyModal: \(show: boolean\) => void;\n}/m, `  onGenerationSuccess?: () => void;
-  checkLimits: () => Promise<boolean>;
-  consumeToken: () => Promise<boolean>;
-  setShowBuyModal: (show: boolean) => void;
-}`);
-
-content = content.replace(/      if \(onGenerationSuccess\) {\n        onGenerationSuccess,[\s\S]*?setShowBuyModal\(\);\n      }/m, `      if (onGenerationSuccess) {\n        onGenerationSuccess();\n      }`);
-
-fs.writeFileSync('src/components/ColorChangeOnlyCard.tsx', content);
+let content = fs.readFileSync('src/server/routes/telegramExport.ts', 'utf8');
+content = content.replace(/const matches = data.match\(\/\^data:\(\[A-Za-z\-\+\\\/\]\+\);base64,\(\.\+\)\$\/\);/, "const matches = data.match(/^data:.*base64,(.+)$/);");
+content = content.replace(/if \(\!matches \|\| matches.length !== 3\) \{/, "if (!matches || matches.length < 2) {");
+content = content.replace(/return Buffer\.from\(matches\[2\], 'base64'\);/, "return Buffer.from(matches[1], 'base64');");
+fs.writeFileSync('src/server/routes/telegramExport.ts', content);

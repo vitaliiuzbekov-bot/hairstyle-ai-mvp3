@@ -11,6 +11,7 @@ import "dotenv/config";
 
 import { analysisRouter } from "./src/server/routes/analysis";
 import { generateRouter } from "./src/server/routes/generate";
+import telegramExportRouter from "./src/server/routes/telegramExport";
 import { authRouter } from "./src/server/routes/auth";
 import { referenceRouter } from "./src/server/routes/reference";
 import { tgStorageRouter } from "./src/server/routes/tgStorage";
@@ -175,6 +176,7 @@ async function startServer() {
 
   app.use("/api", analysisRouter);
   app.use("/api", generateRouter);
+  app.use("/api", telegramExportRouter);
   app.use("/api", authRouter);
   app.use("/api", referenceRouter);
   app.use("/api/tg", tgStorageRouter);

@@ -74,10 +74,16 @@ export const ShareModal: React.FC = () => {
   };
 
   // Поделиться в Telegram
-  const handleTelegramShare = () => {
+const handleTelegramShare = () => {
     const url = shareUrl && !shareUrl.startsWith("data:") && !shareUrl.startsWith("blob:") ? shareUrl : botUrl;
     const shareLink = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareTextWithBot)}`;
-    window.open(shareLink, "_blank");
+    
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg && tg.openTelegramLink) {
+       tg.openTelegramLink(shareLink);
+    } else {
+       window.open(shareLink, "_blank");
+    }
   };
 
   // Поделиться в X (Twitter)

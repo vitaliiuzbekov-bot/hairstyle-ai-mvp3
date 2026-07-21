@@ -140,7 +140,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                onClick={async (e) => {
                   e.stopPropagation();
                   try {
-                     const beforeSrc = imageUrl || (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
+                     const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
                      const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl, userRole === 'salon' ? salonName : undefined);
                      
                      const messageText = "Привет! Смотри, какой стиль я подобрал(а) в нейросети. Хочу такую стрижку и цвет!\nСоздано в @neirostilist_bot";
@@ -189,7 +189,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                onClick={async (e) => {
                   e.stopPropagation();
                   try {
-                     const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+                     const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
                      const collageDataUrl = await generateCollage(beforeSrc, vtonResultUrl, userRole === 'salon' ? salonName : undefined);
                      downloadImage(collageDataUrl, "ai_collage.jpg");
                   } catch (err) {
@@ -208,10 +208,43 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   if(isExportingVideo) return;
                   setIsExportingVideo(true);
                   try {
-                     const beforeSrc = imageUrl || `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+                     const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
                      const afterSrc = displayResultUrl || "";
                      
                      // Генерируем видео локально
+                     
+
+                     const tg = (window as any).Telegram?.WebApp;
+                     const tgUserId = tg?.initDataUnsafe?.user?.id;
+                     
+                     if (tgUserId) {
+                        try {
+                            tg.showAlert("Генерируем видео на сервере и отправляем в чат, подождите 10-15 секунд...");
+                            const res = await fetch('/api/send-to-telegram', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    tgUserId: tgUserId.toString(),
+                                    type: 'video',
+                                    beforeImage: beforeSrc,
+                                    afterImage: afterSrc
+                                })
+                            });
+                            if (res.ok) {
+                                tg.showAlert("Готово! Видео отправлено вам в личные сообщения бота.");
+                                setToastIsError(false);
+                                setToastMessage(`Видео отправлено в чат!`);
+                                return;
+                            } else {
+                                console.error("Сервер не смог сгенерировать видео", await res.text());
+                                // Fallback to local generation below
+                            }
+                        } catch(err) {
+                            console.error("Telegram send error", err);
+                        }
+                     }
+                     
+                     // Local generation fallback
                      const videoBlob = await generateBeforeAfterVideo(beforeSrc, afterSrc);
                      const videoUrl = URL.createObjectURL(videoBlob);
                      
@@ -227,6 +260,8 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      
                      setToastIsError(false);
                      setToastMessage(`Видео сохранено на ваше устройство.`);
+
+
                   } catch (err) {
                      console.error("Video export failed", err);
                      setToastIsError(true);
