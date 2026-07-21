@@ -1,5 +1,5 @@
 import React from "react";
-import { Scissors, Coins, Zap, BookOpen, Info } from "lucide-react";
+import { Scissors, Coins, Zap, BookOpen, Info, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface HeaderProps {
@@ -99,6 +99,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 ml-0 sm:ml-2 shrink-0">
+            <button onClick={() => window.dispatchEvent(new Event('open-feedback-modal'))} className={`w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full flex items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300" : "bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20 hover:text-green-300"}`}>
+              <MessageSquare size={14} className="shrink-0" />
+              <span className="hidden sm:inline">Отзыв</span>
+            </button>
             <button onClick={onOpenTutorial} className={`w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full flex items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300" : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"}`}>
               <Info size={14} className="shrink-0" />
               <span className="hidden sm:inline">Как это работает</span>

@@ -22,8 +22,6 @@ interface AnalysisContextType {
   setVtonResultUrl: (val: string | null) => void;
   vtonError: string | null;
   setVtonError: (val: string | null) => void;
-  customHairColor: string | null;
-  setCustomHairColor: (val: string | null) => void;
 
   arGeneratedImageUrl: Record<string, string>;
   setArGeneratedImageUrl: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -48,7 +46,6 @@ export const AnalysisProvider = ({ children }: { children: ReactNode }) => {
   const [isVtonGenerating, setIsVtonGenerating] = useState(false);
   const [vtonResultUrl, setVtonResultUrl] = useState<string | null>(null);
   const [vtonError, setVtonError] = useState<string | null>(null);
-  const [customHairColor, setCustomHairColor] = useState<string | null>(null);
 
   const [arGeneratedImageUrl, setArGeneratedImageUrl] = useState<Record<string, string>>({});
   const [isArGenerating, setIsArGenerating] = useState<Record<string, boolean>>({});
@@ -62,7 +59,6 @@ export const AnalysisProvider = ({ children }: { children: ReactNode }) => {
     setTryOnStyle(null);
     setVtonResultUrl(null);
     setVtonError(null);
-    setCustomHairColor(null);
     setArGeneratedImageUrl({});
     setArError({});
   };
@@ -80,7 +76,6 @@ export const AnalysisProvider = ({ children }: { children: ReactNode }) => {
         isVtonGenerating, setIsVtonGenerating,
         vtonResultUrl, setVtonResultUrl,
         vtonError, setVtonError,
-        customHairColor, setCustomHairColor,
 
         arGeneratedImageUrl, setArGeneratedImageUrl,
         isArGenerating, setIsArGenerating,

@@ -163,7 +163,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
     try {
       const { 
         gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
-        skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
+        skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
         hairlineStatus, hairQuality, idempotencyKey, haircutName
       } = req.body;
       
@@ -174,7 +174,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       // Check cache first (Cache for 30 days)
         const cacheKey = "v3_force_update_" + getCacheKey({ 
         route: "generate-reference-v28-gender-fixed", 
-        keyword, gender, customHairColor, ageRange, skinTone, faceShape, facialHair,
+        keyword, gender, ageRange, skinTone, faceShape, facialHair,
         hairDensity, hairType, hairLength, hairlineStatus, hairQuality, idempotencyKey, clothingContext
       });
       console.log("[generate-full] checking cache..."); 
@@ -208,7 +208,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         // Pass original hair structure info if provided, otherwise default to natural straight to avoid unexpected curls
         const safeHairType = hairType && hairType.toLowerCase() !== "не указано" ? hairType : "straight/natural";
         const hairDesc = (haircutName || keyword) + (description ? ", " + description : "") + ". Hair texture: " + safeHairType;
-        const colorDesc = customHairColor && customHairColor !== "Любой" ? " Color: " + customHairColor : "";
+        const colorDesc = "";
         
         const finalPrompt = base + "Hair is " + hairDesc + "." + colorDesc;
 
@@ -362,7 +362,6 @@ const handleGenerateFull = async (req, res) => { console.log("HITTING handleGene
       
       const keyword = decodeURIComponent(req.body.keyword || "");
       const description = decodeURIComponent(req.body.description || "");
-      const customHairColor = req.body.customHairColor ? decodeURIComponent(req.body.customHairColor) : undefined;
       
       let selfieImage = req.body.selfieImage;
       if (req.file) {
@@ -380,7 +379,7 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
       // Check cache first (Cache for 30 days)
        const cacheKey = "v3_force_update_" + getCacheKey({ 
         route: "generate-full-v9-reference-vision", 
-        userId, keyword, customHairColor, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
+        userId, keyword, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
         // using string truncation or full string to hash the selfie.
         // String hashing is deterministic.
         selfieHash: getCacheKey(selfieImage),
@@ -509,11 +508,11 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
         return val;
       };
 
-      const isCustomColorRequested = customHairColor && customHairColor !== "Любой";
-      const targetHairColor = isCustomColorRequested ? customHairColor : hairColor;
+      const isCustomColorRequested = false;
+      const targetHairColor = hairColor;
       const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
       
-      let baseImageForFlux = selfieImageFull;
+      let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
       
       // PARALLEL: Start Fal uploads immediately
        let fluxBaseImageUrlPromise = baseImageForFlux.startsWith('data:') ? uploadImageToFal(baseImageForFlux) : Promise.resolve(baseImageForFlux);
@@ -536,6 +535,12 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       fluxStrength = 0.75 + (uiStrength / 100) * 0.20; // 0.75 to 0.95 range
       if (keyword && keyword.includes("same exact current hairstyle")) {
           fluxStrength = 0.35; // keep original structure
+      }
+      
+      // If we have a target image (reference), we just want to face-swap onto it.
+      // No need to run Flux unless they are doing something else.
+      if (finalTargetImageUrl) {
+          fluxStrength = 0; 
       }
 
       let promptEng = "";

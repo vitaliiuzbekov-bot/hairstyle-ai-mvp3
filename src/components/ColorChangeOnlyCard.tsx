@@ -11,6 +11,9 @@ interface ColorChangeOnlyCardProps {
   imageBase64: string | null;
   mimeType: string | null;
   onGenerationSuccess?: () => void;
+  checkLimits: () => Promise<boolean>;
+  consumeToken: () => Promise<boolean>;
+  setShowBuyModal: (show: boolean) => void;
 }
 
 export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
@@ -18,7 +21,10 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
   imageUrl,
   imageBase64,
   mimeType,
-  onGenerationSuccess
+  onGenerationSuccess,
+  checkLimits,
+  consumeToken,
+  setShowBuyModal
 }) => {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedBg, setSelectedBg] = useState<string | null>("Оригинал");
@@ -293,6 +299,15 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
     // If neither color nor bg changed, do nothing
     if (!selectedColor && selectedBg === "Оригинал") return;
     
+    if (!(await checkLimits())) {
+      setShowBuyModal(true);
+      return;
+    }
+    const tokenConsumed = await consumeToken();
+    if (!tokenConsumed) {
+       setShowBuyModal(true);
+       return;
+    }
     setIsLoading(true);
     setErrorMsg(null);
     setLocalVtonResultUrl(null);
@@ -328,7 +343,7 @@ export const ColorChangeOnlyCard: React.FC<ColorChangeOnlyCardProps> = ({
       </div>
       
       <p className={`text-sm mb-6 ${isLightMode ? 'text-gray-600' : 'text-white/60'}`}>
-        Примерьте новый цвет волос и замените задний фон в реальном времени. Это быстро, бесплатно и работает прямо на вашем устройстве!
+        Примерьте новый цвет волос и замените задний фон в реальном времени. Стоимость: 1 генерация.
       </p>
 
       {!localVtonResultUrl && !isLoading && (

@@ -81,8 +81,7 @@ export const useAnalysis = ({
     const [vtonResultUrl, setVtonResultUrl] = useState<string | null>(null);
     const [isTeaserResult, setIsTeaserResult] = useState<boolean>(false);
     const [vtonError, setVtonError] = useState<string | null>(null);
-    const [customHairColor, setCustomHairColor] = useState<string | null>(null);
-    const [vtonStrength, setVtonStrength] = useState<number>(45);
+      const [vtonStrength, setVtonStrength] = useState<number>(45);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     useEffect(() => {
@@ -319,7 +318,6 @@ export const useAnalysis = ({
         styleKeyword: string,
         styleName: string,
         styleDescription: string,
-        selectedColor: string | null = null,
         targetImageUrl: string | null = null,
     ) => {
         if (!imageBase64 && !imageUrl) return;
@@ -362,7 +360,6 @@ export const useAnalysis = ({
           }
           formData.append("keyword", encodeURIComponent(styleKeyword));
           formData.append("description", encodeURIComponent(styleDescription));
-          if (selectedColor) formData.append("customHairColor", encodeURIComponent(selectedColor));
           formData.append("vtonStrength", String(vtonStrength));
           if (results?.gender) formData.append("gender", results.gender);
           if (results?.faceShape) formData.append("faceShape", results.faceShape);
@@ -557,8 +554,6 @@ export const useAnalysis = ({
         setIsTeaserResult,
         vtonError,
         setVtonError,
-        customHairColor,
-        setCustomHairColor,
         vtonStrength,
         setVtonStrength,
         isLoadingMore,

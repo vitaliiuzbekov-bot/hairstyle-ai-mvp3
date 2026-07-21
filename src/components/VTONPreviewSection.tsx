@@ -11,15 +11,6 @@ import { useUI } from "../context/UIContext";
 import { MaskEditorModal } from "./MaskEditorModal";
 import { Toast } from "./Toast";
 
-const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
-  "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
-  "Русый": [{name: "Matrix Socolor", shade: "7A"}, {name: "Redken Shades EQ", shade: "07N"}],
-  "Светло-каштановый": [{name: "L'Oreal Professionnel", shade: "Majirel 6.0"}, {name: "Wella Koleston", shade: "6/0"}],
-  "Каштановый": [{name: "L'Oreal Professionnel", shade: "Majirel 5.0"}, {name: "Wella Koleston", shade: "5/0"}],
-  "Черный": [{name: "Wella Koleston", shade: "2/0"}, {name: "Matrix Socolor", shade: "1A"}],
-  "Рыжий": [{name: "Matrix Socolor", shade: "7C"}, {name: "L'Oreal Professionnel", shade: "Majirel 7.4"}],
-  "Седой": [{name: "L'Oreal Professionnel", shade: "Silver"}, {name: "Redken Shades EQ", shade: "09T"}]
-};
 
 interface VTONPreviewSectionProps {
   tryOnStyle: any;
@@ -28,7 +19,6 @@ interface VTONPreviewSectionProps {
   vtonError: string | null;
   isLightMode?: boolean;
   isTeaserResult?: boolean;
-  customHairColor: string | null;
   resultsHairColor?: string;
   loadedReferenceUrl: string | null;
   imageUrl: string | null;
@@ -37,8 +27,7 @@ interface VTONPreviewSectionProps {
   userRole?: string | null;
   salonName?: string;
   processPayment: (s: string, v: number, v2: number) => void;
-  setCustomHairColor: (val: string | null) => void;
-  generateVirtualTryOn: (kw: string, name: string, desc: string, customColor: string | null, imgUrl?: string) => void;
+  generateVirtualTryOn: (kw: string, name: string, desc: string, imgUrl?: string) => void;
   setChatStyleName: (val: string) => void;
   setIsChatOpen: (val: boolean) => void;
   resultRef: React.RefObject<HTMLDivElement>;
@@ -53,7 +42,6 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
   vtonError,
   isLightMode,
   isTeaserResult,
-  customHairColor,
   resultsHairColor,
   loadedReferenceUrl,
   imageUrl,
@@ -62,7 +50,6 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
   userRole,
   salonName,
   processPayment,
-  setCustomHairColor,
   generateVirtualTryOn,
   setChatStyleName,
   setIsChatOpen,
@@ -105,8 +92,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   tryOnStyle.imageKeyword || tryOnStyle.name,
                   tryOnStyle.name,
                   tryOnStyle.description,
-                  customHairColor,
-                  tryOnStyle.customImageUrl || loadedReferenceUrl || (tryOnStyle as any).imageUrl || undefined
+                                  tryOnStyle.customImageUrl || loadedReferenceUrl || (tryOnStyle as any).imageUrl || undefined
                 );
               }
             }

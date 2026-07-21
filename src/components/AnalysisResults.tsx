@@ -6,6 +6,7 @@ import { LazyImage } from "./LazyImage";
 import { CachedImage } from "./CachedImage";
 import { FaceShapeCard } from "./FaceShapeCard";
 import { TrichologyCard } from "./TrichologyCard";
+import { ColorChangeOnlyCard } from "./ColorChangeOnlyCard";
 import { HaircutList } from "./HaircutList";
 import { AnalysisResult } from "../types";
 
@@ -18,6 +19,8 @@ interface AnalysisResultsProps {
   teaserUrl: string | null;
   isGeneratingTeaser: boolean;
   setShowBuyModal: (val: boolean) => void;
+  checkLimits: () => Promise<boolean>;
+  consumeToken: () => Promise<boolean>;
   setTryOnStyle: (val: any) => void;
   loadMoreRecommendations: () => void;
   isLoadingMore: boolean;
@@ -28,7 +31,7 @@ interface AnalysisResultsProps {
   imageUrl: string | null;
   imageBase64: string | null;
   mimeType: string | null;
-  generateVirtualTryOn: (kw: string, name: string, desc: string, customColor: string | null, imgUrl?: string) => void;
+  generateVirtualTryOn: (kw: string, name: string, desc: string, imgUrl?: string) => void;
   vtonResultUrl: string | null;
   loadingVTONStyles: Record<string, boolean>;
   vtonError: string | null;
@@ -42,6 +45,8 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
   teaserUrl,
   isGeneratingTeaser,
   setShowBuyModal,
+  checkLimits,
+  consumeToken,
   setTryOnStyle,
   loadMoreRecommendations,
   isLoadingMore,
@@ -116,6 +121,18 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
 
           {/* Trichology Analysis Card */}
           <TrichologyCard results={results} isLightMode={isLightMode} />
+
+          {/* Color Change Only */}
+          <ColorChangeOnlyCard
+            isLightMode={isLightMode}
+            imageUrl={imageUrl}
+            imageBase64={imageBase64}
+            mimeType={mimeType}
+            checkLimits={checkLimits}
+            consumeToken={consumeToken}
+            setShowBuyModal={setShowBuyModal}
+            onGenerationSuccess={onGenerationSuccess}
+          />
 
           {/* Recommendations */}
           <HaircutList

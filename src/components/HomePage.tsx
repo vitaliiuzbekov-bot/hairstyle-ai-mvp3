@@ -103,8 +103,8 @@ export const HomePage: React.FC<HomePageProps> = ({
       setIsTeaserResult,
       vtonError,
       setVtonError,
-      customHairColor,
-      setCustomHairColor,
+
+
       vtonStrength,
       setVtonStrength,
       isLoadingMore,
@@ -156,8 +156,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     setVtonResultUrl(null);
     setVtonError(null);
-    setCustomHairColor(null);
-  }, [tryOnStyle, setVtonResultUrl, setVtonError, setCustomHairColor, vtonStrength]);
+
+  }, [tryOnStyle, setVtonResultUrl, setVtonError, vtonStrength]);
 
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const handleExportPDF = async (elementIdOrEvent?: string | React.MouseEvent, filename?: string, images?: { before?: string, reference?: string, after?: string }) => {
@@ -310,6 +310,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               teaserUrl={teaserUrl}
               isGeneratingTeaser={isGeneratingTeaser}
               setShowBuyModal={setShowBuyModal}
+              checkLimits={checkLimits}
+              consumeToken={consumeToken}
               setTryOnStyle={setTryOnStyle}
               loadMoreRecommendations={loadMoreRecommendations}
               isLoadingMore={isLoadingMore}
@@ -346,8 +348,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           vtonResultUrl={vtonResultUrl}
           isTeaserResult={isTeaserResult}
           processPayment={processPayment}
-          customHairColor={customHairColor}
-          setCustomHairColor={setCustomHairColor}
           vtonStrength={vtonStrength}
           setVtonStrength={setVtonStrength}
           generateARPreview={generateARPreview}

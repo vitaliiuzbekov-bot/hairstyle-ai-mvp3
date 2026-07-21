@@ -24,6 +24,9 @@ export const generateBeforeAfterVideo = async (
       ]);
 
       const canvas = document.createElement('canvas');
+      if (typeof canvas.captureStream !== 'function') {
+        throw new Error("Ваше устройство не поддерживает сохранение видео. Попробуйте на компьютере или используйте 'Коллаж'.");
+      }
       
       // Use the generated AFTER image as the source of truth for the canvas dimensions
       // This prevents squishing of the AI result.

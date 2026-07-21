@@ -38,8 +38,6 @@ interface BarberBlueprintModalProps {
   vtonResultUrl?: string | null;
   isTeaserResult?: boolean;
   processPayment: (s: string, v: number, v2: number) => void;
-  customHairColor: string | null;
-  setCustomHairColor: (val: string | null) => void;
   vtonStrength: number;
   setVtonStrength: (val: number) => void;
   generateARPreview: (kw: string, name: string) => void;
@@ -50,7 +48,7 @@ interface BarberBlueprintModalProps {
   setChatStyleName: (val: string) => void;
   setIsChatOpen: (val: boolean) => void;
   loadingVTONStyles: Record<string, boolean>;
-  generateVirtualTryOn: (kw: string, name: string, desc: string, customColor: string | null, imgUrl?: string) => void;
+  generateVirtualTryOn: (kw: string, name: string, desc: string, imgUrl?: string) => void;
   vtonError: string | null;
   isLightMode?: boolean;
 }
@@ -68,8 +66,6 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   vtonResultUrl,
   isTeaserResult,
   processPayment,
-  customHairColor,
-  setCustomHairColor,
   vtonStrength,
   setVtonStrength,
   generateARPreview,
@@ -201,7 +197,6 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               vtonError={vtonError}
               isLightMode={isLightMode}
               isTeaserResult={isTeaserResult}
-              customHairColor={customHairColor}
               resultsHairColor={results?.hairColor}
               loadedReferenceUrl={loadedReferenceUrl}
               imageUrl={imageUrl}
@@ -210,7 +205,6 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               userRole={userRole}
               salonName={salonName}
               processPayment={processPayment}
-              setCustomHairColor={setCustomHairColor}
               generateVirtualTryOn={generateVirtualTryOn}
               setChatStyleName={setChatStyleName}
               setIsChatOpen={setIsChatOpen}

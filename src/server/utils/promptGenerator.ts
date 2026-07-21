@@ -426,7 +426,7 @@ export function getSafeRussianPrompt(gender: string, ageRange: string, haircutNa
 export function getDetailedRussianPrompt(params: any): string {
   const {
     gender, keyword, description, faceShape, hairLength, hairDensity, hairType, skinTone, 
-    skinDetails, hairColor, customHairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
+    skinDetails, hairColor, eyeColor, ageRange, facialFeatures, facialHair, clothingContext,
     hairlineStatus, hairQuality, haircutName
   } = params;
 
@@ -508,9 +508,7 @@ export function getDetailedRussianPrompt(params: any): string {
   }
 
   let colorStr = "";
-  if (customHairColor && customHairColor !== "Любой") {
-    colorStr = customHairColor;
-  } else if (hairColor) {
+  if (hairColor) {
     colorStr = hairColor;
   }
   if (colorStr) {
