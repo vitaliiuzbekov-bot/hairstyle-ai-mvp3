@@ -1,3 +1,4 @@
+import { shareToTelegram } from "../utils/telegram";
 import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -99,24 +100,7 @@ export const ShareModal: React.FC = () => {
   // Поделиться в Telegram
 const handleTelegramShare = () => {
     const url = shareUrl && !shareUrl.startsWith("data:") && !shareUrl.startsWith("blob:") ? shareUrl : botUrl;
-    const shareLink = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareTextWithBot)}`;
-        
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg) {
-       try {
-           if (tg.openTelegramLink) {
-               tg.openTelegramLink(shareLink);
-           } else if (tg.openLink) {
-               tg.openLink(shareLink);
-           } else {
-               window.open(shareLink, "_blank");
-           }
-       } catch(e) {
-           window.open(shareLink, "_blank");
-       }
-    } else {
-       window.open(shareLink, "_blank");
-    }
+    shareToTelegram(url, shareTextWithBot);
   };
 
   // Поделиться в X (Twitter)

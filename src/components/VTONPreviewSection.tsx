@@ -1,3 +1,4 @@
+import { shareToTelegram } from "../utils/telegram";
 import React, { useState } from "react";
 import { Sparkles, Send, Download, FileDown, ShoppingBag, Share2, Eraser, Video } from "lucide-react";
 import { RotatingFactsLoader } from "./RotatingFactsLoader";
@@ -160,17 +161,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                         }
                      } else {
                         downloadImage(collageDataUrl, "ai_collage.jpg");
-                        const tg = window.Telegram?.WebApp;
-                        if (tg) {
-                          const shareUrl = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/neirostilist_bot")}&text=${encodeURIComponent(messageText)}`;
-                          try {
-                             if (tg.openTelegramLink) tg.openTelegramLink(shareUrl);
-                             else if (tg.openLink) tg.openLink(shareUrl);
-                             else window.open(shareUrl, "_blank");
-                          } catch(e) {
-                             window.open(shareUrl, "_blank");
-                          }
-                        }
+                        shareToTelegram("https://t.me/neirostilist_bot", messageText);
                      }
                   } catch (err) {
                      console.error("Collage error", err);
@@ -226,7 +217,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      
                      if (tgUserId) {
                         try {
-                            tg.showAlert("Генерируем видео на сервере и отправляем в чат, подождите 10-15 секунд...");
+                            if (tg.showAlert) tg.showAlert("Генерируем видео на сервере и отправляем в чат, подождите 10-15 секунд..."); else alert("Генерируем видео на сервере и отправляем в чат, подождите 10-15 секунд...");
                             const res = await fetch('/api/send-to-telegram', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -238,14 +229,14 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                                 })
                             });
                             if (res.ok) {
-                                tg.showAlert("Готово! Видео отправлено вам в личные сообщения бота.");
+                                if (tg.showAlert) tg.showAlert("Готово! Видео отправлено вам в личные сообщения бота."); else alert("Готово! Видео отправлено вам в личные сообщения бота.");
                                 setToastIsError(false);
                                 setToastMessage(`Видео отправлено в чат!`);
                                 return;
                             } else {
                                 const errText = await res.text();
                                 console.error("Сервер не смог сгенерировать видео", errText);
-                                tg.showAlert("Ошибка на сервере: " + errText);
+                                if (tg.showAlert) tg.showAlert("Ошибка на сервере: " + errText); else alert("Ошибка на сервере: " + errText);
                                 // Fallback to local generation below
                             }
                         } catch(err) {
