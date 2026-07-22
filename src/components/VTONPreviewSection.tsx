@@ -188,18 +188,21 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      
                      const tg = (window as any).Telegram?.WebApp;
                      
-                     if (tg && tg.showAlert) {
+                                          if (tg && tg.showAlert) {
                          setToastMessage("Генерируем видео на сервере (около 10 сек)...");
                      } else {
                          setToastMessage("Генерируем видео на сервере...");
                      }
                      
+                     const resolvedBeforeSrc = await resolveUrlToDataUri(beforeSrc);
+                     const resolvedAfterSrc = await resolveUrlToDataUri(afterSrc);
+
                      const res = await fetch('/api/generate-video', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify({
-                             beforeImage: beforeSrc,
-                             afterImage: afterSrc
+                             beforeImage: resolvedBeforeSrc,
+                             afterImage: resolvedAfterSrc
                          })
                      });
                      
@@ -228,7 +231,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                          setToastMessage(`Видео отправлено на скачивание!`);
                      } else {
                          console.warn("Server generation failed, falling back to local");
-                         const videoBlob = await generateBeforeAfterVideo(beforeSrc, afterSrc);
+                         const videoBlob = await generateBeforeAfterVideo(resolvedBeforeSrc, resolvedAfterSrc);
                          const tgEnv = (window as any).Telegram?.WebApp;
                          let finalUrl = URL.createObjectURL(videoBlob);
                          const filename = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;

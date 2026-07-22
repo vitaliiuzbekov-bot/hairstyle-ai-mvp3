@@ -11,9 +11,11 @@ export const generateBeforeAfterVideo = async (
       const loadImg = (src: string) => {
         return new Promise<HTMLImageElement>((res, rej) => {
           const img = new Image();
-          img.crossOrigin = "anonymous";
+          if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+            img.crossOrigin = "anonymous";
+          }
           img.onload = () => res(img);
-          img.onerror = rej;
+          img.onerror = () => rej(new Error("Не удалось загрузить изображение: " + src.substring(0, 50)));
           img.src = src;
         });
       };

@@ -85,3 +85,13 @@
   - Adopted Telegram's native `tg.downloadFile({ url, file_name })` API for native popup downloads.
   - Implemented `/api/upload-temp`, `/api/download-proxy`, and `/api/download-local` in `server.ts` to convert client-side base64 blobs into public proxy URLs with the correct headers (`Content-Disposition: attachment; filename="..."`) strictly required by Telegram's `downloadFile` method.
   - Updated `downloadImage.ts` and video export in `VTONPreviewSection.tsx` to utilize this architecture for seamless Mobile saving.
+
+### Issue: "Ошибка экспорта: undefined" for Video Generation
+- **Root Cause**: The result image generated via client-side edits (AR Effects, Mask Eraser) was stored as a local `blob:http://...` URL. 
+  - When sent to the server (`/api/generate-video`), Node.js `fetch` crashed because it cannot access browser-local blob domains, causing a 500 error.
+  - The frontend then fell back to local generation (`generateBeforeAfterVideo`), which applied `crossOrigin="anonymous"` to the blob URL. iOS Safari strict security blocks anonymous cross-origin requests to blob URIs, triggering a silent `Event` rejection. 
+  - Since the rejection wasn't a standard `Error` object, `(err as Error).message` evaluated to `undefined`.
+- **Fix Applied**: 
+  - Added a pre-processing step `resolveUrlToDataUri` in `VTONPreviewSection.tsx` that intercepts `blob:` URLs and converts them back to fully-embedded base64 `data:image/...` strings via `FileReader` *before* hitting the API or canvas.
+  - Removed `crossOrigin="anonymous"` in `videoExport.ts` for internal `data:` and `blob:` URIs.
+  - Enforced a standard `Error` wrap on `img.onerror` so all future failures display a human-readable message.
