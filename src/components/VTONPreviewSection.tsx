@@ -1,6 +1,6 @@
 import { shareToTelegram } from "../utils/telegram";
 import React, { useState } from "react";
-import { Sparkles, Send, Download, FileDown, ShoppingBag, Share2, Eraser, Video } from "lucide-react";
+import { Sparkles, Send, Download, FileDown, ShoppingBag, Share2, Eraser, Video, Grid2x2 } from "lucide-react";
 import { RotatingFactsLoader } from "./RotatingFactsLoader";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { CachedImage } from "./CachedImage";
@@ -205,9 +205,14 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      
                      if (res.ok) {
                          const data = await res.json();
-                         const videoUrl = window.location.origin + data.url;
+                         // data.url is likely /tmp/out_...mp4
+                         // extract the filename
+                         const filename = data.url.split('/').pop();
+                         const videoUrl = window.location.origin + `/api/download-local?file=${filename}&filename=style_transformation_${Date.now()}.mp4`;
                          
-                         if (tg && tg.openLink) {
+                         if (tg && tg.initData && tg.downloadFile) {
+                             tg.downloadFile({ url: videoUrl, file_name: `style_transformation_${Date.now()}.mp4` });
+                         } else if (tg && tg.initData && tg.openLink) {
                              tg.openLink(videoUrl);
                          } else {
                              const a = document.createElement('a');
@@ -220,24 +225,56 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                          }
                          
                          setToastIsError(false);
-                         setToastMessage(`Видео сохранено. Открываем!`);
+                         setToastMessage(`Видео отправлено на скачивание!`);
                      } else {
                          console.warn("Server generation failed, falling back to local");
                          const videoBlob = await generateBeforeAfterVideo(beforeSrc, afterSrc);
-                         const videoUrl = URL.createObjectURL(videoBlob);
+                         const tgEnv = (window as any).Telegram?.WebApp;
+                         let finalUrl = URL.createObjectURL(videoBlob);
+                         const filename = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
                          
-                         const a = document.createElement('a');
-                         a.href = videoUrl;
-                         a.target = '_blank';
-                         a.download = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-                         document.body.appendChild(a);
-                         a.click();
-                         document.body.removeChild(a);
-                         
-                         setTimeout(() => URL.revokeObjectURL(videoUrl), 10000);
+                         if (tgEnv && tgEnv.initData) {
+                             // Upload blob to get public URL
+                             const reader = new FileReader();
+                             reader.readAsDataURL(videoBlob);
+                             await new Promise<void>((resolve, reject) => {
+                                 reader.onloadend = async () => {
+                                     try {
+                                         const base64data = reader.result as string;
+                                         const resUpload = await fetch('/api/upload-temp', {
+                                             method: 'POST',
+                                             headers: { 'Content-Type': 'application/json' },
+                                             body: JSON.stringify({ base64: base64data, ext: 'mp4' })
+                                         });
+                                         if (resUpload.ok) {
+                                             const upData = await resUpload.json();
+                                             finalUrl = window.location.origin + `/api/download-local?file=${upData.file}&filename=${filename}`;
+                                         }
+                                         resolve();
+                                     } catch(e) { resolve(); }
+                                 };
+                             });
+                         }
+
+                         if (tgEnv && tgEnv.initData && tgEnv.downloadFile && !finalUrl.startsWith('blob:')) {
+                             tgEnv.downloadFile({ url: finalUrl, file_name: filename });
+                         } else if (tgEnv && tgEnv.initData && tgEnv.openLink && !finalUrl.startsWith('blob:')) {
+                             tgEnv.openLink(finalUrl);
+                         } else {
+                             const a = document.createElement('a');
+                             a.href = finalUrl;
+                             a.target = '_blank';
+                             a.download = filename;
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                             if (finalUrl.startsWith('blob:')) {
+                                 setTimeout(() => URL.revokeObjectURL(finalUrl), 10000);
+                             }
+                         }
                          
                          setToastIsError(false);
-                         setToastMessage(`Видео сохранено на ваше устройство.`);
+                         setToastMessage(`Видео отправлено на скачивание!`);
                      }
                   } catch (err) {
                      console.error("Video export failed", err);

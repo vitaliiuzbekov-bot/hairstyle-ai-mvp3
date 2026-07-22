@@ -77,3 +77,11 @@
   - The Express server now serves `/tmp` statically using `app.use('/tmp', express.static(...))`.
   - The client receives the URL, constructs the absolute URL (`window.location.origin + data.url`), and uses `tg.openLink(videoUrl)` if inside Telegram, or a fallback `a.href = videoUrl; a.target = '_blank'` otherwise. This forces the OS / Telegram to open the video in an external browser where the user can natively save it to Photos/Downloads.
   - Replaced the failing `xfade` FFmpeg filter with `fade` + `overlay` which works universally on Render's `@ffmpeg-installer` build.
+
+### Issue: React Crash and Mobile Telegram Download Failure
+- **React Error Boundary Crash**: Fixed a crash occurring right after image generation. Caused by a missing `Grid2x2` icon import from `lucide-react` in `VTONPreviewSection.tsx`. Added the import, restoring UI rendering.
+- **Mobile Telegram Mini App Downloads**:
+  - `a.download` does not work in Mobile WebViews (iOS Safari inside Telegram).
+  - Adopted Telegram's native `tg.downloadFile({ url, file_name })` API for native popup downloads.
+  - Implemented `/api/upload-temp`, `/api/download-proxy`, and `/api/download-local` in `server.ts` to convert client-side base64 blobs into public proxy URLs with the correct headers (`Content-Disposition: attachment; filename="..."`) strictly required by Telegram's `downloadFile` method.
+  - Updated `downloadImage.ts` and video export in `VTONPreviewSection.tsx` to utilize this architecture for seamless Mobile saving.

@@ -1,4 +1,6 @@
-import { applyWatermark } from "./watermark";
+const fs = require('fs');
+
+const content = `import { applyWatermark } from "./watermark";
 
 export const downloadImage = async (url: string, filename: string) => {
   try {
@@ -20,11 +22,11 @@ export const downloadImage = async (url: string, filename: string) => {
         if (res.ok) {
             const data = await res.json();
             // Use the download-local proxy endpoint that sets Content-Disposition
-            publicUrl = window.location.origin + `/api/download-local?file=${data.file}&filename=${filename}`;
+            publicUrl = window.location.origin + \`/api/download-local?file=\${data.file}&filename=\${filename}\`;
         }
     } else if (!finalUrl.startsWith("data:") && tg && tg.initData) {
         // External URL inside telegram
-        publicUrl = window.location.origin + `/api/download-proxy?url=${encodeURIComponent(finalUrl)}&filename=${filename}`;
+        publicUrl = window.location.origin + \`/api/download-proxy?url=\${encodeURIComponent(finalUrl)}&filename=\${filename}\`;
     }
 
     // Attempt native Telegram download if available
@@ -78,3 +80,7 @@ export const downloadImage = async (url: string, filename: string) => {
     document.body.removeChild(link);
   }
 };
+`;
+
+fs.writeFileSync('src/utils/downloadImage.ts', content);
+console.log("Rewrote downloadImage.ts!");
