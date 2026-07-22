@@ -95,3 +95,10 @@
   - Added a pre-processing step `resolveUrlToDataUri` in `VTONPreviewSection.tsx` that intercepts `blob:` URLs and converts them back to fully-embedded base64 `data:image/...` strings via `FileReader` *before* hitting the API or canvas.
   - Removed `crossOrigin="anonymous"` in `videoExport.ts` for internal `data:` and `blob:` URIs.
   - Enforced a standard `Error` wrap on `img.onerror` so all future failures display a human-readable message.
+
+### Issue: "Ошибка экспорта: resolveUrlToDataUri is not defined"
+- **Root Cause**: In the previous patch for resolving blob URLs, the regex script failed to inject the `resolveUrlToDataUri` helper into `VTONPreviewSection.tsx` because it was searching for `export function VTONPreviewSection` instead of `export const VTONPreviewSection`. This left the function undefined when the user clicked the Download Video button.
+- **Fix Applied**: 
+  - Added the `resolveUrlToDataUri` function to the shared `src/utils/videoExport.ts` file.
+  - Imported it correctly at the top of `src/components/VTONPreviewSection.tsx`.
+  - Rebuilt the project and restarted the dev server.

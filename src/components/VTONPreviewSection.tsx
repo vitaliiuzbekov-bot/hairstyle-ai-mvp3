@@ -7,7 +7,7 @@ import { CachedImage } from "./CachedImage";
 import { downloadImage } from "../utils/downloadImage";
 import { shareResult } from "../utils/shareResult";
 import { generateCollage } from "../utils/collage";
-import { generateBeforeAfterVideo } from "../utils/videoExport";
+import { generateBeforeAfterVideo, resolveUrlToDataUri } from "../utils/videoExport";
 import { useUI } from "../context/UIContext";
 import { MaskEditorModal } from "./MaskEditorModal";
 import { Toast } from "./Toast";
