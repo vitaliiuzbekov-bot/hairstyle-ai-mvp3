@@ -1,4 +1,7 @@
+const fs = require('fs');
+let code = fs.readFileSync('src/server/routes/telegramExport.ts', 'utf8');
 
+const newCode = `
 import { Router } from "express";
 import multer from "multer";
 
@@ -28,17 +31,17 @@ router.post('/send-video-to-chat', upload.single('video'), async (req, res) => {
 
         const form = new FormData();
         form.append("chat_id", chatId.toString());
-        form.append("video", new Blob([videoFile.buffer], { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' }), `result.${ext}`);
+        form.append("video", new Blob([videoFile.buffer], { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' }), \`result.\${ext}\`);
         form.append("caption", "🎬 Ваше видео готово! Сохраните его в галерею.");
 
-        const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+        const tgRes = await fetch(\`https://api.telegram.org/bot\${botToken}/sendVideo\`, {
             method: 'POST',
             body: form
         });
 
         if (!tgRes.ok) {
             const errText = await tgRes.text();
-            throw new Error(`Telegram API Error: ${errText}`);
+            throw new Error(\`Telegram API Error: \${errText}\`);
         }
 
         res.json({ success: true });
@@ -49,3 +52,7 @@ router.post('/send-video-to-chat', upload.single('video'), async (req, res) => {
 });
 
 export default router;
+`;
+
+fs.writeFileSync('src/server/routes/telegramExport.ts', newCode);
+console.log("Patched telegramExport.ts with multer");

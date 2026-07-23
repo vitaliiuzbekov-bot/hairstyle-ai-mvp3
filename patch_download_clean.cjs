@@ -1,4 +1,5 @@
-export async function downloadVideoInTelegram(videoBlob: Blob, filename: string): Promise<void> {
+const fs = require('fs');
+let code = `export async function downloadVideoInTelegram(videoBlob: Blob, filename: string): Promise<void> {
   const tg = (window as any).Telegram?.WebApp;
 
   // 1. В Telegram WebApp самое надежное решение (особенно для iOS) — отправка файла в чат
@@ -62,3 +63,6 @@ export async function downloadVideoInTelegram(videoBlob: Blob, filename: string)
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
+`;
+fs.writeFileSync('src/utils/telegramDownload.ts', code);
+console.log("Rewritten telegramDownload.ts for direct blob");

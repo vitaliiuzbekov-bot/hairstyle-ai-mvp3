@@ -209,11 +209,24 @@ export const useAnalysis = ({
           let parsedResults: AnalysisResult;
           // We always rely on the powerful server-side AI (Gemini/YandexGPT) for accurate analysis.
           // Local stats (face-api) are too inaccurate for gender/age and were causing major issues.
-          parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
+          try {
+            parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
+          } catch (apiErr: any) {
+            console.warn("Server AI Analysis failed, using local stats fallback!", apiErr);
+            if (localStats) {
+               // Use local stats as fallback
+               parsedResults = {
+                 ...localStats,
+                 color: "Brunette", // Generic fallback
+                 recommendations: []
+               };
+            } else {
+               throw apiErr; // No local stats, must throw
+            }
+          }
 
-          // Only inject initial library styles if this is a fresh analysis.
-          // Otherwise, we keep the previously generated or assigned styles.
-          if (!localStats) {
+          // Inject initial library styles if we used localStats (or if it's a fresh analysis)
+          if (parsedResults && (!parsedResults.recommendations || parsedResults.recommendations.length === 0)) {
             try {
               const { FEMALE_LIBRARY, MALE_LIBRARY } = await import('../data/haircutLibrary');
               const lib = parsedResults.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
