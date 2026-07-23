@@ -211,7 +211,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      await downloadVideoInTelegram(videoBlob, filename);
                      
                      setToastIsError(false);
-                     setToastMessage(`Видео отправлено на скачивание!`);
+                     setToastMessage(`Видео успешно создано!`);
                   } catch (err) {
                      console.error("Video export failed", err);
                      setToastIsError(true);
