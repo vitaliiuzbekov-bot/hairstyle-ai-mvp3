@@ -207,6 +207,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      });
                      
                      if (tg && tg.initData) setToastMessage("Подготовка файла для Telegram...");
+                     const filename = `style_transformation_${Date.now()}.${extension}`;
                      await downloadVideoInTelegram(videoBlob, filename);
                      
                      setToastIsError(false);
