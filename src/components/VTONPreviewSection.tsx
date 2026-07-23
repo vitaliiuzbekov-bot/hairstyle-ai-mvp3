@@ -7,7 +7,10 @@ import { CachedImage } from "./CachedImage";
 import { downloadImage } from "../utils/downloadImage";
 import { shareResult } from "../utils/shareResult";
 import { generateCollage } from "../utils/collage";
-import { generateBeforeAfterVideo, resolveUrlToDataUri } from "../utils/videoExport";
+import { resolveUrlToDataUri } from "../utils/videoExport";
+import { generateBeforeAfterVideo } from "../utils/clientVideoGenerator";
+import { downloadVideoInTelegram } from "../utils/telegramDownload";
+
 import { useUI } from "../context/UIContext";
 import { MaskEditorModal } from "./MaskEditorModal";
 import { Toast } from "./Toast";
@@ -189,96 +192,25 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                      const tg = (window as any).Telegram?.WebApp;
                      
                                           if (tg && tg.showAlert) {
-                         setToastMessage("Генерируем видео на сервере (около 10 сек)...");
+                         setToastMessage("Генерируем видео...");
                      } else {
-                         setToastMessage("Генерируем видео на сервере...");
+                         setToastMessage("Генерируем видео...");
                      }
                      
                      const resolvedBeforeSrc = await resolveUrlToDataUri(beforeSrc);
                      const resolvedAfterSrc = await resolveUrlToDataUri(afterSrc);
-
-                     const res = await fetch('/api/generate-video', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({
-                             beforeImage: resolvedBeforeSrc,
-                             afterImage: resolvedAfterSrc
-                         })
+                     
+                     console.log("Starting client-side video generation...");
+                     const { videoBlob, extension } = await generateBeforeAfterVideo({
+                         beforeImageUrl: resolvedBeforeSrc,
+                         afterImageUrl: resolvedAfterSrc
                      });
                      
-                     if (res.ok) {
-                         const data = await res.json();
-                         // data.url is likely /tmp/out_...mp4
-                         // extract the filename
-                         const filename = data.url.split('/').pop();
-                         const videoUrl = window.location.origin + `/api/download-local?file=${filename}&filename=style_transformation_${Date.now()}.mp4`;
-                         
-                         if (tg && tg.initData && tg.downloadFile) {
-                             tg.downloadFile({ url: videoUrl, file_name: `style_transformation_${Date.now()}.mp4` });
-                         } else if (tg && tg.initData && tg.openLink) {
-                             tg.openLink(videoUrl);
-                         } else {
-                             const a = document.createElement('a');
-                             a.href = videoUrl;
-                             a.target = '_blank';
-                             a.download = `style_transformation_${Date.now()}.mp4`;
-                             document.body.appendChild(a);
-                             a.click();
-                             document.body.removeChild(a);
-                         }
-                         
-                         setToastIsError(false);
-                         setToastMessage(`Видео отправлено на скачивание!`);
-                     } else {
-                         console.warn("Server generation failed, falling back to local");
-                         const videoBlob = await generateBeforeAfterVideo(resolvedBeforeSrc, resolvedAfterSrc);
-                         const tgEnv = (window as any).Telegram?.WebApp;
-                         let finalUrl = URL.createObjectURL(videoBlob);
-                         const filename = `style_transformation_${Date.now()}.${videoBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-                         
-                         if (tgEnv && tgEnv.initData) {
-                             // Upload blob to get public URL
-                             const reader = new FileReader();
-                             reader.readAsDataURL(videoBlob);
-                             await new Promise<void>((resolve, reject) => {
-                                 reader.onloadend = async () => {
-                                     try {
-                                         const base64data = reader.result as string;
-                                         const resUpload = await fetch('/api/upload-temp', {
-                                             method: 'POST',
-                                             headers: { 'Content-Type': 'application/json' },
-                                             body: JSON.stringify({ base64: base64data, ext: 'mp4' })
-                                         });
-                                         if (resUpload.ok) {
-                                             const upData = await resUpload.json();
-                                             finalUrl = window.location.origin + `/api/download-local?file=${upData.file}&filename=${filename}`;
-                                         }
-                                         resolve();
-                                     } catch(e) { resolve(); }
-                                 };
-                             });
-                         }
-
-                         if (tgEnv && tgEnv.initData && tgEnv.downloadFile && !finalUrl.startsWith('blob:')) {
-                             tgEnv.downloadFile({ url: finalUrl, file_name: filename });
-                         } else if (tgEnv && tgEnv.initData && tgEnv.openLink && !finalUrl.startsWith('blob:')) {
-                             tgEnv.openLink(finalUrl);
-                         } else {
-                             const a = document.createElement('a');
-                             a.href = finalUrl;
-                             a.target = '_blank';
-                             a.download = filename;
-                             document.body.appendChild(a);
-                             a.click();
-                             document.body.removeChild(a);
-                             if (finalUrl.startsWith('blob:')) {
-                                 setTimeout(() => URL.revokeObjectURL(finalUrl), 10000);
-                             }
-                         }
-                         
-                         setToastIsError(false);
-                         setToastMessage(`Видео отправлено на скачивание!`);
-                     }
+                     if (tg && tg.initData) setToastMessage("Подготовка файла для Telegram...");
+                     await downloadVideoInTelegram(videoBlob, filename);
+                     
+                     setToastIsError(false);
+                     setToastMessage(`Видео отправлено на скачивание!`);
                   } catch (err) {
                      console.error("Video export failed", err);
                      setToastIsError(true);
