@@ -20,7 +20,7 @@ export async function downloadVideoInTelegram(videoBlob: Blob, filename: string)
           if (!resUpload.ok) throw new Error("Server error " + resUpload.status);
           
           if (tg.showAlert) {
-              tg.showAlert("Видео отправлено в чат с ботом! Вернитесь в чат, чтобы сохранить его в галерею.");
+              tg.showAlert("Видео отправлено в чат! Нажмите ОК, чтобы вернуться в чат и сохранить его.", () => { tg.close(); });
           }
           return; // Успешно отправлено
       } catch (e) {

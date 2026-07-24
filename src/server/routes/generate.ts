@@ -678,6 +678,7 @@ Instructions:
         promptEng = promptRes?.text?.trim() || "";
       } catch (err: any) {
         console.error("Gemini failed to generate prompt, falling back to basic prompt:", err?.message || err);
+        logToTelegram("⚠️ *Gemini Prompting:* Ошибка региона. Используется базовый промпт. Перенесите Render в US регион.").catch(console.error);
         // Better fallback prompt with basic translation for common rus words
         let mappedKw = keyword || "";
         if (mappedKw.includes("Пикси")) mappedKw = "Pixie haircut, very short elegant female cut";
