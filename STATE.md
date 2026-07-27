@@ -121,3 +121,9 @@
 
 ### Summary
 All critical systems (Dev Server, Billing, Gemini Vision, Telegram Export, Error Handling) have been thoroughly tested and verified. The application builds cleanly (`npm run build`) and is prepared for export/deployment.
+
+### Issue: "Wasting money when client uploads incorrect photo without a face"
+- **Root Cause**: The application was allowing users to upload photos without faces, bad angles, or poor lighting. Although `fal-ai/face-swap` would eventually fail and return an error (refunding the user's token), the prior step `fal-ai/flux/dev` would execute first and successfully generate a base haircut image, costing money. 
+- **Fix Applied**: 
+  1. **Frontend Validation (`useImageUpload.ts`)**: Upgraded the local AI check (`face-api.js`) to strictly reject uploads and show a toast error if no face is detected, the lighting is too poor, or the face angle is incorrect (profile/tilted). This prevents the user from even proceeding.
+  2. **Backend Validation (`generate.ts`)**: Added a fallback safeguard in `/api/generate` to block execution and return a 400 error BEFORE any billing deductions or `fal-ai` API calls if the AI analysis (Gemini) determines the `gender` or `faceShape` is "Unknown" / "Неизвестно" (which happens for solid colors, non-human pictures, etc.).

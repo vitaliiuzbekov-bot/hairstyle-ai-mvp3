@@ -439,6 +439,10 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
         }
       }
       
+      if (req.body.gender === "Unknown" || req.body.gender === "Неизвестно" || req.body.faceShape === "Unknown" || req.body.faceShape === "Неизвестно" || !req.body.gender || !req.body.faceShape) {
+        return res.status(400).json({ error: "На фото не распознано лицо. Пожалуйста, загрузите более качественное фото анфас." });
+      }
+
       const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey, req.body.tgUserId, cacheKey, isDeveloper);
       if (!billingCheck.ok) {
         return res.status(400).json({ error: billingCheck.error });

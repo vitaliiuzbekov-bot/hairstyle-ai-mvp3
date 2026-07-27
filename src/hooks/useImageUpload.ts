@@ -158,6 +158,12 @@ export const useImageUpload = () => {
                
             if (cropResult && cropResult.warning) {
                 console.warn("Smart crop warning:", cropResult.warning);
+                addToast(cropResult.warning, "error");
+                setError(cropResult.warning);
+                setImageBase64(null);
+                setImageUrl(null);
+                setIsUploadingImage(false);
+                return;
             }
                
             let targetBase64 = (cropResult && cropResult.base64) ? cropResult.base64 : finalBase64;
