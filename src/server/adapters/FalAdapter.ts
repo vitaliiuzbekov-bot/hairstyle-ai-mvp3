@@ -54,7 +54,7 @@ export class FalAdapter implements ImageGenerationProvider {
       if (error.body) {
         console.error(`- Тело ответа провайдера: ${JSON.stringify(error.body)}`);
       }
-      let fullMsg = error.message;
+      let fullMsg = typeof error.message === "object" ? JSON.stringify(error.message) : error.message;
       if (error.body && error.body.detail) {
          try { fullMsg += " - " + JSON.stringify(error.body.detail); } catch(e) {}
       }

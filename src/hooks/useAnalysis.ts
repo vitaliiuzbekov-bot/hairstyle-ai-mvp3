@@ -348,7 +348,7 @@ export const useAnalysis = ({
             [styleKeyword]: `<div class="p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-2 text-sm text-red-200">Сбой генерации гайда. Используйте визуальный референс для мастера.</div>`,
           }));
           const msg = err?.message || "Ошибка генерации примерки. Попробуйте снова чуть позже.";
-          addToast(msg, "error");
+          addToast(typeof msg === 'object' ? JSON.stringify(msg) : String(msg), "error");
         } finally {
           setLoadingARStyles((prev) => ({ ...prev, [styleKeyword]: false }));
         }
@@ -489,7 +489,7 @@ export const useAnalysis = ({
           console.error("VTON Error:", err);
           hapticNotification('error');
           const msg = err?.message || "Ошибка виртуальной примерки. Попробуйте снова чуть позже.";
-          addToast(msg, "error");
+          addToast(typeof msg === 'object' ? JSON.stringify(msg) : String(msg), "error");
         } finally {
           if ((window as any).currentVtonController === controller) {
             delete (window as any).currentVtonController;

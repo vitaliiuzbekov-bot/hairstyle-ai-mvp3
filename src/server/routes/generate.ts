@@ -886,7 +886,9 @@ Instructions:
     }
   } catch (outerErr: any) {
     if (!res.headersSent) {
-      res.status(500).json({ error: outerErr.message || "Pipeline error" });
+      let finalError = outerErr.message || "Pipeline error";
+      if (typeof finalError === "object") finalError = JSON.stringify(finalError);
+      res.status(500).json({ error: String(finalError) });
     }
   }
 };

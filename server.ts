@@ -78,11 +78,7 @@ const telegramValidationMiddleware = (req: express.Request, res: express.Respons
 };
 
 async function startServer() {
-  const fs = require('fs');
-const origLog = console.log;
-const origErr = console.error;
-console.log = function(...args) { origLog(...args); fs.appendFileSync('/tmp/real-server.log', args.map(String).join(' ') + '\n'); };
-console.error = function(...args) { origErr(...args); fs.appendFileSync('/tmp/real-server.log', 'ERROR: ' + args.map(String).join(' ') + '\n'); };
+  
 const app = express();
   app.set("trust proxy", 1);
   const PORT = 3000;

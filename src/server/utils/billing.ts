@@ -95,7 +95,7 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
     if (err.message === "ALREADY_DEDUCTED") {
        return { ok: false, error: "Уже в обработке (Idempotency)." };
     }
-    return { ok: false, error: `Внутренняя ошибка биллинга: ${err.message}` };
+    return { ok: false, error: `Внутренняя ошибка биллинга: ${typeof err.message === 'object' ? JSON.stringify(err.message) : err.message}` };
   }
 };
 

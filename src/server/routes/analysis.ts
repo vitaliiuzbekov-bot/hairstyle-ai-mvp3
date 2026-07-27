@@ -83,8 +83,8 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
 
     // If we have precise local Face-API data, we can use it directly and skip full vision,
     // OR we can still use Vision strictly for analyzing HAIR parameters while forcing the rest.
-    console.time("Yandex Vision (Analysis)");
-    console.log("Analyzing geometry via Yandex Vision / Gemini...");
+    console.time("Gemini Vision (Analysis)");
+    console.log("Analyzing geometry via Gemini Vision...");
     
     // If the frontend did a local analysis, it can optionally pass the local detected colors to avoid Vision entirely
     const skipVision = req.body.skipVision === true || req.body.skipVision === 'true';
@@ -159,7 +159,7 @@ ${preDetectedFacts}
             visualDescription = preDetectedFacts + "\nВНИМАНИЕ: Детальный визуальный анализ временно недоступен. Используйте базовые параметры из описания выше.";
         }
     }
-    console.timeEnd("Yandex Vision (Analysis)");
+    console.timeEnd("Gemini Vision (Analysis)");
 
     console.time("YandexGPT");
     console.log("Generating recommendations via YandexGPT...");

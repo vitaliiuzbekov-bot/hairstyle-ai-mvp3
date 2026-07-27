@@ -71,7 +71,7 @@ export const analyzeImageApi = async (
     if (response.status === 429 && data.fallback) {
       throw { isFallback: true, message: data.error };
     }
-    throw new Error(data.error || "Ошибка при анализе фото. Попробуйте еще раз.");
+    throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error || "Ошибка при анализе фото. Попробуйте еще раз.");
   }
 
   return data;
@@ -110,7 +110,7 @@ export const generateArApi = async (
   }
 
   if (!response.ok) {
-    throw new Error(data.error || "Ошибка от сервера при генерации примерки.");
+    throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error || "Ошибка от сервера при генерации примерки.");
   }
   return data;
 };
@@ -151,7 +151,7 @@ export const loadMoreApi = async (
   }
 
   if (!response.ok) {
-    throw new Error(data.error || "Ошибка при генерации новых вариантов от сервера.");
+    throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error || "Ошибка при генерации новых вариантов от сервера.");
   }
   return data;
 };
@@ -196,7 +196,7 @@ export const generateFullApi = async (
   }
 
   if (!response.ok) {
-    throw new Error(data.error || "Ошибка от сервера при инициализации генерации.");
+    throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error || "Ошибка от сервера при инициализации генерации.");
   }
   
   console.log('[api] Generation response:', data);
