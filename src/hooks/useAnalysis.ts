@@ -98,7 +98,27 @@ export const useAnalysis = ({
 
     const fallbackFaceApiWrapper = async (targetBase64: string | null, targetMimeType: string | null) => {
         const { fallbackFaceApi } = await import('../services/fallbackAnalysis');
-        return fallbackFaceApi(targetBase64, targetMimeType || "image/jpeg", preferredStyle);
+        
+        const baseResult = await fallbackFaceApi(targetBase64, targetMimeType || "image/jpeg", preferredStyle);
+        
+        if (targetBase64 && baseResult) {
+            try {
+                const img = new Image();
+                img.src = 'data:' + (targetMimeType || "image/jpeg") + ';base64,' + targetBase64;
+                await new Promise((resolve) => { img.onload = resolve; });
+                const { analyzeFaceAndHairClientSide } = await import('../services/advancedClientAnalysis');
+                const advanced = await analyzeFaceAndHairClientSide(img);
+                console.log("🔥 [Advanced Analysis] Merging results:", advanced);
+                
+                if (advanced.hairColor) baseResult.hairColor = advanced.hairColor;
+                if (advanced.skinTone) baseResult.skinTone = advanced.skinTone;
+                if (advanced.hairLength !== 'Неизвестно') baseResult.hairLength = advanced.hairLength;
+            } catch(e) {
+                console.error("Advanced client analysis merge failed", e);
+            }
+        }
+
+        return baseResult;
     };
 
     const generateTeaser = async (rec: any, resultData: AnalysisResult) => {
@@ -217,12 +237,19 @@ export const useAnalysis = ({
                // Use local stats as fallback
                parsedResults = {
                  ...localStats,
-                 color: "Brunette", // Generic fallback
+                 hairColor: "Brunette", // Generic fallback
                  recommendations: []
                };
             } else {
                throw apiErr; // No local stats, must throw
             }
+          }
+          
+          // Override server values with our advanced client-side analysis
+          if (localStats && parsedResults) {
+              if (localStats.hairColor) parsedResults.hairColor = localStats.hairColor;
+              if (localStats.skinTone) parsedResults.skinTone = localStats.skinTone;
+              if (localStats.hairLength && localStats.hairLength !== 'Неизвестно') parsedResults.hairLength = localStats.hairLength;
           }
 
           // Inject initial library styles if we used localStats (or if it's a fresh analysis)
@@ -488,7 +515,7 @@ export const useAnalysis = ({
         setIsLoadingMore(true);
         setError(null);
 
-        const existingNames = results.recommendations.map((r) => r.name);
+        const existingNames = (results.recommendations || []).map((r) => r.name);
 
         try {
           if (mode === 'library') {

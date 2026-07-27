@@ -562,18 +562,6 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       }
 
       let promptEng = "";
-      try {
-        console.log("Generating prompt via Gemini AI...");
-        const geminiApiKey = process.env.GEMINI_API_KEY;
-        if (!geminiApiKey) {
-            throw new Error("GEMINI_API_KEY не установлен");
-        }
-        const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ 
-            apiKey: geminiApiKey, 
-            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-        });
-        
         let systemInstruction = `You are an expert AI image generation prompt engineer.
 Your task is to write a highly detailed, photorealistic prompt for a text-to-image AI (e.g., Flux) to change a person's hairstyle in an image.
 We have the following specs from the user (some may be in Russian):
@@ -597,6 +585,19 @@ Instructions:
 8. The clothing/background instructions should be incorporated if present.
 9. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
 10. CRITICAL: The entire response MUST be entirely in ENGLISH. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters. DO NOT translate to Russian under any circumstances.`;
+      try {
+        console.log("Generating prompt via Gemini AI...");
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        if (!geminiApiKey) {
+            throw new Error("GEMINI_API_KEY не установлен");
+        }
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ 
+            apiKey: geminiApiKey, 
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+        });
+        
+
 
         let contentsPayload: any = [{ text: systemInstruction }];
 
@@ -677,10 +678,19 @@ Instructions:
         });
         promptEng = promptRes?.text?.trim() || "";
       } catch (err: any) {
-        console.error("Gemini failed to generate prompt, falling back to basic prompt:", err?.message || err);
-        logToTelegram("⚠️ *Gemini Prompting:* Ошибка региона. Используется базовый промпт. Перенесите Render в US регион.").catch(console.error);
-        // Better fallback prompt with basic translation for common rus words
-        let mappedKw = keyword || "";
+        console.error("Gemini failed to generate prompt, falling back to Yandex text-only:", err?.message || err);
+        logToTelegram("⚠️ *Gemini Prompting:* Ошибка API. Переход на YandexGPT для генерации промпта (Текст-онли).").catch(console.error);
+        try {
+            const { callLLM } = await import("../services/llm");
+            promptEng = await callLLM(systemInstruction, "Generate the prompt for the target hairstyle based on the text parameters. Ignore missing visual references.");
+            console.log("Successfully generated prompt via Yandex.");
+            promptEng = promptEng?.trim() || "";
+        } catch (yandexErr: any) {
+             console.error("Yandex fallback also failed, using basic prompt:", yandexErr?.message || yandexErr);
+             logToTelegram("⚠️ *Yandex Prompt Fallback Failed:* " + (yandexErr?.message || "")).catch(console.error);
+
+             // Better fallback prompt with basic translation for common rus words
+             let mappedKw = keyword || "";
         if (mappedKw.includes("Пикси")) mappedKw = "Pixie haircut, very short elegant female cut";
         if (mappedKw.includes("Классический Боб")) mappedKw = "Classic Bob haircut, elegant straight hair above shoulders";
         if (mappedKw.includes("Удлиненный боб")) mappedKw = "Long Bob (Lob), collarbone length";
@@ -691,6 +701,7 @@ Instructions:
         if (finalColor) {
             promptEng = `[STRICTLY ${finalColor.toUpperCase()} HAIR COLOR] ` + promptEng;
         }
+      }
       }
       
       promptEng = promptEng.substring(0, 1500).trim();

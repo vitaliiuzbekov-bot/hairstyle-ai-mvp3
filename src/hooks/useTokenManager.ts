@@ -116,9 +116,10 @@ export const useTokenManager = () => {
                 referredBy = referrerId;
                 startGens = 1; // Bonus for the new user!
                 try {
-                  const refUserDoc = doc(db, "users", referrerId);
-                  updateDoc(refUserDoc, {
-                     generationsLeft: increment(1)
+                  fetch("/api/add-tokens", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userId: referrerId, amount: 1, reason: "referral" })
                   }).catch(() => {});
                   
                  fetch("/api/log", {
@@ -206,15 +207,25 @@ export const useTokenManager = () => {
     initUser();
 
     const handleDailyReward = async () => {
-      setGenerationsLeft((prev) => (prev !== null ? prev + 1 : 1));
       const currentUid = auth.currentUser?.uid;
       if (currentUid && currentUid !== "local-user") {
         try {
-          const userRef = doc(db, "users", currentUid);
-          await updateDoc(userRef, { generationsLeft: increment(1) });
+          const res = await fetch("/api/daily-reward", {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({ userId: currentUid })
+          });
+          if (res.ok) {
+             setGenerationsLeft((prev) => (prev !== null ? prev + 1 : 1));
+          } else {
+             const data = await res.json();
+             console.error("Failed to sync daily reward to backend", data);
+          }
         } catch (e) {
           console.error("Failed to sync daily reward to backend", e);
         }
+      } else {
+         setGenerationsLeft((prev) => (prev !== null ? prev + 1 : 1));
       }
     };
 
@@ -357,13 +368,13 @@ export const useTokenManager = () => {
             setGenerationsLeft(next);
           } else {
             try {
-              const userRef = doc(db, "users", userId);
-              await updateDoc(userRef, {
-                generationsLeft: increment(generationsCount),
-                fullAccess: true
+              await fetch("/api/add-tokens", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ userId, amount: generationsCount, reason: "mock_purchase", fullAccess: true })
               });
             } catch (e) {
-              console.warn("Could not write mock purchase to Firestore", e);
+              console.warn("Could not write mock purchase to backend", e);
             }
             setGenerationsLeft((prev) => (prev || 0) + generationsCount);
           }
@@ -382,10 +393,13 @@ export const useTokenManager = () => {
           setGenerationsLeft(next);
         } else {
           try {
-            const userRef = doc(db, "users", userId);
-            await updateDoc(userRef, { generationsLeft: increment(1) });
+            await fetch("/api/add-tokens", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, amount: 1, reason: "fallback" })
+            });
           } catch (e) {
-             console.warn("Could not write fallback to Firestore", e);
+             console.warn("Could not write fallback to backend", e);
           }
           setGenerationsLeft((prev) => (prev || 0) + 1);
         }

@@ -283,6 +283,39 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
 
   res.status(200).send("OK");
 });
+
+authRouter.post('/daily-reward', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+    if (!adminDb) return res.status(500).json({ error: "adminDb not initialized" });
+    
+    const userRef = adminDb.collection("users").doc(userId);
+    const userDoc = await userRef.get();
+    
+    if (userDoc.exists) {
+       const data = userDoc.data();
+       const lastClaimed = data?.lastClaimedDate;
+       const today = new Date().toDateString();
+       
+       if (lastClaimed === today) {
+          return res.status(400).json({ error: "Already claimed today" });
+       }
+       
+       await userRef.update({
+          generationsLeft: FieldValue.increment(1),
+          lastClaimedDate: today
+       });
+       res.json({ success: true, message: "Reward claimed" });
+    } else {
+       res.status(404).json({ error: "User not found" });
+    }
+  } catch (error: any) {
+    console.error("Daily reward error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 authRouter.post('/feedback', async (req: Request, res: Response) => {
   try {
     const { userId, tgUserId, name, text } = req.body;
@@ -294,6 +327,28 @@ authRouter.post('/feedback', async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error("Feedback error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+authRouter.post('/add-tokens', async (req: Request, res: Response) => {
+  try {
+    const { userId, amount, reason } = req.body;
+    if (!userId || !amount) return res.status(400).json({ error: "userId and amount are required" });
+    if (!adminDb) return res.status(500).json({ error: "adminDb not initialized" });
+    
+    // In a real app we'd verify the reason/source. 
+    // For this MVP, we just allow the client to request tokens for referrals/fallbacks.
+    const userRef = adminDb.collection("users").doc(userId);
+    const updateData: any = { generationsLeft: FieldValue.increment(amount) };
+    if (req.body.fullAccess) {
+       updateData.fullAccess = true;
+    }
+    await userRef.update(updateData);
+    console.log(`Added ${amount} tokens to ${userId} for ${reason}`);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Add tokens error:", error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -45,22 +45,22 @@ export async function uploadImageToFal(base64DataUri: string): Promise<string> {
   }
   
   if (finalUri.startsWith('data:')) {
-    try {
-      const match = finalUri.match(/^data:image\/(\w+);base64,(.+)$/);
+      const match = finalUri.match(/^data:image\/(\w+);base64,(.+)$/s); // added 's' flag just in case
       if (match) {
         const mimeType = `image/${match[1]}`;
         const buffer = Buffer.from(match[2], 'base64');
         const blob = new Blob([buffer], { type: mimeType });
+        console.log("Uploading blob to fal.storage of size:", blob.size);
         const uploadedUrl = await fal.storage.upload(blob);
+        console.log("Upload success! URL:", uploadedUrl);
         return uploadedUrl;
+      } else {
+        console.warn("REGEX DID NOT MATCH!");
       }
-    } catch (e) {
-      console.warn("Failed to upload to fal.storage:", e);
-    }
   }
-
   return finalUri;
 }
+
 
 export async function generateReference(prompt: string): Promise<string> {
   if (!API_KEY || API_KEY === 'mock-key') {

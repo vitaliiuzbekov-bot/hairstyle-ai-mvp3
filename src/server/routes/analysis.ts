@@ -154,9 +154,9 @@ ${preDetectedFacts}
                 throw new Error("GEMINI_API_KEY не установлен. Нейросеть не может проанализировать изображение.");
             }
         } catch (e: any) {
-            console.error("Gemini Vision failed, entering fallback mode:", e.message); logToTelegram("⚠️ *Gemini Vision:* Ошибка региона (Render). Рекомендуется выбрать регион US (Oregon/Ohio) при деплое, чтобы избежать блокировок Gemini Free Tier. Перешел на резервный базовый анализ.").catch(console.error);
-            // DO NOT THROW EXCEPTIONS! We can still process using preDetectedFacts
-            visualDescription = preDetectedFacts + "\nВНИМАНИЕ: Детальный визуальный анализ временно недоступен из-за перегрузки серверов ИИ. Используйте только базовые параметры из описания выше для подбора подходящих причесок. По умолчанию считайте длину волос средней/короткой, густоту нормальной, текстуру прямой.";
+            console.error("Gemini Vision failed, relying on local AI fallback:", e.message);
+            logToTelegram("⚠️ *Gemini Vision:* Ошибка API. Используются локальные данные.").catch(console.error);
+            visualDescription = preDetectedFacts + "\nВНИМАНИЕ: Детальный визуальный анализ временно недоступен. Используйте базовые параметры из описания выше.";
         }
     }
     console.timeEnd("Yandex Vision (Analysis)");

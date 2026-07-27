@@ -439,7 +439,7 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                   <button
                     onClick={() => { hapticImpact('medium'); analyzeImage(); }}
                     disabled={isAnalyzing || isUploadingImage || !imageBase64}
-                    className={`${tg?.initDataUnsafe?.user ? 'hidden' : 'flex'} relative w-full font-bold py-4 sm:py-5 px-6 items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${
+                    className={`flex relative w-full font-bold py-4 sm:py-5 px-6 items-center justify-center gap-3 transition-all duration-500 text-sm sm:text-base rounded-[1.25rem] overflow-hidden group focus:ring-4 focus:ring-blue-500/50 ${
                       isAnalyzing || isUploadingImage || !imageBase64
                         ? (isLightMode ? "bg-gray-100 text-gray-400 border border-transparent cursor-not-allowed" : "bg-white/5 text-white/40 border-transparent cursor-not-allowed")
                         : (isLightMode ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md active:scale-[0.98]" : "bg-white text-black hover:bg-gray-100 shadow-md active:scale-[0.98]")

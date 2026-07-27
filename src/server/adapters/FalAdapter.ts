@@ -54,7 +54,11 @@ export class FalAdapter implements ImageGenerationProvider {
       if (error.body) {
         console.error(`- Тело ответа провайдера: ${JSON.stringify(error.body)}`);
       }
-      throw new Error(`Fal.ai integration failed via SDK: ${error.message}`);
+      let fullMsg = error.message;
+      if (error.body && error.body.detail) {
+         try { fullMsg += " - " + JSON.stringify(error.body.detail); } catch(e) {}
+      }
+      throw new Error(`Fal.ai integration failed via SDK: ${fullMsg}`);
     }
   }
 
@@ -64,6 +68,10 @@ export class FalAdapter implements ImageGenerationProvider {
   async swapFace(options: FaceSwapOptions): Promise<Buffer> {
     
     try {
+      console.log("[FalAdapter] swapFace options lengths:", { base: options.baseImageUrl?.length, swap: options.swapImageUrl?.length });
+      if (options.swapImageUrl && options.swapImageUrl.startsWith('data:')) {
+          console.log("[FalAdapter] swapImageUrl is still a data URI! Starting with:", options.swapImageUrl.substring(0, 50));
+      }
       const result = await imageGenQueue.add(async () => {
         const res = await fal.run("fal-ai/face-swap", {
         input: {

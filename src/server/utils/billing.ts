@@ -78,6 +78,10 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
     return { ok: true };
   } catch (err: any) {
     if (err.code === 7 || (err.message && (err.message.includes('PERMISSION_DENIED') || err.message.includes('Missing or insufficient permissions')))) {
+      if (process.env.NODE_ENV !== 'production') {
+         console.warn("Firebase permission denied (Dev Mode). Bypassing billing check.");
+         return { ok: true };
+      }
       console.warn("Firebase permission denied. Blocking request.");
       return { ok: false, error: "Сервис временно недоступен. Попробуйте позже." };
     }

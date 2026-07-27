@@ -97,7 +97,7 @@ export const HaircutList = React.memo(
         </div>
 
         <div className="flex flex-col gap-5 lg:gap-6 pb-6">
-          {results.recommendations.map((rec, idx) => (
+          {(results.recommendations || []).map((rec, idx) => (
             <RecommendationCard
               key={idx}
               idx={idx}
@@ -131,10 +131,10 @@ export const HaircutList = React.memo(
           </button>
           <button
             onClick={() => {
-              if (results && results.recommendations.length > 0) {
+              if (results && (results.recommendations || []).length > 0) {
                 const randomRec =
-                  results.recommendations[
-                    Math.floor(Math.random() * results.recommendations.length)
+                  (results.recommendations || [])[
+                    Math.floor(Math.random() * (results.recommendations || []).length)
                   ];
                 setTryOnStyle(randomRec);
               }
