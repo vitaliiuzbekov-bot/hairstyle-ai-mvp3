@@ -554,7 +554,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       // Higher strength = more deviation from the base image.
       // We want high strength so the hair changes to match the prompt!
       // If we use 0.20, Flux barely changes the image.
-      fluxStrength = 0.75 + (uiStrength / 100) * 0.20; // 0.75 to 0.95 range
+      fluxStrength = 0.50 + (uiStrength / 100) * 0.40; // 0.75 to 0.95 range
       if (keyword && keyword.includes("same exact current hairstyle")) {
           fluxStrength = 0.35; // keep original structure
       }
@@ -650,32 +650,19 @@ Instructions:
             }
         }
 
-        const promptRes = await geminiQueue.add(async () => { 
-           return withRetry(async () => { 
-                
-               const controller = new AbortController();
-               const timeout = setTimeout(() => controller.abort(new Error("Gemini timeout")), 60000);
+        const promptRes = await geminiQueue.add(async () => {
+           return withRetry(async () => {
                try {
-                   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify({
-                           contents: [{ parts: contentsPayload }],
-                           generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
-                       }),
-                       signal: controller.signal
+                   const response = await ai.models.generateContent({
+                       model: 'gemini-2.5-flash',
+                       contents: contentsPayload,
+                       config: {
+                           temperature: 0.7,
+                           maxOutputTokens: 500
+                       }
                    });
-                   clearTimeout(timeout);
-                   if (!res.ok) {
-                       const errText = await res.text();
-                       throw new Error(`HTTP ${res.status}: ${errText}`);
-                   }
-                   const data = await res.json();
-                   
-                   return { text: data?.candidates?.[0]?.content?.parts?.[0]?.text };
+                   return { text: response.text };
                } catch (e: any) {
-                   
-                   clearTimeout(timeout);
                    throw e;
                }
            });
