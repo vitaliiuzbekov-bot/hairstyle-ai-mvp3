@@ -103,6 +103,27 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
                   {slides[step].text}
                 </p>
               </motion.div>
+            ) : localStorage.getItem("userRole") ? (
+              <motion.div
+                key="welcome-back"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className={`p-6 flex-1 flex flex-col justify-center items-center text-center ${isLightMode ? "bg-white" : ""}`}
+              >
+                <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-green-500/20 to-emerald-500/20 rounded-full flex items-center justify-center mb-4 border border-green-500/10">
+                  <Sparkles size={28} className={isLightMode ? "text-green-600" : "text-green-400"} />
+                </div>
+                <h3 className={`text-xl font-bold mb-4 ${isLightMode ? "text-gray-900" : "text-white"}`}>С возвращением!</h3>
+                <p className={`text-sm mb-8 ${isLightMode ? "text-gray-500" : "text-white/50"}`}>Нажмите кнопку ниже, чтобы продолжить работу с НейроСтилистом.</p>
+                <button
+                  onClick={() => setShowWelcome(false)}
+                  className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:opacity-90 transition-opacity"
+                >
+                  Начать работу
+                </button>
+              </motion.div>
             ) : (
               <motion.div
                 key="role-selection"

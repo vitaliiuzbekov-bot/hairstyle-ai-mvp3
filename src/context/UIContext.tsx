@@ -69,18 +69,15 @@ export const UIProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    const welcomeShown = localStorage.getItem("welcomeShown");
-    if (!welcomeShown) {
-      setShowWelcome(true);
-    }
-    
-    // Check Telegram CloudStorage just in case it was seen on another device
+    // Show welcome modal every time the app opens, as requested by user
+    setShowWelcome(true);
+
+    // Keep Telegram CloudStorage logic to sync roles, but dont hide welcome modal
     const tg = (window as any).Telegram?.WebApp as any;
-    if (tg?.isVersionAtLeast?.('6.9') && tg?.CloudStorage) {
-      tg.CloudStorage.getItem('welcomeShown', (err, value) => {
-        if (!err && value === 'true' && showWelcome) {
-          setShowWelcome(false);
-          localStorage.setItem("welcomeShown", "true");
+    if (tg?.isVersionAtLeast?.("6.9") && tg?.CloudStorage) {
+      tg.CloudStorage.getItem("userRole", (err: any, value: string) => {
+        if (!err && value) {
+          localStorage.setItem("userRole", value);
         }
       });
     }
