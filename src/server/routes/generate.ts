@@ -670,7 +670,7 @@ Instructions:
         promptEng = promptRes?.text?.trim() || "";
       } catch (err: any) {
         console.error("Gemini failed to generate prompt, falling back to Yandex text-only:", err?.message || err);
-        logToTelegram("⚠️ *Gemini Prompting:* Ошибка API. Переход на YandexGPT для генерации промпта (Текст-онли).").catch(console.error);
+        const errMsg = err?.message || String(err); logToTelegram(`⚠️ *Gemini Prompting:* Ошибка API: ${errMsg}. Переход на YandexGPT для генерации промпта (Текст-онли).`).catch(console.error);
         try {
             const { callLLM } = await import("../services/llm");
             promptEng = await callLLM(systemInstruction, "Generate the prompt for the target hairstyle based on the text parameters. Ignore missing visual references.");
