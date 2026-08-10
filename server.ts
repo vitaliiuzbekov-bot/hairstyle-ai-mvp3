@@ -84,9 +84,12 @@ const app = express();
   const PORT = 3000;
 
   // Enhance security with Helmet
-  app.use((req,res,next)=>{console.log("GLOBAL MW", req.path); next();}); app.use(helmet({
+  app.use(helmet({
     contentSecurityPolicy: false, // Disabled for dev with inline styles/scripts and third-party APIs
-    crossOriginEmbedderPolicy: false
+    crossOriginEmbedderPolicy: false,
+    xFrameOptions: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false
   }));
 
   // Compress responses for better performance

@@ -14,6 +14,7 @@ import { BlueprintTechnicalDetails } from "./BlueprintTechnicalDetails";
 import { VTONPreviewSection } from "./VTONPreviewSection";
 import { PersonalGuideSection } from "./PersonalGuideSection";
 import { useUI } from "../context/UIContext";
+import { useAnalysisContext } from "../context/AnalysisContext";
 
 const COLOR_BRANDS: Record<string, {name: string, shade: string}[]> = {
   "Блонд": [{name: "L'Oreal Professionnel", shade: "Majirel 10.1"}, {name: "Wella Koleston", shade: "10/16"}],
@@ -80,6 +81,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   vtonError,
   isLightMode,
 }) => {
+  const { isProMode, clientName, stylistNotes, setStylistNotes } = useAnalysisContext();
   const [loadedReferenceUrl, setLoadedReferenceUrl] = React.useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const [isCollageGenerating, setIsCollageGenerating] = React.useState(false);
@@ -108,7 +110,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
         <div className={`p-4 sm:p-6 border-b flex justify-between items-center sm:bg-transparent sticky top-0 z-50 ${isLightMode ? 'bg-white border-gray-200' : 'bg-[#0f0c1b] border-white/10'}`}>
           <h3 className={`font-serif text-xl sm:text-2xl flex items-center gap-3 tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
             <Scissors className={isLightMode ? 'text-gray-500' : 'text-white/60'} size={24} />
-            Детальный гайд для парикмахера
+            {isProMode ? (clientName ? `Схема стрижки для клиента: ${clientName}` : "Детальный гайд для парикмахера") : "Детали и примерка стиля"}
           </h3>
           <button
             onClick={() => {
@@ -126,7 +128,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
 
         <div className="p-6 sm:p-8 flex-1 min-h-0 flex flex-col lg:flex-row gap-8 overflow-y-auto custom-scrollbar">
           {/* Technical Details */}
-          <BlueprintTechnicalDetails
+          {isProMode && <BlueprintTechnicalDetails
             tryOnStyle={tryOnStyle}
             results={results}
             isLightMode={isLightMode}
@@ -136,7 +138,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               }
               setTryOnStyle(null);
             }}
-          />
+          />}
 
           {/* Visual References */}
           <div className={`flex-1 lg:pl-8 lg:border-l order-1 lg:order-2 flex flex-col ${isLightMode ? 'border-gray-200' : 'border-white/10'}`}>
@@ -219,7 +221,7 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               isLightMode={isLightMode}
               exportToPDF={() => {
                 const baseImage = imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`) : undefined);
-                exportToPDF(undefined, "neurostylist-guide.pdf", {
+                exportToPDF(undefined, clientName ? `neurostylist-guide-${clientName}.pdf` : "neurostylist-guide.pdf", {
                   before: baseImage,
                   reference: loadedReferenceUrl || undefined,
                   after: vtonResultUrl || undefined

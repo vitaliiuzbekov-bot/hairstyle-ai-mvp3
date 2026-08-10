@@ -4,6 +4,7 @@ import { X, Star, Gift, Share2 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { ImageSlider } from "./ImageSlider";
 import { useModalBackButton } from "../hooks/useTelegramBackButton";
+import { useAnalysisContext } from "../context/AnalysisContext";
 
 interface BuyModalProps {
   showBuyModal: boolean;
@@ -26,6 +27,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({
 }) => {
   useScrollLock(showBuyModal);
   useModalBackButton(showBuyModal, () => setShowBuyModal(false));
+  const { isProMode } = useAnalysisContext();
 
   if (!showBuyModal) return null;
 
@@ -42,10 +44,11 @@ export const BuyModal: React.FC<BuyModalProps> = ({
         >
           <X size={20} className="stroke-current" />
         </button>
-        <h2 className={`text-xl font-bold bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent mb-4 mt-2 flex items-center gap-2 z-10`}>
-           <div className={`flex items-center justify-center w-8 h-8 rounded-full ${isLightMode ? 'bg-amber-100' : 'bg-amber-500/20'}`}>
-             <Star size={18} className="text-amber-500 fill-current" />
-           </div>
+
+        <h2 className={`text-xl font-bold bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent mb-4 mt-2 flex items-center gap-2 z-10`}> 
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${isLightMode ? 'bg-amber-100' : 'bg-amber-500/20'}`}>
+            <Star size={18} className="text-amber-500 fill-current" />
+          </div>
           Buy Generations
         </h2>
 
@@ -53,7 +56,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({
         <div className={`w-full text-center relative z-10 mb-5`}>
           <ImageSlider isLightMode={isLightMode} />
           <p className={`text-[12px] mt-4 font-medium px-2 leading-relaxed ${isLightMode ? 'text-gray-700' : 'text-white/80'}`}>
-            С невероятной точностью. Получите <b>детальный PDF-гайд</b> со схемами, параметрами окрашивания и подробным мудбордом для вашего мастера.
+            {isProMode ? "С невероятной точностью. Получите детальный PDF-гайд со схемами, параметрами окрашивания и подробным мудбордом для вашего клиента." : "Магия трансформации! Выбирайте новые стили, смотрите как они выглядят на вас, и сохраняйте лучшие варианты."}
           </p>
         </div>
 
@@ -63,7 +66,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({
             { id: "popular", label: "3 генерации стрижек", count: 3, stars: 199, isPopular: true },
             { id: "premium", label: "3 генерации + PDF", count: 3, stars: 349 },
             ...(userRole === 'master' || userRole === 'salon' ? [{ id: "master", label: "Пакет мастера (10 генераций для клиентов)", count: 10, stars: 500 }] : [])
-          ].map(pkg => (
+          ].filter(pkg => isProMode || pkg.id !== 'premium').map(pkg => (
             <button
               key={pkg.id}
               onClick={() => processPayment(pkg.id as any, pkg.stars, pkg.count)}
@@ -98,26 +101,22 @@ export const BuyModal: React.FC<BuyModalProps> = ({
               <Gift size={16} className={isLightMode ? 'text-purple-500' : "text-purple-400"} />
               Бесплатные генерации
             </h3>
-            <p className={`text-[11px] mb-3 leading-relaxed ${isLightMode ? 'text-purple-600/80' : 'text-purple-300/70'}`}>
-              Пригласи друга и получите +1 бесплатную генерацию каждый!
+            <p className={`text-xs mb-3 ${isLightMode ? 'text-purple-700/70' : 'text-purple-300/70'}`}>
+              Пригласи друга и получи 1 генерацию бесплатно
             </p>
             <button 
               onClick={() => {
-                 const inviteLink = `https://t.me/neirostilist_bot/app?startapp=ref_${userId}`;
-                 shareToTelegram(inviteLink, "Смотри, какой крутой ИИ-стилист! Заходи по моей ссылке и получи бонусные генерации 🎁");
+                const inviteLink = `https://t.me/neirostilist_bot/app?startapp=ref_${userId}`;
+                shareToTelegram(inviteLink, "Смотри, какой крутой ИИ-стилист! Заходи по моей ссылке и получи бонусные генерации 🎁");
               }}
               className={`w-full text-sm font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${isLightMode ? 'bg-white text-purple-700 shadow-sm hover:shadow-md' : 'bg-purple-500/30 text-white hover:bg-purple-500/40'}`}
             >
-              <Share2 size={16} /> Пригласить
+              <Share2 size={16} />
+              Поделиться ссылкой
             </button>
           </div>
         </div>
-        
-        <p className={`text-[10px] mt-5 px-4 text-center leading-relaxed relative z-10 ${isLightMode ? 'text-gray-400' : 'text-white/40'}`}>
-          Оплата производится во внутренней валюте Telegram (Stars). Звёзды списываются с вашего баланса Telegram.
-        </p>
       </div>
     </div>
   );
 };
-

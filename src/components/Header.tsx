@@ -1,6 +1,8 @@
 import React from "react";
 import { Scissors, Coins, Zap, BookOpen, Info, MessageSquare } from "lucide-react";
+import { useAnalysisContext } from "../context/AnalysisContext";
 import { useNavigate } from "react-router-dom";
+import { useUI } from "../context/UIContext";
 
 interface HeaderProps {
   generationsLeft: number | null;
@@ -17,6 +19,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+
   generationsLeft,
   isBuying,
   buyTokens,
@@ -31,6 +34,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [logoClicks, setLogoClicks] = React.useState(0);
   const navigate = useNavigate();
+  const { addToast } = useUI();
+  const { isProMode, setIsProMode } = useAnalysisContext();
 
   const handleLogoClick = () => {
     const nextClicks = logoClicks + 1;
@@ -92,11 +97,18 @@ export const Header: React.FC<HeaderProps> = ({
             {isBuying ? "..." : "Купить"}
           </button>
           
-          <div className="hidden md:flex flex-col items-end gap-1 shrink-0">
+          <div className="flex items-center gap-2 ml-1 sm:ml-2 shrink-0"><button onClick={() => {
+              const newMode = !isProMode;
+              setIsProMode(newMode);
+              if (newMode) {
+                addToast("PRO-режим включен: расширенная аналитика, PDF-отчеты и заметки.", "info");
+              }
+            }} className={`relative inline-flex h-5 sm:h-6 w-9 sm:w-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors ${isProMode ? "bg-amber-500" : isLightMode ? "bg-gray-300" : "bg-white/20"}`}><span className={`inline-block h-3 sm:h-4 w-3 sm:w-4 transform rounded-full bg-white transition-transform ${isProMode ? "translate-x-2 sm:translate-x-3" : "-translate-x-2 sm:-translate-x-3"}`} /></button><span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${isProMode ? "text-amber-500" : isLightMode ? "text-gray-400" : "text-white/40"}`}>PRO</span></div>
+          {false && <div className="hidden md:flex flex-col items-end gap-1 shrink-0">
             <p className={`text-xs tracking-[0.2em] uppercase font-medium ${isLightMode ? 'text-gray-400' : 'text-white/60'}`}>
               ИИ-Подбор
             </p>
-          </div>
+          </div>}
 
           <div className="flex items-center gap-1 sm:gap-2 ml-0 sm:ml-2 shrink-0">
             <button onClick={() => { if (window.Telegram?.WebApp?.openTelegramLink) { window.Telegram.WebApp.openTelegramLink("https://t.me/neirostilist_bot"); } else { window.open("https://t.me/neirostilist_bot", "_blank"); } }} className={`w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full flex items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300" : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"}`}>
@@ -110,10 +122,10 @@ export const Header: React.FC<HeaderProps> = ({
               <Info size={14} className="shrink-0" />
               <span className="hidden sm:inline">Как это работает</span>
             </button>
-            <button onClick={onOpenLibrary} className={`w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full flex items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300" : "bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"}`}>
+            {isProMode && <button onClick={onOpenLibrary} className={`w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full flex items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300" : "bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"}`}>
               <BookOpen size={14} className="shrink-0" />
               <span className="hidden sm:inline">Каталог</span>
-            </button>
+            </button>}
           </div>
           <div className="relative ml-0 sm:ml-2 shrink-0">
             <button

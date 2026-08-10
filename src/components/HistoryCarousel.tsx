@@ -6,6 +6,7 @@ import { useUI } from "../context/UIContext";
 
 interface HistoryItem {
   keyword: string;
+  clientName?: string;
   url: string;
   timestamp?: number;
 }
@@ -59,7 +60,7 @@ const HistoryCarouselComponent: React.FC<HistoryCarouselProps> = ({
 
             <div className={`absolute inset-x-0 bottom-0 p-3 pt-12 flex flex-col items-start ${isLightMode ? 'bg-gradient-to-t from-black/60 via-black/20 to-transparent' : 'bg-gradient-to-t from-black/90 via-black/40 to-transparent'}`}>
               <p className="text-[10px] sm:text-xs font-semibold text-white/90 truncate w-full text-left">
-                {item.keyword}
+                {item.keyword} {item.clientName && <span className="text-amber-400 font-medium ml-1">({item.clientName})</span>}
               </p>
               {item.timestamp && (
                 <p className="text-[8px] sm:text-[9px] text-white/80 mt-0.5">

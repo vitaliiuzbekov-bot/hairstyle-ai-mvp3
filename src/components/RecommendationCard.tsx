@@ -4,6 +4,7 @@ import { Sparkles, Lock, RefreshCw, Maximize2 } from "lucide-react";
 import { LazyImage } from "./LazyImage";
 import { CachedImage } from "./CachedImage";
 import { AnalysisResult } from "../types";
+import { useAnalysisContext } from "../context/AnalysisContext";
 
 interface RecommendationCardProps {
   rec: any;
@@ -28,6 +29,7 @@ export const RecommendationCard = React.memo(({
   setTryOnStyle,
   isLightMode,
 }: RecommendationCardProps) => {
+  const { isProMode } = useAnalysisContext();
   return (
     <div
       className={`opacity-0 animate-fade-in-up rounded-2xl overflow-hidden transition-all duration-500 group flex flex-col sm:flex-row items-stretch border ${isLightMode ? 'bg-white shadow-md border-gray-200 hover:shadow-lg' : 'glass-panel hover:border-white/20 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] border-white/10'}`}
@@ -150,20 +152,31 @@ export const RecommendationCard = React.memo(({
           </p>
         </div>
 
+        {isProMode ? (
         <div className="mt-4 flex flex-col xl:flex-row gap-3">
           <button
             onClick={() => setTryOnStyle(rec)}
             className={`px-6 py-3.5 sm:py-4 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 w-full flex-1 border ${isLightMode ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm' : 'bg-blue-600/80 text-white hover:bg-blue-600 border-blue-500/50'}`}
           >
-            <Sparkles size={16} className="shrink-0" /> Примерить этот стиль
+            <Sparkles size={16} className="shrink-0" /> Примерить клиенту
           </button>
           <button
             onClick={() => setTryOnStyle(rec)}
             className={`px-6 py-3.5 sm:py-4 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 w-full flex-1 border ${isLightMode ? 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm' : 'text-white/90 bg-white/5 hover:bg-white/10 border-white/10'}`}
           >
-            <Maximize2 size={16} className="shrink-0" /> Показать парикмахеру (гайд)
+            <Maximize2 size={16} className="shrink-0" /> Технический гайд
           </button>
         </div>
+      ) : (
+        <div className="mt-4 flex flex-col xl:flex-row gap-3">
+          <button
+            onClick={() => setTryOnStyle(rec)}
+            className={`px-6 py-3.5 sm:py-4 rounded-full text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 w-full flex-1 border ${isLightMode ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm' : 'bg-blue-600/80 text-white hover:bg-blue-600 border-blue-500/50'}`}
+          >
+            <Sparkles size={16} className="shrink-0" /> Примерить и посмотреть детали
+          </button>
+        </div>
+      )}
       </div>
     </div>
   );

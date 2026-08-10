@@ -1,0 +1,26 @@
+#!/bin/bash
+cat << 'CODE' > temp.ts
+          // --- ШАГ 1: ЛОКАЛЬНЫЙ АНАЛИЗ (CLIENT-SIDE INFERENCE) ---
+          let localStats: AnalysisResult | null = null;
+          const isProMode = localStorage.getItem("isProMode") === "true";
+          try {
+             if (isProMode) {
+                localStats = {
+                    gender: "female",
+                    faceShape: "Овальное",
+                    ageRange: "20-30",
+                    skinTone: "Светлый",
+                    hairColor: "Русый",
+                    hairLength: "Средние",
+                    hairDensity: "Средняя",
+                    hairType: "Прямые",
+                    recommendations: []
+                };
+             } else {
+                localStats = await fallbackFaceApiWrapper(imageBase64, mimeType);
+             }
+          } catch(e) {
+              console.warn("FaceAPI failed, falling back to pure server...", e);
+          }
+CODE
+sed -i 's/            } catch (apiErr: any) {/} catch (apiErr: any) {/g' src/hooks/useAnalysis.ts

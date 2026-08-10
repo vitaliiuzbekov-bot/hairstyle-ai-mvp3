@@ -5,6 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { useTelegram } from "../hooks/useTelegram";
 
 interface UploadZoneProps {
+  isProMode?: boolean;
+  clientName: string;
+  setClientName: (val: string) => void;
   imageBase64: string | null;
   imageUrl: string | null;
   mimeType: string | null;
@@ -29,6 +32,9 @@ interface UploadZoneProps {
 }
 
 const UploadZoneComponent: React.FC<UploadZoneProps> = ({
+  isProMode,
+  clientName,
+  setClientName,
   imageBase64,
   imageUrl,
   mimeType,
@@ -310,23 +316,6 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                     сервере.
                   </label>
                 </div>
-
-                <div className="mt-6 w-full max-w-[340px]">
-                  <button 
-                    onClick={() => { hapticImpact('light'); navigate('/faq'); }}
-                    className={`w-full flex items-center p-4 rounded-xl border transition-all text-left group ${isLightMode ? 'bg-white/50 border-gray-200 hover:border-gray-300 hover:bg-white' : 'glass-panel border-white/10 hover:border-white/20'}`}
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isLightMode ? 'bg-purple-50 group-hover:bg-blue-100' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                        <BookOpen size={18} className={isLightMode ? 'text-purple-600' : 'text-white/70'} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className={`text-sm font-medium mb-0.5 ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>Гайд по использованию</h4>
-                        <p className={`text-xs ${isLightMode ? 'text-gray-500' : 'text-white/50'}`}>Как сделать фото и как работают подписки</p>
-                      </div>
-                    </div>
-                  </button>
-                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-4">
@@ -397,45 +386,20 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                   )
                 )}
 
-                {/* Style Selection */}
-                {!results &&
-                  !error &&
-                  !isAnalyzing &&
-                  !isUploadingImage && (
-                    <div className="mb-4">
-                      <label className={`block text-[11px] font-semibold uppercase tracking-widest mb-3 text-center sm:text-left ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>
-                        Выберите стиль или настроение:
-                      </label>
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 max-h-[140px] overflow-y-auto hide-scrollbar sm:max-h-none sm:overflow-visible pr-1 sm:pr-0">
-                        {[
-                          "Любой",
-                          "Деловой",
-                          "Романтичный",
-                          "Креативный",
-                          "Кэжуал",
-                          "Спортивный",
-                          "Дерзкий",
-                          "Элегантный",
-                        ].map((styleOpt) => (
-                          <button
-                            key={styleOpt}
-                            onClick={() => { hapticImpact('light'); setPreferredStyle(styleOpt); }}
-                            className={`px-4 py-2.5 rounded-2xl text-[13px] transition-all font-medium border ${
-                              preferredStyle === styleOpt
-                                ? (isLightMode ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20" : "bg-white text-gray-900 border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]")
-                                : (isLightMode ? "bg-white hover:bg-gray-50 text-gray-700 border-gray-200" : "glass-button hover:bg-white/10 text-white/80 border-white/10")
-                            }`}
-                          >
-                            {styleOpt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Action Button */}
                 {!results && !error && (
                   <>
+                  {isProMode && imageBase64 && (
+                    <div className="mb-4">
+                      <label className={`block text-xs uppercase tracking-widest font-medium mb-1.5 ${isLightMode ? 'text-gray-500' : 'text-white/60'}`}>Имя клиента (необязательно)</label>
+                      <input 
+                        type="text" 
+                        value={clientName || ''}
+                        onChange={(e) => setClientName(e.target.value)}
+                        placeholder="Например, Анна" 
+                        className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/50 ${isLightMode ? 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400' : 'bg-white/5 border-white/10 text-white placeholder:text-white/30'}`}
+                      />
+                    </div>
+                  )}
                   <button
                     onClick={() => { hapticImpact('medium'); analyzeImage(); }}
                     disabled={isAnalyzing || isUploadingImage || !imageBase64}
@@ -450,10 +414,10 @@ const UploadZoneComponent: React.FC<UploadZoneProps> = ({
                     )}
                     <span className="relative z-10 flex items-center gap-2">
                       {isUploadingImage
-                        ? "Обработка на устройстве..."
+                        ? "Обработка фото..."
                         : isAnalyzing
-                          ? "Нейросеть в работе..."
-                          : "Подобрать стрижку"}
+                          ? "Анализ..."
+                          : isProMode ? "Начать подбор (PRO)" : "Подобрать стрижку"}
                     </span>
                   </button>
                   {/* Telegram WebApp Integration for MainButton is handled via hook, but we keep an invisible/fallback button for non-TG env */}

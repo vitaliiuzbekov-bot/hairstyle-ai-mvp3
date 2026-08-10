@@ -147,7 +147,7 @@ export const exportToPDF = async (
     pdfContainer.innerHTML = `
       <style>
         ${injectedCSS}
-        .pdf-page { box-sizing: border-box; padding: 10px 20px; font-family: Arial, Helvetica, sans-serif !important; color: #000000 !important; }
+        .pdf-page { box-sizing: border-box; width: 794px !important; overflow: hidden; padding: 10px 20px; font-family: Arial, Helvetica, sans-serif !important; color: #000000 !important; }
         
         .pdf-header { border-bottom: 2px solid #000; padding-bottom: 24px; margin-bottom: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-inside: avoid; }
         .pdf-header h1 { font-size: 40px; font-weight: bold; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; color: #000 !important; }
@@ -221,7 +221,7 @@ export const exportToPDF = async (
     const wrapper = document.createElement("div");
     wrapper.id = "pdf-export-wrapper-secret";
     wrapper.style.position = "absolute";
-    wrapper.style.width = "718px";
+    wrapper.style.width = "794px";
     wrapper.style.top = "0px";
     wrapper.style.left = "0px";
     wrapper.style.zIndex = "-1";
@@ -254,13 +254,14 @@ export const exportToPDF = async (
          scrollX: 0,
          x: 0,
          y: 0,
-         windowWidth: 718,
+         windowWidth: 794,
+         width: 794,
          // REMOVED letterRendering: true, this fixes glued text in PDF
         onclone: (clonedDoc: Document) => {
           clonedDoc.documentElement.style.overflow = 'visible';
-          clonedDoc.documentElement.style.width = '100%';
+          clonedDoc.documentElement.style.width = '794px';
           clonedDoc.body.style.overflow = 'visible';
-          clonedDoc.body.style.width = '100%';
+          clonedDoc.body.style.width = '794px';
           clonedDoc.body.style.margin = '0';
           clonedDoc.body.style.padding = '0';
           

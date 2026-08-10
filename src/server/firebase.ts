@@ -16,7 +16,14 @@ try {
   }
 
   if (getApps().length === 0) {
-    const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT;
+        let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccountStr && process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+        try {
+            serviceAccountStr = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8');
+        } catch (e) {
+            console.error("Failed to decode FIREBASE_SERVICE_ACCOUNT_BASE64", e);
+        }
+    }
     let credential;
     if (serviceAccountStr) {
         try {

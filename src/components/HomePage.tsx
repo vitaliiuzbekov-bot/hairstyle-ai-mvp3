@@ -62,7 +62,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const { consentGiven, setConsentGiven, consentError, setConsentError, userRole, salonName } = useUser();
 
   const { addToast, chatStyleName, setChatStyleName, isChatOpen, setIsChatOpen } = useUI();
-  const { tryOnStyle, setTryOnStyle, preferredStyle, setPreferredStyle } = useAnalysisContext();
+  const { tryOnStyle, setTryOnStyle, preferredStyle, setPreferredStyle, isProMode, clientName, setClientName, setStylistNotes } = useAnalysisContext();
 
   const {
     imageBase64,
@@ -140,6 +140,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           setVtonResultUrl(null);
           setIsTeaserResult(false);
           setVtonError(null);
+    setClientName("");
+    setStylistNotes("");
       });
   }, [originalHandleFileUpload, setResults, setArGeneratedImageUrl, setTryOnStyle, setVtonResultUrl, setIsTeaserResult, setVtonError]);
 
@@ -156,6 +158,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     setVtonResultUrl(null);
     setVtonError(null);
+    setClientName("");
+    setStylistNotes("");
 
   }, [tryOnStyle, setVtonResultUrl, setVtonError, vtonStrength]);
 
@@ -175,6 +179,8 @@ export const HomePage: React.FC<HomePageProps> = ({
     setVtonResultUrl(null);
     setIsTeaserResult(false);
     setVtonError(null);
+    setClientName("");
+    setStylistNotes("");
     localStorage.removeItem('lastGeneratedImage');
     localStorage.removeItem('lastOriginalImage');
     localStorage.removeItem('lastStyleName');
@@ -223,7 +229,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-16">
         {/* Intro */}
-        {!imageBase64 && (
+        {!imageBase64 && !isProMode && (
           <div className="text-center max-w-2xl mx-auto mb-10 md:mb-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
             <h2 className={`font-serif text-2xl sm:text-3xl md:text-5xl lg:text-5xl mb-4 md:mb-6 leading-tight tracking-tight ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
               Какая стрижка подойдет <br />{" "}
@@ -245,7 +251,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
 
-        {/* History Link */}
         {!imageBase64 && history && history.length > 0 && (
           <div className="flex justify-center mb-8 fade-in">
              <button 
@@ -257,7 +262,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
 
-        {!imageBase64 && (
+        {!imageBase64 && isProMode && (
           <div className="fade-in">
             <PresetsCarousel 
               isLightMode={isLightMode} 
@@ -269,6 +274,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
 
+        {isProMode && !imageBase64 && (
+          <div className="text-center max-w-2xl mx-auto mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className={`font-serif text-3xl mb-2 ${isLightMode ? "text-gray-900" : "text-white/90"}`}>PRO-режим</h2>
+            <p className={`text-sm ${isLightMode ? "text-gray-500" : "text-white/50"}`}>Расширенный функционал для мастеров. <a href="https://t.me/neirostilist_bot" target="_blank" className="text-blue-500 underline hover:text-blue-400">Связь с разработчиком для внедрения</a></p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
           {/* Left / Top: Upload Zone */}
           {isInitializing ? (
@@ -276,7 +288,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <Skeleton className="w-full h-[500px] rounded-[1.5rem]" isLightMode={isLightMode} />
             </div>
           ) : (
-            <UploadZone
+            <UploadZone isProMode={isProMode} clientName={clientName} setClientName={setClientName}
               imageBase64={imageBase64}
               imageUrl={imageUrl}
               mimeType={mimeType}

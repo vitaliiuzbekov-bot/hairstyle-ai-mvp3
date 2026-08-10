@@ -28,8 +28,17 @@ export async function uploadBufferToFirebase(buffer: Buffer, contentType: string
         }
       });
       return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${uuid}`;
-  } catch (err) {
-      console.warn("Failed to upload to Firebase Storage, falling back to base64.", err.message);
+  } catch (err: any) {
+      let errMsg = err?.message || 'Unknown error';
+      if (typeof errMsg === 'string' && errMsg.includes('{')) {
+          try {
+              const parsed = JSON.parse(errMsg);
+              errMsg = parsed?.error?.message || errMsg;
+          } catch (e) {
+              // ignore
+          }
+      }
+      console.warn("Failed to upload to Firebase Storage, falling back to base64. Reason:", errMsg);
       return base64Url;
   }
 }

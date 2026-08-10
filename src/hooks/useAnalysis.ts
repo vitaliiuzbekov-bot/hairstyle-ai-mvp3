@@ -10,6 +10,7 @@ interface UseAnalysisProps {
     imageUrl: string | null;
     mimeType: string;
     preferredStyle: string;
+    clientName?: string;
     telegramInitData?: string;
     userId: string | null;
     initError?: string | null;
@@ -29,6 +30,7 @@ export const useAnalysis = ({
     imageUrl,
     mimeType,
     preferredStyle,
+    clientName,
     telegramInitData,
     userId,
     initError,
@@ -192,10 +194,24 @@ export const useAnalysis = ({
 
         try {
           // --- ШАГ 1: ЛОКАЛЬНЫЙ АНАЛИЗ (CLIENT-SIDE INFERENCE) ---
-          // Выполняем тяжелый процесс определения лица, пола и возраста на устройстве клиента
           let localStats: AnalysisResult | null = null;
+          const isProMode = localStorage.getItem("isProMode") === "true";
           try {
-              localStats = await fallbackFaceApiWrapper(imageBase64, mimeType);
+             if (isProMode) {
+                localStats = {
+                    gender: "female",
+                    faceShape: "Овальное",
+                    ageRange: "20-30",
+                    skinTone: "Светлый",
+                    hairColor: "Русый",
+                    hairLength: "Средние",
+                    hairDensity: "Средняя",
+                    hairType: "Прямые",
+                    recommendations: []
+                };
+             } else {
+                localStats = await fallbackFaceApiWrapper(imageBase64, mimeType);
+             }
           } catch(e) {
               console.warn("FaceAPI failed, falling back to pure server...", e);
           }
@@ -227,21 +243,18 @@ export const useAnalysis = ({
           }
 
           let parsedResults: AnalysisResult;
-          // We always rely on the powerful server-side AI (Gemini/YandexGPT) for accurate analysis.
-          // Local stats (face-api) are too inaccurate for gender/age and were causing major issues.
           try {
             parsedResults = await analyzeImageApi(formData, telegramInitData) as AnalysisResult;
           } catch (apiErr: any) {
             console.warn("Server AI Analysis failed, using local stats fallback!", apiErr);
             if (localStats) {
-               // Use local stats as fallback
                parsedResults = {
                  ...localStats,
-                 hairColor: "Brunette", // Generic fallback
+                 hairColor: "Brunette",
                  recommendations: []
                };
             } else {
-               throw apiErr; // No local stats, must throw
+               throw apiErr;
             }
           }
           
@@ -472,6 +485,7 @@ export const useAnalysis = ({
               originalUrl: data.imageUrl,
               keyword: styleKeyword || "Стиль",
               timestamp: Date.now(),
+              clientName: clientName || undefined
             };
             
             // local IndexedDB async save

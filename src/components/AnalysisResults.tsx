@@ -6,7 +6,7 @@ import { LazyImage } from "./LazyImage";
 import { CachedImage } from "./CachedImage";
 import { FaceShapeCard } from "./FaceShapeCard";
 import { TrichologyCard } from "./TrichologyCard";
-import { ColorChangeOnlyCard } from "./ColorChangeOnlyCard";
+import { useAnalysisContext } from "../context/AnalysisContext";
 import { HaircutList } from "./HaircutList";
 import { AnalysisResult } from "../types";
 
@@ -38,7 +38,9 @@ interface AnalysisResultsProps {
   onGenerationSuccess?: () => void;
 }
 
+
 const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
+
   isAnalyzing,
   results,
   generationsLeft,
@@ -62,6 +64,8 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
   vtonError,
   onGenerationSuccess
 }) => {
+  const { isProMode } = useAnalysisContext();
+
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,14 +80,7 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
     <>
       {isAnalyzing && !results && (
         <div className="col-span-1 lg:col-span-7 flex flex-col justify-center min-h-[400px] animate-in fade-in slide-in-from-right-12 duration-1000 fill-mode-both items-center gap-6">
-          <RotatingFactsLoader isLightMode={isLightMode} title="Изучаем ваши черты..." />
-          <button
-            onClick={() => window.dispatchEvent(new Event('open-library'))}
-            className={`px-6 py-3 rounded-full flex items-center gap-2 font-medium transition-all shadow-md active:scale-95 ${isLightMode ? 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-50' : 'bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30'}`}
-          >
-            <BookOpen size={18} />
-            Полистать каталог пока ИИ думает
-          </button>
+          {!isProMode ? <RotatingFactsLoader isLightMode={isLightMode} title="Изучаем ваши черты..." /> : <div className="text-xl font-medium animate-pulse">Загрузка...</div>}
         </div>
       )}
 
@@ -93,7 +90,7 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
             <h3 className={`font-serif text-2xl sm:text-3xl ${isLightMode ? 'text-gray-900' : 'text-white/90'}`}>
               Результаты анализа
             </h3>
-            {exportToPDF && (
+            {isProMode && exportToPDF && (
               <button
                 onClick={() => exportToPDF("analysis-results-content", "neurostylist-analysis.pdf")}
                 disabled={isExportingPDF}
@@ -115,24 +112,6 @@ const AnalysisResultsComponent: React.FC<AnalysisResultsProps> = ({
               <p className="text-xs sm:text-sm font-medium leading-relaxed">{results.warning}</p>
             </div>
           )}
-
-          {/* Vitals */}
-          <FaceShapeCard results={results} isLightMode={isLightMode} />
-
-          {/* Trichology Analysis Card */}
-          <TrichologyCard results={results} isLightMode={isLightMode} />
-
-          {/* Color Change Only */}
-          <ColorChangeOnlyCard
-            isLightMode={isLightMode}
-            imageUrl={imageUrl}
-            imageBase64={imageBase64}
-            mimeType={mimeType}
-            checkLimits={checkLimits}
-            consumeToken={consumeToken}
-            setShowBuyModal={setShowBuyModal}
-            onGenerationSuccess={onGenerationSuccess}
-          />
 
           {/* Recommendations */}
           <HaircutList

@@ -6,6 +6,7 @@ export interface HistoryItem {
   blob?: Blob;
   originalBlob?: Blob;
   keyword: string;
+  clientName?: string;
   timestamp: number;
 }
 
@@ -14,6 +15,7 @@ export interface HairstylePreset {
   id: string;          // стабильный ID (например, uuid)
   title: string;
   keyword: string;
+  clientName?: string;
   previewUrl?: string; // src для <img>, может быть objectURL
   previewBlob?: Blob;  // оригинальный Blob превью
   createdAt: number;

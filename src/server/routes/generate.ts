@@ -146,25 +146,17 @@ async function resolveImageToBase64(imageUrl: string | undefined): Promise<strin
 }
 
 export const generateRouter = Router();
-
-
 const jobMap = new Map<string, any>();
-
-// Memory leak prevention: Clean up old jobs from in-memory map every 30 minutes
 setInterval(() => {
-    const now = Date.now();
-    let deletedCount = 0;
-    for (const [jobId, jobData] of jobMap.entries()) {
-        // Remove jobs older than 1 hour
-        if (jobData.createdAt && (now - jobData.createdAt > 60 * 60 * 1000)) {
-            jobMap.delete(jobId);
-            deletedCount++;
-        }
-    }
-    if (deletedCount > 0) {
-        console.log(`[Cleanup] Removed ${deletedCount} stale jobs from memory.`);
-    }
-}, 30 * 60 * 1000);
+  const now = Date.now();
+  for (const [key, val] of jobMap.entries()) {
+    if (now - (val.createdAt || 0) > 30 * 60 * 1000) jobMap.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+
+
+
 
 
 
@@ -315,9 +307,13 @@ generateRouter.post("/generate-full/status", async (req, res) => {
   try {
     const { jobId } = req.body;
     if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
-    if (jobMap.has(jobId)) { res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); return res.json(jobMap.get(jobId)); }
+    
     if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
     
+    if (jobMap.has(jobId)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      return res.json(jobMap.get(jobId));
+    }
     const doc = await adminDb.collection("jobs").doc(jobId).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Job not found" });
@@ -337,15 +333,14 @@ generateRouter.get('/job/:jobId', async (req, res) => {
     console.log("[GET /job/:jobId] Polling for jobId:", jobId);
     if (!jobId || typeof jobId !== 'string') return res.status(400).json({ error: "Missing jobId" });
 
-    if (jobMap.has(jobId)) { 
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); 
-      const result = jobMap.get(jobId);
-      console.log("[GET /job/:jobId] Result from jobMap:", result);
-      return res.json(result); 
-    }
+
     
     if (!adminDb) return res.status(500).json({ error: "DB not initialized" });
     
+    if (jobMap.has(jobId)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      return res.json(jobMap.get(jobId));
+    }
     const doc = await adminDb.collection("jobs").doc(jobId).get();
     if (!doc.exists) {
       console.log("[GET /job/:jobId] Job not found in Firestore:", jobId);
@@ -451,13 +446,14 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
       jobMap.set(jobId, { status: "processing", createdAt: Date.now() });
       if (adminDb) {
          try {
-           
            await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
-           
-         } catch (dbErr) {
-           console.error("[generate-full] Warning: Failed to set job status in Firestore (using in-memory map instead):", dbErr.message);
+         } catch (dbErr: any) {
+           console.error("[generate-full] Warning: Failed to set job status in Firestore:", dbErr.message);
          }
       }
+      
+      // Respond early to avoid Render timeout, job continues in background
+      res.json({ isAsync: true, jobId });
       
         let jobStatus = "done";
         let jobErrorMsg = "";
@@ -813,19 +809,20 @@ Instructions:
        
       jobStatus = "error";
       jobErrorMsg = err.message || "Pipeline error";
+      jobMap.set(jobId, { status: "error", error: jobErrorMsg, createdAt: Date.now() });
     } finally {
       clearTimeout(timeoutId);
-      console.log('[generate-full] Saving job status to jobMap/Firestore, jobId:', jobId);
+      console.log('[generate-full] Saving job status to Firestore/jobMap, jobId:', jobId);
       if (jobStatus === "done") {
-        jobMap.set(jobId, { status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob });
+          jobMap.set(jobId, { status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob, originalUrl: originalImageUrl, createdAt: Date.now() });
       } else {
-        jobMap.set(jobId, { status: "error", error: jobErrorMsg });
+          jobMap.set(jobId, { status: "error", error: jobErrorMsg, createdAt: Date.now() });
       }
       
       if (adminDb) {
          try {
            if (jobStatus === "done") {
-             await adminDb.collection("jobs").doc(jobId).update({ status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob });
+             await adminDb.collection("jobs").doc(jobId).update({ status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob, originalUrl: originalImageUrl });
              
              // Update user historyCache so the slider can find the original image
              if (userId) {
@@ -856,7 +853,7 @@ Instructions:
              await adminDb.collection("jobs").doc(jobId).update({ status: "error", error: jobErrorMsg });
            }
          } catch (dbErr: any) {
-           console.error("[generate-full] Failed to save job status to Firestore (in-memory map updated successfully):", dbErr.message);
+           console.warn("[generate-full] Failed to save job status to Firestore (async background):", dbErr.message);
          }
       }
       

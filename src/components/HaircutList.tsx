@@ -119,7 +119,7 @@ export const HaircutList = React.memo(
             className={`relative overflow-hidden cursor-pointer flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm" : "text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]"}`}
           >
             <Upload size={16} />
-            <span>Свое фото</span>
+            <span>Своя стрижка (фото)</span>
             <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleCustomUpload} />
           </button>
           <button
@@ -127,45 +127,8 @@ export const HaircutList = React.memo(
             className={`flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-sm" : "text-amber-100 bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30 shadow-[0_8px_32px_rgba(245,158,11,0.15)]"}`}
           >
             <ImageIcon size={16} />
-            Библиотека стрижек
+            Каталог стрижек
           </button>
-          <button
-            onClick={() => {
-              if (results && (results.recommendations || []).length > 0) {
-                const randomRec =
-                  (results.recommendations || [])[
-                    Math.floor(Math.random() * (results.recommendations || []).length)
-                  ];
-                setTryOnStyle(randomRec);
-              }
-            }}
-            className={`flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 shadow-sm" : "text-indigo-100 bg-indigo-500/20 hover:bg-indigo-500/30 border-indigo-500/30 shadow-[0_8px_32px_rgba(99,102,241,0.15)]"}`}
-          >
-            <Wand2 size={16} />
-            Случайный стиль
-          </button>
-
-          <div className="flex flex-col gap-3 w-full sm:w-auto">
-            <button
-              onClick={() => loadMoreRecommendations('library')}
-              disabled={isLoadingMore}
-              className={`flex items-center justify-center w-full sm:w-auto gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base disabled:opacity-50 border ${isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm" : "text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]"}`}
-            >
-              <BookOpen size={16} />
-              Варианты из библиотеки (Бесплатно)
-            </button>
-            
-            <button
-              onClick={() => loadMoreRecommendations('ai')}
-              disabled={isLoadingMore}
-              className={`flex items-center justify-center w-full sm:w-auto gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base disabled:opacity-50 border ${isLightMode ? "bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 shadow-sm" : "bg-indigo-600/80 text-white hover:bg-indigo-500/80 border-indigo-500/50 shadow-[0_8px_32px_rgba(99,102,241,0.2)]"}`}
-            >
-              <Sparkles size={16} className={isLoadingMore ? "animate-pulse" : ""} />
-              {isLoadingMore
-                ? "ИИ генерирует..."
-                : "Сгенерировать новые (1 ⭐️)"}
-            </button>
-          </div>
         </div>
       </div>
     );

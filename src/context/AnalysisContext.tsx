@@ -30,6 +30,13 @@ interface AnalysisContextType {
   arError: Record<string, string | null>;
   setArError: React.Dispatch<React.SetStateAction<Record<string, string | null>>>;
 
+  clientName: string;
+  stylistNotes: string;
+  setStylistNotes: (val: string) => void;
+  setClientName: (val: string) => void;
+  isProMode: boolean;
+  setIsProMode: (val: boolean) => void;
+
   resetAnalysis: () => void;
 }
 
@@ -51,12 +58,25 @@ export const AnalysisProvider = ({ children }: { children: ReactNode }) => {
   const [isArGenerating, setIsArGenerating] = useState<Record<string, boolean>>({});
   const [arError, setArError] = useState<Record<string, string | null>>({});
 
+  const [clientName, setClientName] = useState<string>("");
+  const [stylistNotes, setStylistNotes] = useState<string>("");
+  const [isProModeState, setIsProModeState] = useState<boolean>(() => {
+    return localStorage.getItem("isProMode") === "true";
+  });
+
+  const setIsProMode = (val: boolean) => {
+    setIsProModeState(val);
+    localStorage.setItem("isProMode", String(val));
+  };
+
   const resetAnalysis = () => {
     setImageBase64(null);
     setImageFile(null);
     setResults(null);
     setPreferredStyle("Любой");
     setTryOnStyle(null);
+    setClientName("");
+    setStylistNotes("");
     setVtonResultUrl(null);
     setVtonError(null);
     setArGeneratedImageUrl({});
@@ -80,6 +100,11 @@ export const AnalysisProvider = ({ children }: { children: ReactNode }) => {
         arGeneratedImageUrl, setArGeneratedImageUrl,
         isArGenerating, setIsArGenerating,
         arError, setArError,
+
+        clientName, setClientName,
+        stylistNotes, setStylistNotes,
+        isProMode: isProModeState,
+        setIsProMode,
 
         resetAnalysis
       }}

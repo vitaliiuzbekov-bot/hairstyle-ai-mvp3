@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 interface HistoryItem {
   keyword: string;
+  clientName?: string;
   url: string;
   timestamp?: number;
 }
