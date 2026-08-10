@@ -23,3 +23,4 @@ React 18+ with TypeScript, Vite, Express.js backend (server.ts), Firebase Admin 
 - Verified `html2pdf.js` fixes for generating PDFs without cutoff.
 - `npm run lint` and `npm run build` passed successfully.
 - Checked environment variables usage.
+- **BUG FIX**: The "Связь с разработчиком" link in PRO mode didn't work in Telegram because `target="_blank"` is intercepted by the Telegram Web App browser in a way that sometimes blocks it. Replaced the `<a>` tag with a `<span>` and an `onClick` handler that calls `Telegram.WebApp.openTelegramLink` (or fallback to `openLink` / `window.open`). This ensures external links open natively in Telegram.
