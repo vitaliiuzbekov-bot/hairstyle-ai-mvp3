@@ -55,3 +55,8 @@ React 18+ with TypeScript, Vite, Express.js backend (server.ts), Firebase Admin 
 - **Root Cause:** Telegram's native `openTelegramLink` method silently blocks attempts to open a link to the *exact same bot* (`neirostilist_bot`) that the WebApp is currently running in.
 - **Fix 1:** Changed the "Связь с разработчиком" (Contact Developer) link in `HomePage.tsx` to point to `@vitalii_uzbekov` instead of the bot. Telegram permits opening different profiles.
 - **Fix 2:** Updated `openUrlInTelegram` in `telegram.ts` so that if the target URL is `neirostilist_bot`, it explicitly calls `tg.close()` (which naturally drops the user back into the bot chat) instead of failing silently.
+
+## Bugfix: Telegram Link Deep-Linking on iOS/Android Webview
+- Fixed an issue where Telegram Mini App webviews were failing to process deep links (`tg.openTelegramLink` or `window.location.href`) properly and just vibrating.
+- Implemented a robust fallback in `telegram.ts` where a physical `<a>` tag is created in the DOM, assigned the `target="_blank"` and `href` attributes, and programmatically clicked. This forces the native Telegram webview interception to trigger correctly on all platforms.
+- Updated the "Связь с разработчиком" button in `HomePage.tsx` to be an actual `<a>` tag with an `onClick` that prevents default and routes through the robust link handler.

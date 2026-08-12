@@ -21,6 +21,7 @@ export const shareToTelegram = (url: string, text: string) => {
 };
 
 
+
 export const openUrlInTelegram = (url: string) => {
     const tg = window.Telegram?.WebApp;
     if (tg && tg.HapticFeedback) {
@@ -28,27 +29,27 @@ export const openUrlInTelegram = (url: string) => {
     }
     
     // If the URL is exactly the bot we are in, just close the webapp to return to the chat
-    if (url === "https://t.me/neirostilist_bot" || url === "https://t.me/neirostilist_bot/") {
+    if (url.includes("neirostilist_bot")) {
         if (tg) {
-            (tg as any).close();
+            tg.close();
             return;
         }
     }
 
-    if (tg) {
-        try {
-            if (tg.openTelegramLink && url.startsWith("https://t.me/")) {
-                tg.openTelegramLink(url);
-            } else if (tg.openLink) {
-                tg.openLink(url, { try_instant_view: false });
-            } else {
-                window.location.href = url;
-            }
-        } catch (e) {
-            window.location.href = url;
-        }
-    } else {
-        window.open(url, "_blank");
+    // The most reliable way to open a link in all versions of Telegram Mini Apps
+    // is to create a physical anchor tag in the DOM and trigger a click on it,
+    // allowing the TMA webview to intercept it natively.
+    try {
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } catch (e) {
+        window.location.href = url;
     }
 };
+
 
