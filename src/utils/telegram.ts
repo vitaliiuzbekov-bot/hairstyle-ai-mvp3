@@ -1,4 +1,6 @@
+import { trackEvent } from "../services/analytics";
 export const shareToTelegram = (url: string, text: string) => {
+    trackEvent("share_clicked");
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
     const tg = window.Telegram?.WebApp;
     if (tg) {
@@ -22,15 +24,15 @@ export const openUrlInTelegram = (url: string) => {
     const tg = window.Telegram?.WebApp;
     if (tg) {
         try {
-            if (url.startsWith('https://t.me/') && tg.openTelegramLink) {
+            if (tg.openTelegramLink) {
                 tg.openTelegramLink(url);
             } else if (tg.openLink) {
-                tg.openLink(url);
+                tg.openLink(url, { try_instant_view: false });
             } else {
-                window.open(url, "_blank");
+                window.location.href = url;
             }
         } catch (e) {
-            window.open(url, "_blank");
+            window.location.href = url;
         }
     } else {
         window.open(url, "_blank");

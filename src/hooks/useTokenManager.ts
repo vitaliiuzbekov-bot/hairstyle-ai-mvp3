@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { trackEvent } from "../services/analytics";
 import { signInAnonymously } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -201,6 +202,7 @@ export const useTokenManager = () => {
         setInitError(null);
       } finally {
         setIsInitializing(false);
+        if (!initError) { setTimeout(() => trackEvent("app_open"), 500); }
       }
     };
 

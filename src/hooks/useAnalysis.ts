@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AnalysisResult } from '../types';
 import { analyzeImageApi, generateArApi, generateFullApi, loadMoreApi } from '../services/api';
+import { trackEvent } from '../services/analytics';
 // import { fallbackFaceApi } from '../services/fallbackAnalysis';
 import { addHistoryItem } from '../services/localHistory';
 import { hapticNotification } from '../utils/haptics';
@@ -438,6 +439,7 @@ export const useAnalysis = ({
           formData.append("idempotencyKey", idempotencyKey);
 
           console.log('[useAnalysis] Начало генерации');
+          trackEvent("generation_started", { styleKeyword });
           console.log('[useAnalysis] Starting generateFullApi (which polls internally)');
           const data = await generateFullApi(formData, telegramInitData, signal);
           console.log('[useAnalysis] Результат получен:', data);
@@ -476,6 +478,7 @@ export const useAnalysis = ({
             }
 
             setVtonResultUrl(watermarkedUrl);
+            trackEvent("generation_completed", { styleKeyword });
             consumeToken(); // Optimistic deduction on successful UI render
             addToast("Примерка завершена! Посмотрите результат в Истории.", "success");
             hapticNotification('success');
@@ -501,6 +504,7 @@ export const useAnalysis = ({
             return;
           }
           console.error("VTON Error:", err);
+          trackEvent("generation_failed", { error: String(err?.message || "unknown") });
           hapticNotification('error');
           const msg = err?.message || "Ошибка виртуальной примерки. Попробуйте снова чуть позже.";
           addToast(typeof msg === 'object' ? JSON.stringify(msg) : String(msg), "error");

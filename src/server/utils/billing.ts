@@ -11,7 +11,10 @@ export const checkAndDeductGeneration = async (userId: string | undefined, idemp
   }
 
   if (userId === "local-user") {
-    return { ok: true }; 
+    if (process.env.NODE_ENV !== "production") {
+      return { ok: true };
+    }
+    return { ok: false, error: "Пожалуйста, откройте приложение через официального бота Telegram." };
   }
 
   if (!adminDb) {

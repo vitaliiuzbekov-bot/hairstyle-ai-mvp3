@@ -13,6 +13,7 @@ import { analysisRouter } from "./src/server/routes/analysis";
 import { generateRouter } from "./src/server/routes/generate";
 import telegramExportRouter from "./src/server/routes/telegramExport";
 import { authRouter } from "./src/server/routes/auth";
+import { analyticsRouter } from "./src/server/routes/analytics";
 import { referenceRouter } from "./src/server/routes/reference";
 import { tgStorageRouter } from "./src/server/routes/tgStorage";
 import { logToTelegram } from "./src/server/services/logger";
@@ -183,6 +184,7 @@ const app = express();
   app.use("/api", generateRouter);
   app.use("/api", telegramExportRouter);
   app.use("/api", authRouter);
+  app.use("/api/analytics", analyticsRouter);
   app.use("/api", referenceRouter);
   app.use("/api/tg", tgStorageRouter);
 

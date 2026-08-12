@@ -4,6 +4,7 @@ import { AnalysisResult } from '../types';
 import { useUI } from '../context/UIContext';
 import { storage } from '../firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { trackEvent } from '../services/analytics';
 
 export const useImageUpload = () => {
     const { processImage, isProcessing: isCompressing, error: compressError } = useImageProcessor();
@@ -109,6 +110,7 @@ export const useImageUpload = () => {
         try {
             const b64 = await processImage(file);
             setRawImageBase64(b64);
+            trackEvent("photo_uploaded");
         } catch (err: any) {
             const msg = compressError || err.message || "Ошибка обработки";
             addToast(msg, "error");

@@ -24,3 +24,28 @@ React 18+ with TypeScript, Vite, Express.js backend (server.ts), Firebase Admin 
 - `npm run lint` and `npm run build` passed successfully.
 - Checked environment variables usage.
 - **BUG FIX**: The "Связь с разработчиком" link in PRO mode didn't work in Telegram because `target="_blank"` is intercepted by the Telegram Web App browser in a way that sometimes blocks it. Replaced the `<a>` tag with a `<span>` and an `onClick` handler that calls `Telegram.WebApp.openTelegramLink` (or fallback to `openLink` / `window.open`). This ensures external links open natively in Telegram.
+
+## Recent Actions (Analytics & UI Tweaks)
+- Added `/stats` command handling to the Telegram webhook (`src/server/routes/auth.ts`). When the user sends `/stats` directly to the bot, it returns a breakdown of unique users, generations, shares, and purchases per acquisition source. This allows the admin to view analytics directly in Telegram without needing a web dashboard.
+- Redesigned `WelcomeModal.tsx` to provide clear, step-by-step onboarding instructions (1. Take photo, 2. Get AI Analysis, 3. Choose & Try On) instead of the previous vague marketing slides.
+- Fixed the "Связь с разработчиком" link on `HomePage.tsx`. Updated `src/utils/telegram.ts` (`openUrlInTelegram`) to explicitly try `tg.openTelegramLink`, fallback to `tg.openLink(..., { try_instant_view: false })`, and finally fallback to `window.location.href`. This resolves issues where Telegram would ignore links targeting the same bot or intercept them incorrectly.
+
+## UI Fixes (Mobile Header)
+- Fixed horizontal layout overflow on narrow mobile screens (e.g. 360px/375px) in `Header.tsx`.
+- The right-side action buttons (Bot, Feedback, Tutorial, and Catalog) took up too much horizontal space and pushed the Profile button off-screen.
+- Moved these secondary actions to the `ProfileModal.tsx` settings menu for mobile users. They are now hidden on mobile (`hidden sm:flex`) in the main header but remain visible on desktop.
+- This ensures critical items (Tokens, Buy, PRO mode, Profile) have enough room to render correctly without squishing.
+
+## UI Fixes (Mobile Header)
+- Fixed horizontal layout overflow on narrow mobile screens (e.g. 360px/375px) in `Header.tsx`.
+- The right-side action buttons (Bot, Feedback, Tutorial, and Catalog) took up too much horizontal space and pushed the Profile button off-screen.
+- Moved these secondary actions to the `ProfileModal.tsx` settings menu for mobile users. They are now hidden on mobile (`hidden sm:flex`) in the main header but remain visible on desktop.
+- This ensures critical items (Tokens, Buy, PRO mode, Profile) have enough room to render correctly without squishing.
+
+## Final Pre-Launch Security & Build Audit
+- Verifed `npm run lint` and `npm run build` - 0 errors.
+- Discovered and patched a critical vulnerability in `src/server/utils/billing.ts` where any user with `userId="local-user"` could bypass billing. Added `process.env.NODE_ENV !== 'production'` check so local-users are completely blocked from free generations in production.
+- Added missing `FIREBASE_SERVICE_ACCOUNT_BASE64` to `.env.example`.
+- Verified `tgAuth.ts` correctly validates Telegram WebApp `initData` using HMAC-SHA256 signature.
+- Verified Webhook endpoint correctly validates `x-telegram-bot-api-secret-token`.
+- Verified `vite.config.ts` has `vite-plugin-pwa` fully removed to prevent Render.com build errors.

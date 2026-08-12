@@ -138,13 +138,16 @@ function App() {
     const handleOpenLibrary = () => setIsLibraryOpen(true);
     const handleOpenBuyModal = () => setShowBuyModal(true);
     const handleOpenFeedback = () => setIsFeedbackOpen(true);
+    const handleOpenTutorial = () => setShowTutorial(true);
     window.addEventListener('open-library', handleOpenLibrary);
     window.addEventListener('open-buy-modal', handleOpenBuyModal);
     window.addEventListener('open-feedback-modal', handleOpenFeedback);
+    window.addEventListener('open-tutorial', handleOpenTutorial);
     return () => {
       window.removeEventListener('open-library', handleOpenLibrary);
       window.removeEventListener('open-buy-modal', handleOpenBuyModal);
       window.removeEventListener('open-feedback-modal', handleOpenFeedback);
+      window.removeEventListener('open-tutorial', handleOpenTutorial);
     };
   }, [setIsLibraryOpen, setShowBuyModal]);
 

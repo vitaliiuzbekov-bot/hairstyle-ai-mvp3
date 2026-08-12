@@ -156,6 +156,60 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
   }
 
   const body = req.body;
+  // Check for text commands
+  if (body.message && body.message.text) {
+    const text = body.message.text;
+    const chatId = body.message.chat.id;
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    
+    if (text === '/stats' && String(chatId) === adminChatId && adminDb) {
+      try {
+        const eventsSnap = await adminDb.collection("analytics_events").get();
+        const stats: Record<string, { users: Set<string>, generations: number, shares: number, purchases: number }> = {};
+        
+        eventsSnap.docs.forEach(doc => {
+          const data = doc.data();
+          const source = data.source || "unknown";
+          
+          if (!stats[source]) {
+            stats[source] = { users: new Set(), generations: 0, shares: 0, purchases: 0 };
+          }
+          
+          if (data.userId) stats[source].users.add(data.userId);
+          if (data.event === "generation_completed") stats[source].generations++;
+          if (data.event === "share_clicked") stats[source].shares++;
+          if (data.event === "purchase_completed") stats[source].purchases++;
+        });
+
+        let msg = "📊 <b>Статистика по источникам:</b>\n\n";
+        Object.entries(stats).forEach(([source, data]) => {
+          msg += `<b>Источник:</b> ${source}\n`;
+          msg += `👥 Уникальных пользователей: ${data.users.size}\n`;
+          msg += `🎨 Сделано генераций: ${data.generations}\n`;
+          msg += `🔗 Поделились результатами: ${data.shares}\n`;
+          msg += `💰 Покупок: ${data.purchases}\n\n`;
+        });
+        
+        if (Object.keys(stats).length === 0) {
+           msg += "Нет данных.";
+        }
+
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: msg,
+            parse_mode: 'HTML'
+          })
+        });
+      } catch (e) {
+        console.error("Stats command error", e);
+      }
+      return res.status(200).send("OK");
+    }
+  }
+
   
   if (body.pre_checkout_query) {
     try {
@@ -208,7 +262,29 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
              fullAccess: true
            });
         }
-        await logToTelegram(`💰 <b>Успешная оплата Stars!</b>\nПакет: <code>${packageId}</code>\nПользователь ID: <code>${userId}</code>\nСумма: ${starsAmount} Stars\nНачислено: ${pkg.count} генераций`);
+        
+        await logToTelegram(`💰 <b>Успешная оплата Stars!</b>
+Пакет: <code>${packageId}</code>
+Пользователь ID: <code>${userId}</code>
+Сумма: ${starsAmount} Stars
+Начислено: ${pkg.count} генераций`);
+        
+        try {
+          const userSnap = await adminDb.collection("users").doc(userId).get();
+          const source = userSnap.exists ? (userSnap.data()?.source || "direct") : "direct";
+          await adminDb.collection("analytics_events").add({
+            userId,
+            event: "purchase_completed",
+            source,
+            timestamp: Date.now(),
+            serverTimestamp: FieldValue.serverTimestamp(),
+            packageId,
+            starsAmount
+          });
+        } catch (e) {
+          console.error("Analytics purchase_completed error", e);
+        }
+
       } catch (e: any) {
         if (e.message === "ALREADY_PROCESSED") {
             console.log("Duplicate webhook received, ignoring.");
