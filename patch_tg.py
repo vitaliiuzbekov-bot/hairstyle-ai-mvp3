@@ -18,9 +18,16 @@ export const openUrlInTelegram = (url: string) => {
         }
     }
 
-    // The most reliable way to open a link in all versions of Telegram Mini Apps
-    // is to create a physical anchor tag in the DOM and trigger a click on it,
-    // allowing the TMA webview to intercept it natively.
+    if (tg && tg.openTelegramLink && url.startsWith("https://t.me/")) {
+        try {
+            tg.openTelegramLink(url);
+            return; // Stop here if it succeeds (or is intercepted by TG)
+        } catch (e) {
+            // fallback
+        }
+    }
+
+    // Fallback for non-telegram links or if openTelegramLink fails
     try {
         const a = document.createElement("a");
         a.href = url;
