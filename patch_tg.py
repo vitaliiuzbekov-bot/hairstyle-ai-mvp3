@@ -1,26 +1,9 @@
-import { trackEvent } from "../services/analytics";
-export const shareToTelegram = (url: string, text: string) => {
-    trackEvent("share_clicked");
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-        try {
-            if (tg.openTelegramLink) {
-                tg.openTelegramLink(shareUrl);
-            } else if (tg.openLink) {
-                tg.openLink(shareUrl);
-            } else {
-                window.open(shareUrl, "_blank");
-            }
-        } catch (e) {
-            window.open(shareUrl, "_blank");
-        }
-    } else {
-        window.open(shareUrl, "_blank");
-    }
-};
+import sys
 
+with open("src/utils/telegram.ts", "r") as f:
+    content = f.read()
 
+new_func = """
 export const openUrlInTelegram = (url: string) => {
     const tg = window.Telegram?.WebApp;
     if (tg && tg.HapticFeedback) {
@@ -30,7 +13,7 @@ export const openUrlInTelegram = (url: string) => {
     // If the URL is exactly the bot we are in, just close the webapp to return to the chat
     if (url === "https://t.me/neirostilist_bot" || url === "https://t.me/neirostilist_bot/") {
         if (tg) {
-            (tg as any).close();
+            tg.close();
             return;
         }
     }
@@ -51,4 +34,10 @@ export const openUrlInTelegram = (url: string) => {
         window.open(url, "_blank");
     }
 };
+"""
 
+import re
+content = re.sub(r'export const openUrlInTelegram = \(url: string\) => \{.*?\};', new_func, content, flags=re.DOTALL)
+
+with open("src/utils/telegram.ts", "w") as f:
+    f.write(content)

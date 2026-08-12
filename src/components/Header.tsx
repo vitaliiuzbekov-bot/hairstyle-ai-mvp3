@@ -1,3 +1,4 @@
+import { openUrlInTelegram } from '../utils/telegram';
 import React from "react";
 import { Scissors, Coins, Zap, BookOpen, Info, MessageSquare } from "lucide-react";
 import { useAnalysisContext } from "../context/AnalysisContext";
@@ -111,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>}
 
           <div className="flex items-center gap-1 sm:gap-2 ml-0 sm:ml-2 shrink-0">
-            <button onClick={() => { if (window.Telegram?.WebApp?.openTelegramLink) { window.Telegram.WebApp.openTelegramLink("https://t.me/neirostilist_bot"); } else { window.open("https://t.me/neirostilist_bot", "_blank"); } }} className={`hidden sm:flex w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300" : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"}`}>
+            <button onClick={() => openUrlInTelegram("https://t.me/neirostilist_bot")} className={`hidden sm:flex w-8 h-8 sm:w-auto sm:h-9 sm:px-3 rounded-full items-center justify-center sm:gap-1.5 transition-all font-medium text-[11px] sm:text-xs border shrink-0 ${isLightMode ? "bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300" : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"}`}>
               <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M21.5 2l-20.5 9 7.5 3 11-10-8.5 11.5 6.5 2 4-15.5z"></path></svg>
               <span className="hidden sm:inline">Бот</span>
             </button>

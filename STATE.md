@@ -49,3 +49,9 @@ React 18+ with TypeScript, Vite, Express.js backend (server.ts), Firebase Admin 
 - Verified `tgAuth.ts` correctly validates Telegram WebApp `initData` using HMAC-SHA256 signature.
 - Verified Webhook endpoint correctly validates `x-telegram-bot-api-secret-token`.
 - Verified `vite.config.ts` has `vite-plugin-pwa` fully removed to prevent Render.com build errors.
+
+## Bugfix: Telegram WebApp Link Blocking (Haptic feedback only)
+- Fixed an issue where clicking "Связь с разработчиком" or "Перейти в бота" inside the Telegram Mini App only vibrated the phone and did nothing.
+- **Root Cause:** Telegram's native `openTelegramLink` method silently blocks attempts to open a link to the *exact same bot* (`neirostilist_bot`) that the WebApp is currently running in.
+- **Fix 1:** Changed the "Связь с разработчиком" (Contact Developer) link in `HomePage.tsx` to point to `@vitalii_uzbekov` instead of the bot. Telegram permits opening different profiles.
+- **Fix 2:** Updated `openUrlInTelegram` in `telegram.ts` so that if the target URL is `neirostilist_bot`, it explicitly calls `tg.close()` (which naturally drops the user back into the bot chat) instead of failing silently.
