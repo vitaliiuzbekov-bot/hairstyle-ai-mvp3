@@ -278,7 +278,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {isProMode && !imageBase64 && (
           <div className="text-center max-w-2xl mx-auto mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className={`font-serif text-3xl mb-2 ${isLightMode ? "text-gray-900" : "text-white/90"}`}>PRO-режим</h2>
-            <p className={`text-sm ${isLightMode ? "text-gray-500" : "text-white/50"}`}>Расширенный функционал для мастеров. <a href="https://t.me/vitalii_uzbekov" onClick={(e) => { e.preventDefault(); openUrlInTelegram("https://t.me/vitalii_uzbekov"); }} className="text-blue-500 underline hover:text-blue-400 cursor-pointer">Связь с разработчиком для внедрения</a></p>
+            <p className={`text-sm ${isLightMode ? "text-gray-500" : "text-white/50"}`}>Расширенный функционал для мастеров. <span onClick={() => window.dispatchEvent(new Event("open-feedback-modal"))} className="text-blue-500 underline hover:text-blue-400 cursor-pointer">Связь с разработчиком для внедрения</span></p>
           </div>
         )}
 

@@ -60,3 +60,7 @@ React 18+ with TypeScript, Vite, Express.js backend (server.ts), Firebase Admin 
 - Fixed an issue where Telegram Mini App webviews were failing to process deep links (`tg.openTelegramLink` or `window.location.href`) properly and just vibrating.
 - Implemented a robust fallback in `telegram.ts` where a physical `<a>` tag is created in the DOM, assigned the `target="_blank"` and `href` attributes, and programmatically clicked. This forces the native Telegram webview interception to trigger correctly on all platforms.
 - Updated the "Связь с разработчиком" button in `HomePage.tsx` to be an actual `<a>` tag with an `onClick` that prevents default and routes through the robust link handler.
+
+## Bugfix: Feedback Modal for Developer Contact
+- Based on user request, replaced the external link for "Связь с разработчиком" (Contact Developer) in `HomePage.tsx` with a trigger to open the existing `FeedbackModal`.
+- This ensures users can reliably send messages directly to the developer from within the app without dealing with Telegram's strict deep-link blocking policies.
