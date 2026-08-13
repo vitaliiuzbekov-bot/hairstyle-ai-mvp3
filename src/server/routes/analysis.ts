@@ -68,7 +68,7 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
       preferredStyle: preferredStyle || "Любой",
       faceApiGender, faceApiShape, faceApiAge
     };
-    const cacheKey = "v2_" + getCacheKey(cacheKeyParams);
+    const cacheKey = "v4_" + getCacheKey(cacheKeyParams);
     
     const cachedAnalysis = await getCachedValue<any>(cacheKey);
     if (cachedAnalysis) {
@@ -88,7 +88,7 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
     
     // If the frontend did a local analysis, it can optionally pass the local detected colors to avoid Vision entirely
     const skipVision = req.body.skipVision === true || req.body.skipVision === 'true';
-    const preDetectedFacts = faceApiGender ? `[HINTS FROM LOCAL AI (MAY BE INACCURATE): Suggested Gender: ${faceApiGender === 'male' ? 'MALE' : 'FEMALE'}. Age is approx ${faceApiAge}. Face shape: ${faceApiShape}. ${req.body.localSkinTone ? `Skin tone: ${req.body.localSkinTone}.` : ''} ${req.body.localHairColor ? `Hair color: ${req.body.localHairColor}.` : ''}]` : "";
+    const preDetectedFacts = faceApiGender ? `[HINTS FROM LOCAL AI (MAY BE INACCURATE): Age is approx ${faceApiAge}. Face shape: ${faceApiShape}. ${req.body.localSkinTone ? `Skin tone: ${req.body.localSkinTone}.` : ''} ${req.body.localHairColor ? `Hair color: ${req.body.localHairColor}.` : ''}]` : "";
     
     if (skipVision && preDetectedFacts) {
         console.log("Skipping Vision API, using frontend provided parameters only.");
@@ -98,7 +98,7 @@ analysisRouter.post("/analyze", analyzeLimiter, async (req: Request, res: Respon
         const visionPrompt = `You are an expert trichologist, physiognomist and master hair stylist. Analyze this person's face and hair with ultimate precision from the photo. Provide a very detailed clinical description: 
 ${preDetectedFacts} 
 
-1) EXACT gender and estimated age. CRITICAL: If a gender is suggested in the hints, you MUST use that exact gender, even if the person has long hair or features you might otherwise misinterpret. Do NOT guess the gender differently from the hint.
+1) EXACT gender and estimated age. 
 2) Precise face shape.
 3) EXACT hair length in cm and category (bald, buzz, short, medium, long). 
 4) EXACT hair density (thick, medium, thin, sparse, balding) and exact status of the hairline (is there a receding hairline, temporal thinning, bald spots?). 
@@ -168,7 +168,7 @@ ${preDetectedFacts}
 Output EXCLUSIVELY a JSON object (no markdown, no backticks, strictly parseable JSON).
 
 Сначала выдели характеристики в соответствии со следующими правилами:
-- gender ("male" или "female", строго соответствуй полу из описания! Если в описании указано MALE или FEMALE, используй это.)
+- gender ("male" или "female", определи реальный пол клиента на основе визуального описания)
 - faceShape (например, "Овальная", "Квадратная" - НА РУССКОМ)
 - hairLength (ОБЯЗАТЕЛЬНО проанализируй длину из описания и выбери одну из: "Лысый", "Ежик/Очень короткие", "Короткие", "Средние", "Длинные" - НА РУССКОМ)
 - hairDensity (ОБЯЗАТЕЛЬНО: "Редкие/Тонкие", "Средние", "Густые" - НА РУССКОМ)
@@ -210,7 +210,9 @@ Return ONLY the raw JSON string matching this schema:
     const parsedResults = safeParseJSON(textOutput);
     
     // 🔥 INJECT 3 RANDOM LIBRARY RECOMMENDATIONS TO SAVE AI COSTS 🔥
-    const lib = parsedResults.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
+    const genderStr = String(parsedResults.gender || '').toLowerCase();
+    const isMale = genderStr.includes('male') || genderStr.includes('муж') || genderStr === 'm' || genderStr.includes('пар');
+    const lib = isMale ? MALE_LIBRARY : FEMALE_LIBRARY;
     const shuffled = [...lib].sort(() => 0.5 - Math.random());
     const picked = shuffled.slice(0, 3);
     parsedResults.recommendations = picked.map(item => ({

@@ -14,6 +14,10 @@ service cloud.firestore {
        allow read: if true; // Client can poll status
        allow write: if false; // Only admin writes
     }
+    match /jobs/{jobId} {
+       allow read: if true; // Client can poll status
+       allow write: if false; // Only admin writes
+    }
     match /{document=**} {
        allow read, write: if false; 
     }

@@ -530,7 +530,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       const targetHairColor = hairColor;
       const finalColor = targetHairColor && targetHairColor !== "Любой" ? translateColor(targetHairColor).toLowerCase() : "";
       
-      let baseImageForFlux = finalTargetImageUrl || selfieImageFull;
+      let baseImageForFlux = selfieImageFull;
       
       // PARALLEL: Start Fal uploads immediately
        let fluxBaseImageUrlPromise = baseImageForFlux.startsWith('data:') ? uploadImageToFal(baseImageForFlux) : Promise.resolve(baseImageForFlux);
@@ -555,11 +555,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
           fluxStrength = 0.35; // keep original structure
       }
       
-      // If we have a target image (reference), we just want to face-swap onto it.
-      // No need to run Flux unless they are doing something else.
-      if (finalTargetImageUrl) {
-          fluxStrength = 0; 
-      }
+      // Target image is used by Gemini to guide the prompt; we still run Flux on the user's selfie.
 
       let promptEng = "";
         let systemInstruction = `You are an expert AI image generation prompt engineer.

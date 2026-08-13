@@ -1,52 +1,18 @@
-import sys
+import re
 
 with open("src/server/routes/generate.ts", "r") as f:
     content = f.read()
 
-# Remove jobMap interval
-import re
-content = re.sub(r'const jobMap = new Map<string, any>\(\);\s*// Memory leak prevention.*?}, 30 \* 60 \* 1000\);', '', content, flags=re.DOTALL)
+# Bust cache for generate
+content = content.replace('"v3_force_update_" + getCacheKey', '"v4_realism_" + getCacheKey')
 
-# Replace jobMap.has in generate-full/status
-content = content.replace('if (jobMap.has(jobId)) { res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); return res.json(jobMap.get(jobId)); }', '')
+old_system = 'Your task is to write a highly detailed, photorealistic prompt for a text-to-image AI (e.g., Flux) to change a person\'s hairstyle in an image.'
+new_system = 'Your task is to write a highly detailed, photorealistic prompt for a text-to-image AI to generate an amateur, unretouched smartphone selfie with a specific hairstyle. CRITICAL: The image MUST look like a casual iPhone photo, with natural lighting, real skin texture (pores, slight imperfections), and NO studio lighting. Avoid CGI or plastic look.'
+content = content.replace(old_system, new_system)
 
-# Replace jobMap.has in /job/:jobId
-target = """    if (jobMap.has(jobId)) { 
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate"); 
-      const result = jobMap.get(jobId);
-      console.log("[GET /job/:jobId] Result from jobMap:", result);
-      return res.json(result); 
-    }"""
-content = content.replace(target, '')
-
-# Modify early return in handleGenerateFull
-target2 = """      jobMap.set(jobId, { status: "processing", createdAt: Date.now() });
-      if (adminDb) {
-         try {
-           
-           await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
-           
-         } catch (dbErr) {
-           console.error("[generate-full] Warning: Failed to set job status in Firestore (using in-memory map instead):", dbErr.message);
-         }
-      }"""
-replacement2 = """      if (adminDb) {
-         try {
-           await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
-         } catch (dbErr: any) {
-           console.error("[generate-full] Warning: Failed to set job status in Firestore:", dbErr.message);
-         }
-      }
-      
-      // Respond early to avoid Render timeout, job continues in background
-      res.json({ isAsync: true, jobId });"""
-content = content.replace(target2, replacement2)
-
-# Remove jobMap updates in finally block
-content = content.replace('        jobMap.set(jobId, { status: "done", imageUrl: swappedImageUrlForJob, referenceImage: finalImageUrlForJob });', '')
-content = content.replace('        jobMap.set(jobId, { status: "error", error: jobErrorMsg });', '')
-content = content.replace('console.log(\'[generate-full] Saving job status to jobMap/Firestore, jobId:\', jobId);', 'console.log(\'[generate-full] Saving job status to Firestore, jobId:\', jobId);')
-content = content.replace('(in-memory map updated successfully):', '(async background):')
+old_fallback = 'promptEng = `A photorealistic portrait of a person. Age: ${ageRange || "unknown"}, Gender: ${gender || "unknown"}. New Hairstyle: ${mappedKw} - ${description || ""}. Desired Hair Color: ${finalColor || "original"}. The face features must remain exactly the same.`;'
+new_fallback = 'promptEng = `Amateur smartphone selfie photo of a person. Age: ${ageRange || "unknown"}, Gender: ${gender || "unknown"}. New Hairstyle: ${mappedKw} - ${description || ""}. Desired Hair Color: ${finalColor || "original"}. Shot on iPhone 12, natural window light, real skin texture with visible pores and slight imperfections, candid photography, unretouched, highly realistic, everyday life photo, not a studio shoot, avoiding plastic look.`;'
+content = content.replace(old_fallback, new_fallback)
 
 with open("src/server/routes/generate.ts", "w") as f:
     f.write(content)

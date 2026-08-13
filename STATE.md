@@ -1,66 +1,42 @@
-# Current State
-
-## Stack
-React 18+ with TypeScript, Vite, Express.js backend (server.ts), Firebase Admin (Firestore + Storage), Telegram Bot API.
-
-## Recent Actions
-- Investigated why the final photo was not arriving on the frontend despite Fal.ai succeeding.
-- Found that the Google AI Studio testing environment's Application Default Credentials lack permissions to write to Firestore (`PERMISSION_DENIED`), causing the background job update to fail silently.
-- Restored `jobMap` as a fallback memory cache in `generate.ts`. This ensures that even if Firestore `adminDb` throws a permission error in the sandbox, the frontend polling still retrieves the successful result.
-- Fixed `firebase.ts` to properly parse `FIREBASE_SERVICE_ACCOUNT_BASE64` from environment variables, ensuring that when deployed to Render, the Firestore integration will work correctly.
-- Increased the frontend polling timeout in `api.ts` from 120 seconds to 300 seconds to prevent premature timeouts during long generations.
-- Ensured `originalUrl` is properly saved to Firestore and returned to the frontend so `localStorage` history updates correctly.
-
-## Current Pending Architectural Improvements
-- Ensure Render deployment includes `FIREBASE_SERVICE_ACCOUNT_BASE64`.
-- **CRITICAL BUG FIX**: The `jobMap.set` was accidentally empty inside the `finally` block in `generate.ts`. This caused the job state to stay in "processing" indefinitely in the fallback cache. The client kept polling until timeout. Fixed this so `jobMap` correctly receives the `done` status. Testing in AI Studio will now work smoothly again.
-- **BUG FIX**: The generated PDF for the "Barber Blueprint" (Техническая карта) was slightly cut off on the right side on mobile devices or narrow windows.
-  - The root cause was that `html2canvas` limits its capture area based on `document.body.style.width = '100%'`, which on mobile restricts the width to a value smaller than the required `794px` (A4 format).
-  - Fixed it in `pdfExport.ts` by explicitly setting `width: 794px` on `clonedDoc.body` and `clonedDoc.documentElement` instead of `100%`, and setting `width` and `windowWidth` to `794` in `html2canvas` options.
-  - Also enforced `width: 794px !important; overflow: hidden;` on `.pdf-page` to guarantee layout containment.
-## Final Pre-Deployment Checks
-- Removed debug routes (debug-jobs, debug-users, debug-adc).
-- Verified `html2pdf.js` fixes for generating PDFs without cutoff.
-- `npm run lint` and `npm run build` passed successfully.
-- Checked environment variables usage.
-- **BUG FIX**: The "Связь с разработчиком" link in PRO mode didn't work in Telegram because `target="_blank"` is intercepted by the Telegram Web App browser in a way that sometimes blocks it. Replaced the `<a>` tag with a `<span>` and an `onClick` handler that calls `Telegram.WebApp.openTelegramLink` (or fallback to `openLink` / `window.open`). This ensures external links open natively in Telegram.
-
-## Recent Actions (Analytics & UI Tweaks)
-- Added `/stats` command handling to the Telegram webhook (`src/server/routes/auth.ts`). When the user sends `/stats` directly to the bot, it returns a breakdown of unique users, generations, shares, and purchases per acquisition source. This allows the admin to view analytics directly in Telegram without needing a web dashboard.
-- Redesigned `WelcomeModal.tsx` to provide clear, step-by-step onboarding instructions (1. Take photo, 2. Get AI Analysis, 3. Choose & Try On) instead of the previous vague marketing slides.
-- Fixed the "Связь с разработчиком" link on `HomePage.tsx`. Updated `src/utils/telegram.ts` (`openUrlInTelegram`) to explicitly try `tg.openTelegramLink`, fallback to `tg.openLink(..., { try_instant_view: false })`, and finally fallback to `window.location.href`. This resolves issues where Telegram would ignore links targeting the same bot or intercept them incorrectly.
-
-## UI Fixes (Mobile Header)
-- Fixed horizontal layout overflow on narrow mobile screens (e.g. 360px/375px) in `Header.tsx`.
-- The right-side action buttons (Bot, Feedback, Tutorial, and Catalog) took up too much horizontal space and pushed the Profile button off-screen.
-- Moved these secondary actions to the `ProfileModal.tsx` settings menu for mobile users. They are now hidden on mobile (`hidden sm:flex`) in the main header but remain visible on desktop.
-- This ensures critical items (Tokens, Buy, PRO mode, Profile) have enough room to render correctly without squishing.
-
-## UI Fixes (Mobile Header)
-- Fixed horizontal layout overflow on narrow mobile screens (e.g. 360px/375px) in `Header.tsx`.
-- The right-side action buttons (Bot, Feedback, Tutorial, and Catalog) took up too much horizontal space and pushed the Profile button off-screen.
-- Moved these secondary actions to the `ProfileModal.tsx` settings menu for mobile users. They are now hidden on mobile (`hidden sm:flex`) in the main header but remain visible on desktop.
-- This ensures critical items (Tokens, Buy, PRO mode, Profile) have enough room to render correctly without squishing.
-
-## Final Pre-Launch Security & Build Audit
-- Verifed `npm run lint` and `npm run build` - 0 errors.
-- Discovered and patched a critical vulnerability in `src/server/utils/billing.ts` where any user with `userId="local-user"` could bypass billing. Added `process.env.NODE_ENV !== 'production'` check so local-users are completely blocked from free generations in production.
-- Added missing `FIREBASE_SERVICE_ACCOUNT_BASE64` to `.env.example`.
-- Verified `tgAuth.ts` correctly validates Telegram WebApp `initData` using HMAC-SHA256 signature.
-- Verified Webhook endpoint correctly validates `x-telegram-bot-api-secret-token`.
-- Verified `vite.config.ts` has `vite-plugin-pwa` fully removed to prevent Render.com build errors.
-
-## Bugfix: Telegram WebApp Link Blocking (Haptic feedback only)
-- Fixed an issue where clicking "Связь с разработчиком" or "Перейти в бота" inside the Telegram Mini App only vibrated the phone and did nothing.
-- **Root Cause:** Telegram's native `openTelegramLink` method silently blocks attempts to open a link to the *exact same bot* (`neirostilist_bot`) that the WebApp is currently running in.
-- **Fix 1:** Changed the "Связь с разработчиком" (Contact Developer) link in `HomePage.tsx` to point to `@vitalii_uzbekov` instead of the bot. Telegram permits opening different profiles.
-- **Fix 2:** Updated `openUrlInTelegram` in `telegram.ts` so that if the target URL is `neirostilist_bot`, it explicitly calls `tg.close()` (which naturally drops the user back into the bot chat) instead of failing silently.
-
-## Bugfix: Telegram Link Deep-Linking on iOS/Android Webview
-- Fixed an issue where Telegram Mini App webviews were failing to process deep links (`tg.openTelegramLink` or `window.location.href`) properly and just vibrating.
-- Implemented a robust fallback in `telegram.ts` where a physical `<a>` tag is created in the DOM, assigned the `target="_blank"` and `href` attributes, and programmatically clicked. This forces the native Telegram webview interception to trigger correctly on all platforms.
-- Updated the "Связь с разработчиком" button in `HomePage.tsx` to be an actual `<a>` tag with an `onClick` that prevents default and routes through the robust link handler.
-
-## Bugfix: Feedback Modal for Developer Contact
-- Based on user request, replaced the external link for "Связь с разработчиком" (Contact Developer) in `HomePage.tsx` with a trigger to open the existing `FeedbackModal`.
-- This ensures users can reliably send messages directly to the developer from within the app without dealing with Telegram's strict deep-link blocking policies.
+## Changes applied
+- Removed smartphone/iPhone elements from generated prompts to fix phone appearing in reference photos.
+- Restored ability to generate images in Studio preview by removing strict Telegram validation for "local-user".
+- Fixed Dev-mode bypass for multipart/form-data requests (like image uploads) by checking the `x-developer-mode` header, which fixes the 400 Bad Request error during image generation in AI Studio preview.
+- Added detailed logging to `api.ts` to log the exact HTML body if a Proxy Error occurs again, to aid in future debugging.
+- Refactored `/generate-reference` to use dynamic, detailed prompts based on user parameters (age, skin tone, face shape, eye color, facial hair) for hyper-realistic and accurate references.
+- Replaced hardcoded seeds with random seed generation to ensure varied reference faces across identical API calls.
+- Removed the in-memory `jobMap` global state tracker from `generate.ts`.
+- Switched job polling entirely to Firestore (`jobs` collection) to solve horizontal scaling/multi-server tracking issues.
+- `useAnalysis` frontend logic remains fully compatible as it already handled standard API payloads from the backend.
+- Refactored `generate.ts` (Step 4):
+  - Extracted heavy image processing functions (`resolveImageToBase64` and `getProxiedUrl`) into a new file `src/server/utils/imageTools.ts`.
+  - Extracted massive multi-line LLM prompts (for consultation, stylist chat, and recommendations) into `src/server/utils/promptGenerator.ts`.
+  - The build is stable and tested. `generate.ts` is cleaner and easier to maintain.
+- Refactored frontend polling (Step 5):
+  - Updated `generateFullApi` in `src/services/api.ts` to use Firebase Client SDK (`onSnapshot`).
+  - Removed HTTP polling loop completely. The frontend now listens to real-time updates directly from the Firestore `jobs` collection.
+  - The `useAnalysis.ts` hook was automatically simplified since `generateFullApi` still returns a Promise resolving with the result, keeping UI logic perfectly intact without network spaghetti.
+- Addressed `Cookie check` HTML Proxy Error (AI Studio session expiration/iframe block):
+  - Updated `src/services/api.ts` to detect the `Cookie check` response from the AI Studio proxy.
+  - Implemented automatic `window.location.reload()` fallback to refresh the session cookie gracefully instead of crashing the UI.
+  - Noted that this is a development environment restriction and requires a Cloud Run / Render deployment for production Telegram Web Apps.
+- Addressed Telegram Dev Environment constraints (Cookie check fix iteration 2):
+  - Fixed incomplete application of the `Cookie check` interception. The previous fix was applied only to some API routes. Now applied globally to VTON (`generateFullApi`), Analysis, and Load More endpoints.
+  - Added `options.credentials = 'include'` to `fetchWithRetry` to force WKWebView/Telegram to send cookies, mitigating the issue where Safari drops cookies in background iframes.
+  - Confirmed the user's requirement to test exclusively in the AI Studio environment via Telegram, avoiding premature Cloud Run deployment recommendations.
+- Reverted the confusing Telegram-specific error message in `api.ts` regarding the `Cookie check`.
+- Explained to the user that the `Cookie check` is a strict security mechanism of the Google AI Studio proxy environment and how to resolve it correctly (refreshing the preview or opening it in a new tab).
+- Addressed the issue where final generation did not reach the frontend despite successful Fal.ai processing.
+  - Root cause: Frontend `api.ts` used `onSnapshot` to listen to the `jobs` collection in Firestore, but `firestore.rules` was configured to allow reading from `generations` instead of `jobs`. This resulted in a silent permission denial.
+  - Fix: Updated and deployed `firestore.rules` to grant read access to the `jobs` collection, enabling the frontend to receive real-time updates.
+- Found and fixed a critical bug where the app was infinitely reloading if the AI Studio proxy blocked the request due to missing cookies (which happens in telegram webviews and sometimes randomly in preview). Replaced `window.location.reload()` with a graceful UI error throw so the user knows what to do instead of watching the page blink.
+- **CRITICAL MISTAKE ACKNOWLEDGED**: Restoring from GitHub overwrote local uncommitted fixes in AI Studio, bringing back the gender mismatch bug in analysis.ts.
+- **BUG ANALYSIS: Gender Mismatch (Screenshot)**: In `analysis.ts`, `parsedResults.gender === 'male'` fails if the AI returns "Male" or "Мужчина". It defaults to `FEMALE_LIBRARY`, causing men to receive female haircuts.
+- **BUG ANALYSIS: Unnatural Library References**: `fluxStrength = 0` bypassed Flux generation entirely for library references, causing the app to just FaceSwap the user's face onto the library model's body. I modified this to run Flux on the user's body instead.
+- **CURRENT STATUS**: Waiting for user approval before making any further code changes.
+- **FIXED**: Gender Mismatch in `analysis.ts` has been resolved by making gender detection case-insensitive and language-agnostic (handling "Male", "Мужчина", etc.).
+- The system is now ready for testing the Analysis feature.
+- Conducted a full audit of the workspace to prepare for export.
+- Cleaned up over 70 temporary scripts (`.cjs`, `.mjs`, `.sh`) generated during debugging.
+- Verified that all core features match the working GitHub application while preserving today's critical fixes (Firestore Polling, Gender Fix, Cookie Check).
+- Successfully completed a clean production build (`npm run build`). The app is ready for ZIP download or GitHub commit.

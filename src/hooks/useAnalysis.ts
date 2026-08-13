@@ -270,7 +270,7 @@ export const useAnalysis = ({
           if (parsedResults && (!parsedResults.recommendations || parsedResults.recommendations.length === 0)) {
             try {
               const { FEMALE_LIBRARY, MALE_LIBRARY } = await import('../data/haircutLibrary');
-              const lib = parsedResults.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
+              const genderStr = String(parsedResults.gender || '').toLowerCase(); const isMale = genderStr.includes('male') || genderStr.includes('муж') || genderStr === 'm' || genderStr.includes('пар'); const lib = isMale ? MALE_LIBRARY : FEMALE_LIBRARY;
               const allStyles = Object.values(lib).flat();
               
               let filteredStyles = allStyles;
@@ -539,7 +539,7 @@ export const useAnalysis = ({
           if (mode === 'library') {
              // pull from static library
              const { FEMALE_LIBRARY, MALE_LIBRARY } = await import('../data/haircutLibrary');
-             const lib = results.gender === 'male' ? MALE_LIBRARY : FEMALE_LIBRARY;
+             const genderStr = String(results.gender || '').toLowerCase(); const isMale = genderStr.includes('male') || genderStr.includes('муж') || genderStr === 'm' || genderStr.includes('пар'); const lib = isMale ? MALE_LIBRARY : FEMALE_LIBRARY;
              // flatten
              const allStyles = Object.values(lib).flat();
              const available = allStyles.filter(s => !existingNames.includes(s.name));
