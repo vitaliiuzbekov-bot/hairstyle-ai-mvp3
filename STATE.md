@@ -40,3 +40,5 @@
 - Cleaned up over 70 temporary scripts (`.cjs`, `.mjs`, `.sh`) generated during debugging.
 - Verified that all core features match the working GitHub application while preserving today's critical fixes (Firestore Polling, Gender Fix, Cookie Check).
 - Successfully completed a clean production build (`npm run build`). The app is ready for ZIP download or GitHub commit.
+- Fixed 'semi-profile' FaceSwap mismatch by strictly enforcing 'EN FACE' head pose retention in the Gemini prompt for Flux I2I.
+- Fixed plastic-looking references by switching from hardcoded seeds to random seeds, and explicitly requesting 'amateur smartphone photo' without plastic smoothing in the reference prompt.

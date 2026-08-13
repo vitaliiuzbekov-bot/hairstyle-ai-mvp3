@@ -209,11 +209,11 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       try {
         const isFemale = (gender || "").toLowerCase() === "female" || (gender || "").toLowerCase().includes("жен");
         const isMale = !isFemale && ((gender || "").toLowerCase() === "male" || (gender || "").toLowerCase().includes("муж") || (gender || "").toLowerCase().includes("man") || (gender || "").toLowerCase().includes("boy"));
-        const femalePrompt = "Professional front-facing portrait of a 25-year-old striking Caucasian woman, head and shoulders visible, perfectly symmetrical face. Neutral lighting, clean white background. Centered framing, entire hairstyle is fully visible in frame. ";
-        const malePrompt = "Professional front-facing portrait of a 28-year-old striking Caucasian man, head and shoulders visible, perfectly symmetrical face, strong square jaw, sparse stubble. Neutral lighting, clean white background. Centered framing, entire hairstyle is fully visible in frame. ";
+        const femalePrompt = "Ultra-realistic amateur smartphone photo of a 25-year-old Caucasian woman looking directly at the camera. Natural skin texture, casual lighting, plain white wall background. Centered front-facing framing, unedited raw photography, no plastic smoothing. Entire hairstyle is fully visible. ";
+        const malePrompt = "Ultra-realistic amateur smartphone photo of a 28-year-old Caucasian man looking directly at the camera. Natural skin texture, pores, sparse stubble, casual lighting, plain white wall background. Centered front-facing framing, unedited raw photography, no plastic smoothing. Entire hairstyle is fully visible. ";
         
         const base = isMale ? malePrompt : femalePrompt;
-        const seedValue = isMale ? 99999 : 55555;
+        const seedValue = Math.floor(Math.random() * 1000000);
         
         // Pass original hair structure info if provided, otherwise default to natural straight to avoid unexpected curls
         const safeHairType = hairType && hairType.toLowerCase() !== "не указано" ? hairType : "straight/natural";
@@ -579,8 +579,10 @@ Instructions:
 6. Make sure to specify that the person's face structure (eyes, nose, mouth, chin, jawline, and core head shape) MUST remain completely unchanged.
 7. IMPORTANT: Do NOT alter the facial features. If the person is bald in the source image and you are adding hair, ensure the face strictly matches the source.
 8. The clothing/background instructions should be incorporated if present.
-9. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:] and focus heavily on hair changing.
-10. CRITICAL: The entire response MUST be entirely in ENGLISH. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters. DO NOT translate to Russian under any circumstances.`;
+9. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:].
+10. ABSOLUTELY CRITICAL: The person's head pose, angle, and gaze direction MUST strictly remain exactly as the original image (e.g. EN FACE if original is EN FACE). Never describe side-profile or semi-profile.
+11. ABSOLUTELY CRITICAL: Describe the exact requested haircut geometry accurately (e.g. if buzz cut, state extremely short cropped hair, no crest, no volume).
+12. CRITICAL: The entire response MUST be entirely in ENGLISH. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters. DO NOT translate to Russian under any circumstances.`;
       try {
         console.log("Generating prompt via Gemini AI...");
         const geminiApiKey = process.env.GEMINI_API_KEY;
