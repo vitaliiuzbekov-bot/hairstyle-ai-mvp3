@@ -28,7 +28,6 @@ interface VTONPreviewSectionProps {
   imageUrl: string | null;
   imageBase64: string | null;
   mimeType: string | null;
-  userRole?: string | null;
   salonName?: string;
   processPayment: (s: string, v: number, v2: number) => void;
   generateVirtualTryOn: (kw: string, name: string, desc: string, imgUrl?: string) => void;
@@ -51,7 +50,6 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
   imageUrl,
   imageBase64,
   mimeType,
-  userRole,
   salonName,
   processPayment,
   generateVirtualTryOn,
@@ -152,7 +150,7 @@ export const VTONPreviewSection: React.FC<VTONPreviewSectionProps> = ({
                   e.stopPropagation();
                   try {
                      const beforeSrc = (imageUrl && !imageUrl.startsWith('blob:')) ? imageUrl : (imageBase64?.startsWith('data:') ? imageBase64 : `data:${mimeType || "image/jpeg"};base64,${imageBase64}`);
-                     const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl, userRole === 'salon' ? salonName : undefined);
+                     const collageDataUrl = await generateCollage(beforeSrc, displayResultUrl, undefined);
                      const messageText = "Привет! Смотри, какой стиль я подобрал(а) в нейросети. Хочу такую стрижку и цвет!\nСоздано в @neirostilist_bot";
                      
                      if (navigator.share) {

@@ -60,7 +60,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   isDeveloper,
   resultImage
 }) => {
-  const { consentGiven, setConsentGiven, consentError, setConsentError, userRole, salonName } = useUser();
+  const { consentGiven, setConsentGiven, consentError, setConsentError, salonName } = useUser();
 
   const { addToast, chatStyleName, setChatStyleName, isChatOpen, setIsChatOpen } = useUI();
   const { tryOnStyle, setTryOnStyle, preferredStyle, setPreferredStyle, isProMode, clientName, setClientName, setStylistNotes } = useAnalysisContext();
@@ -366,7 +366,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           generateARPreview={generateARPreview}
           exportToPDF={handleExportPDF}
           isExportingPDF={isExportingPDF}
-          userRole={userRole}
           salonName={salonName}
           setChatStyleName={setChatStyleName}
           setIsChatOpen={setIsChatOpen}

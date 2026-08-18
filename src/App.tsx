@@ -14,7 +14,6 @@ const QuickTutorial = React.lazy(() => import("./components/QuickTutorial").then
 const HaircutLibraryModal = React.lazy(() => import("./components/HaircutLibraryModal").then(m => ({ default: m.HaircutLibraryModal })));
 const ShareModal = React.lazy(() => import("./components/ShareModal").then(m => ({ default: m.ShareModal })));
 const FeedbackModal = React.lazy(() => import("./components/FeedbackModal").then(m => ({ default: m.FeedbackModal })));
-const PWAPrompt = React.lazy(() => import("./components/PWAPrompt").then(m => ({ default: m.PWAPrompt })));
 
 import { useTokenManager } from "./hooks/useTokenManager";
 import { useOfflineStatus } from "./hooks/useOfflineStatus";
@@ -62,7 +61,6 @@ function App() {
   const { tg, isLightMode, setIsLightMode, telegramInitData, shareResult } = useTelegram();
   const {
     userAvatar, setUserAvatar,
-    userRole, setUserRole,
     salonName, setSalonName,
     consentGiven, setConsentGiven,
     loadLastGeneration
@@ -263,7 +261,6 @@ function App() {
               showBuyModal={showBuyModal}
               setShowBuyModal={setShowBuyModal}
               isBuying={isBuying}
-              userRole={userRole}
               userId={userId}
               processPayment={processPayment}
               isLightMode={isLightMode}
@@ -273,7 +270,6 @@ function App() {
             <WelcomeModal
               showWelcome={showWelcome}
               setShowWelcome={setShowWelcome}
-              setUserRole={setUserRole}
               salonName={salonName}
               setSalonName={setSalonName}
               showSalonNameInput={showSalonNameInput}
@@ -283,8 +279,7 @@ function App() {
           )}
           <DailyRewardModal isLightMode={isLightMode} />
           {isShareOpen && <ShareModal />}
-          <PWAPrompt isLightMode={isLightMode} />
-          {isFeedbackOpen && (
+                    {isFeedbackOpen && (
             <FeedbackModal 
               userId={userId} 
               isLightMode={isLightMode} 
@@ -295,7 +290,6 @@ function App() {
           {isProfileOpen && (
             <ProfileModal
               userId={userId}
-              userRole={userRole}
               userAvatar={userAvatar}
               isLightMode={isLightMode}
               setIsLightMode={setIsLightMode}

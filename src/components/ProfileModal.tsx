@@ -3,11 +3,11 @@ import { useModalBackButton } from '../hooks/useTelegramBackButton';
 import React from "react";
 import { X, User, Share2, Sun, Moon, LogOut, ArrowDownToLine, Clock, BookOpen, Info } from "lucide-react";
 import { useUser } from "../context/UserContext";
+import { useAnalysisContext } from "../context/AnalysisContext";
 import { useNavigate } from "react-router-dom";
 
 interface ProfileModalProps {
   userId: string | null;
-  userRole: string;
   userAvatar: string | null;
   isLightMode: boolean;
   setIsLightMode?: (val: boolean) => void;
@@ -20,7 +20,6 @@ interface ProfileModalProps {
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   userId,
-  userRole,
   userAvatar,
   isLightMode,
   setIsLightMode,
@@ -28,6 +27,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const { setUserRole } = useUser();
   const navigate = useNavigate();
+  const { isProMode } = useAnalysisContext();
   useModalBackButton(true, onClose);
 
   const handleShare = () => {
@@ -78,35 +78,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
 
-        {/* Roles menu */}
-        <div className="flex flex-col gap-0.5">
-          <p className={`text-[10px] px-2 font-semibold uppercase tracking-wider mb-0.5 mt-1 ${isLightMode ? 'text-gray-400' : 'text-gray-500'}`}>Роль</p>
-          <button 
-            onClick={() => setUserRole('client')}
-            className={`w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-lg transition-colors ${
-              userRole === 'client' 
-                ? (isLightMode ? 'bg-gray-100 font-semibold' : 'bg-white/10 font-semibold')
-                : (isLightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5')
-            }`}
-          >
-            Для себя
-            {userRole === 'client' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 block"></span>}
-          </button>
-          <button 
-            onClick={() => setUserRole('master')}
-            className={`w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-lg transition-colors ${
-              userRole === 'master' 
-                ? (isLightMode ? 'bg-gray-100 font-semibold' : 'bg-white/10 font-semibold')
-                : (isLightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5')
-            }`}
-          >
-            Мастер
-            {userRole === 'master' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 block"></span>}
-          </button>
-        </div>
-
-        <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
-
         {/* Referral Section */}
         <div className="flex flex-col gap-1 mt-1 p-2">
           <p className={`text-[10px] font-semibold uppercase tracking-wider ${isLightMode ? 'text-gray-400' : 'text-gray-500'}`}>Реферальная ссылка</p>
@@ -132,6 +103,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
         </div>
         <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
+        
         {/* History Link */}
         <div className="flex flex-col gap-0.5 mt-1">
           <button 
@@ -147,9 +119,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
              История генераций
           </button>
         </div>
-
+        
         <div className={`h-[1px] w-full ${isLightMode ? 'bg-gray-100' : 'bg-white/10'}`}></div>
-
+        
         {/* Settings menu */}
         <div className="flex flex-col gap-0.5 mt-1">
           {setIsLightMode && (
@@ -163,22 +135,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {isLightMode ? "Тёмная тема" : "Светлая тема"}
             </button>
           )}
-
+          
           <button 
-            onClick={() => {
-              window.dispatchEvent(new Event('show-pwa-prompt'));
-              onClose();
-            }}
-            className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-              isLightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5'
-            }`}
-          >
-            <ArrowDownToLine size={14} className="text-emerald-500" />
-            Установить приложение (PWA)
-          </button>
-
-          <button 
-            onClick={handleShare}
+             onClick={handleShare}
             className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
               isLightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5'
             }`}
@@ -213,7 +172,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             Как это работает
           </button>
           
-          {userRole === 'master' && (
+          {isProMode && (
              <button 
                onClick={() => {
                  window.dispatchEvent(new Event('open-library'));

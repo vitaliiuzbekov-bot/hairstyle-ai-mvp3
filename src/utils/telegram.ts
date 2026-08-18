@@ -32,7 +32,7 @@ export const openUrlInTelegram = (url: string) => {
     // If the URL is exactly the bot we are in, just close the webapp to return to the chat
     if (url.includes("neirostilist_bot")) {
         if (tg) {
-            tg.close();
+            (tg as any).close();
             return;
         }
     }

@@ -161,6 +161,28 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
     const text = body.message.text;
     const chatId = body.message.chat.id;
     const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+
+    if (text.startsWith('/start')) {
+        try {
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: 'Привет! Добро пожаловать в НейроСтилист. Нажми кнопку ниже, чтобы подобрать идеальную прическу!',
+                    reply_markup: {
+                        inline_keyboard: [[{
+                            text: '✂️ Открыть НейроСтилист',
+                            web_app: { url: webAppUrl }
+                        }]]
+                    }
+                })
+            });
+        } catch (e) {
+             console.error("Failed to send welcome message:", e.message);
+        }
+        return res.status(200).send("OK");
+    }
     
     if (text === '/stats' && String(chatId) === adminChatId && adminDb) {
       try {

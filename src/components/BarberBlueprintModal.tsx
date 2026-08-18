@@ -44,7 +44,6 @@ interface BarberBlueprintModalProps {
   generateARPreview: (kw: string, name: string) => void;
   exportToPDF: (elementIdOrEvent?: string | React.MouseEvent, filename?: string, images?: { before?: string, reference?: string, after?: string }) => void;
   isExportingPDF: boolean;
-  userRole?: string | null;
   salonName?: string;
   setChatStyleName: (val: string) => void;
   setIsChatOpen: (val: boolean) => void;
@@ -72,7 +71,6 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
   generateARPreview,
   exportToPDF,
   isExportingPDF,
-  userRole,
   salonName,
   setChatStyleName,
   setIsChatOpen,
@@ -204,7 +202,6 @@ const BarberBlueprintModal: React.FC<BarberBlueprintModalProps> = ({
               imageUrl={imageUrl}
               imageBase64={imageBase64}
               mimeType={mimeType}
-              userRole={userRole}
               salonName={salonName}
               processPayment={processPayment}
               generateVirtualTryOn={generateVirtualTryOn}

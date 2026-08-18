@@ -10,7 +10,6 @@ interface BuyModalProps {
   showBuyModal: boolean;
   setShowBuyModal: (show: boolean) => void;
   isBuying: boolean;
-  userRole: string;
   userId: string | null;
   processPayment: (planId: "basic" | "popular" | "premium" | "master", stars: number, tokens: number) => Promise<void>;
   isLightMode?: boolean;
@@ -20,7 +19,6 @@ export const BuyModal: React.FC<BuyModalProps> = ({
   showBuyModal,
   setShowBuyModal,
   isBuying,
-  userRole,
   userId,
   processPayment,
   isLightMode,
@@ -65,7 +63,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({
             { id: "basic", label: "1 генерация стрижек", count: 1, stars: 99 },
             { id: "popular", label: "3 генерации стрижек", count: 3, stars: 199, isPopular: true },
             { id: "premium", label: "3 генерации + PDF", count: 3, stars: 349 },
-            ...(userRole === 'master' || userRole === 'salon' ? [{ id: "master", label: "Пакет мастера (10 генераций для клиентов)", count: 10, stars: 500 }] : [])
+            ...(isProMode ? [{ id: "master", label: "Пакет мастера (10 генераций для клиентов)", count: 10, stars: 500 }] : [])
           ].filter(pkg => isProMode || pkg.id !== 'premium').map(pkg => (
             <button
               key={pkg.id}
