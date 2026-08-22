@@ -73,23 +73,8 @@ export const RotatingFactsLoader: React.FC<Props> = ({ isLightMode, title = "И�
             </div>
 
             {/* Promotional Banner (Monetization / Up-sell) */}
-            <div className={`w-full p-3 rounded-lg flex flex-col gap-2 items-center text-center ${
-              isLightMode ? 'bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200 text-amber-900' : 'bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 text-amber-200'
-            }`}>
-              <div className="font-bold flex items-center gap-1">
-                <Sparkles size={14} className="text-amber-500" />
-                Premium Аккаунт
-              </div>
-              <p className="text-xs opacity-90">Пропускайте очередь и получайте генерации в 3 раза быстрее!</p>
-              <button 
-                onClick={() => window.dispatchEvent(new Event('open-buy-modal'))}
-                className={`mt-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors ${
-                  isLightMode ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-500/80 text-white hover:bg-amber-500'
-                }`}
-              >
-                Подробнее
-              </button>
-            </div>
+            
+              
 
             <button 
               onClick={() => window.dispatchEvent(new Event('open-library'))}

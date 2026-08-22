@@ -32,12 +32,12 @@ export class FalAdapter implements ImageGenerationProvider {
 
   async generateBaseImage(options: FluxOptions): Promise<Buffer> {
     try {
-      const result = await imageGenQueue.add(() => fal.run<any, any>("fal-ai/flux/dev", {
+      const result = await imageGenQueue.add(() => fal.run<any, any>("fal-ai/flux/dev/image-to-image", {
         input: {
           prompt: options.prompt,
           image_url: options.imageUrl,
           strength: options.strength,
-          num_inference_steps: 12
+          num_inference_steps: 28, guidance_scale: 3.5
         }
       }));
 

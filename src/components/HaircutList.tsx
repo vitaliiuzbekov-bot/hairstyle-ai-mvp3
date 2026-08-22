@@ -40,6 +40,8 @@ export const HaircutList = React.memo(
     isLightMode,
   }: HaircutListProps) => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [isCustomPromptOpen, setIsCustomPromptOpen] = useState(false);
+    const [customPromptText, setCustomPromptText] = useState("");
     
     const [cropperFileSrc, setCropperFileSrc] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<HaircutCategory>("short");
@@ -63,8 +65,52 @@ export const HaircutList = React.memo(
       e.target.value = '';
     };
 
+    
+      
+    
     return (
       <div className="w-full">
+      {isCustomPromptOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsCustomPromptOpen(false)}>
+          <div className={`w-full max-w-md rounded-2xl p-6 shadow-2xl ${isLightMode ? 'bg-white' : 'bg-[#1A1525] border border-white/10'}`} onClick={e => e.stopPropagation()}>
+            <h3 className={`text-xl font-bold mb-4 ${isLightMode ? 'text-gray-900' : 'text-white'}`}>Свой вариант</h3>
+            <p className={`text-sm mb-4 ${isLightMode ? 'text-gray-600' : 'text-white/70'}`}>
+              Опишите желаемую стрижку, укладку или цвет своими словами. Нейросеть сгенерирует образ по вашему описанию.
+            </p>
+            <textarea
+              value={customPromptText}
+              onChange={e => setCustomPromptText(e.target.value)}
+              placeholder="Например: короткая стрижка с зачесом назад, выбритые виски, пепельный блонд..."
+              className={`w-full h-32 p-4 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none resize-none transition-colors ${isLightMode ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-black/40 border-white/10 text-white placeholder-white/30'}`}
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setIsCustomPromptOpen(false)}
+                className={`flex-1 py-3 rounded-xl font-medium transition-colors ${isLightMode ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/5 text-white hover:bg-white/10'}`}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  if (customPromptText.trim().length > 0) {
+                    setTryOnStyle({
+                        name: "Свой вариант",
+                        keyword: "Свой вариант",
+                        description: customPromptText.trim()
+                    });
+                    setIsCustomPromptOpen(false);
+                  }
+                }}
+                disabled={!customPromptText.trim()}
+                className={`flex-1 py-3 rounded-xl font-bold text-white transition-all ${!customPromptText.trim() ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-lg'}`}
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
         {cropperFileSrc && (
           <ImageCropperModal
             imageSrc={cropperFileSrc}
@@ -121,6 +167,16 @@ export const HaircutList = React.memo(
             <Upload size={16} />
             <span>Своя стрижка (фото)</span>
             <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleCustomUpload} />
+          </button>
+          
+          <button
+            onClick={() => {
+               setIsCustomPromptOpen(true);
+            }}
+            className={`flex items-center gap-2 rounded-full px-6 py-4 transition-all font-medium text-sm sm:text-base border w-full sm:w-auto justify-center ${isLightMode ? "bg-white text-gray-800 border-gray-200 hover:bg-gray-50 shadow-sm" : "text-white/90 glass-panel hover:bg-white/5 border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.37)]"}`}
+          >
+            <Sparkles size={16} />
+            <span>Свой вариант (текст)</span>
           </button>
           <button
             onClick={() => window.dispatchEvent(new Event('open-library'))}

@@ -2,6 +2,7 @@ import { AnalysisResult } from '../types';
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 1000): Promise<Response> {
   const isDev = localStorage.getItem("isDeveloperMode") === "true";
+  options.credentials = 'include';
   if (isDev) {
     options.headers = { ...options.headers, "X-Developer-Mode": "true" };
   }
@@ -62,7 +63,7 @@ export const analyzeImageApi = async (
     data = JSON.parse(textResponse);
   } catch (e) {
     if (textResponse.trim().toLowerCase().startsWith("<!doctype html>")) {
-       throw new Error(`Сбой сети: Сервер перегружен или вернул HTML-страницу (Код ${response.status}). Возможно, вы загружаете слишком большое фото (>15МБ). Попробуйте еще раз.`);
+       throw new Error(`Ошибка сессии (Cookie Proxy). Пожалуйста, обновите страницу (потяните вниз) или откройте приложение заново. Код: ${response.status}`);
     }
     throw new Error(`Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`);
   }
@@ -104,7 +105,7 @@ export const generateArApi = async (
     data = JSON.parse(textResponse);
   } catch (e) {
     if (textResponse.includes("<!doctype html>") || textResponse.includes("<!DOCTYPE html>")) {
-       throw new Error(`Ошибка сети: Сервер перегружен или недоступен (HTML Proxy Error, HTTP ${response.status}). Пожалуйста, подождите немного и повторите попытку.`);
+       throw new Error(`Ошибка сессии (Cookie Proxy). Пожалуйста, обновите страницу (потяните вниз) или откройте приложение заново. Код: ${response.status}`);
     }
     throw new Error(`Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`);
   }
@@ -145,7 +146,7 @@ export const loadMoreApi = async (
     data = JSON.parse(textResponse);
   } catch (e) {
     if (textResponse.includes("<!doctype html>") || textResponse.includes("<!DOCTYPE html>")) {
-       throw new Error(`Ошибка сети: Сервер перегружен или недоступен (HTML Proxy Error, HTTP ${response.status}). Пожалуйста, подождите немного и повторите попытку.`);
+       throw new Error(`Ошибка сессии (Cookie Proxy). Пожалуйста, обновите страницу (потяните вниз) или откройте приложение заново. Код: ${response.status}`);
     }
     throw new Error(`Ошибка сервера: HTTP ${response.status}. Ответ: ${textResponse.slice(0, 50)}`);
   }

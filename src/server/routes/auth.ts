@@ -173,7 +173,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
                     reply_markup: {
                         inline_keyboard: [[{
                             text: '✂️ Открыть НейроСтилист',
-                            web_app: { url: webAppUrl }
+                            web_app: { url: process.env.TELEGRAM_WEB_APP_URL || "https://t.me/hairstyleaimvp_bot/app" }
                         }]]
                     }
                 })

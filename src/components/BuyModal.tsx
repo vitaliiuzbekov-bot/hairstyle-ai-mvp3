@@ -62,7 +62,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({
           {[
             { id: "basic", label: "1 генерация стрижек", count: 1, stars: 99 },
             { id: "popular", label: "3 генерации стрижек", count: 3, stars: 199, isPopular: true },
-            { id: "premium", label: "3 генерации + PDF", count: 3, stars: 349 },
+            
             ...(isProMode ? [{ id: "master", label: "Пакет мастера (10 генераций для клиентов)", count: 10, stars: 500 }] : [])
           ].filter(pkg => isProMode || pkg.id !== 'premium').map(pkg => (
             <button

@@ -40,6 +40,28 @@ import { uploadImageToFal } from "../services/falClient";
 import { defaultImageService } from "../services/ImageGenerationService";
 import { isAuthorizedDeveloper } from "../utils/tgAuth";
 
+async function getUrlForFal(url) {
+    if (!url) return url;
+    if (url.startsWith('data:')) {
+        return await uploadImageToFal(url);
+    }
+    if (url.startsWith('/tmp/')) {
+        const fileName = url.split('/').pop();
+        const localPath = path.join(process.cwd(), 'tmp', fileName);
+        if (fs.existsSync(localPath)) {
+            const fileBuffer = fs.readFileSync(localPath);
+            const base64Data = `data:image/jpeg;base64,${fileBuffer.toString('base64')}`;
+            return await uploadImageToFal(base64Data);
+        } else {
+            console.error(`[getUrlForFal] File not found: ${localPath}`);
+            // DO NOT THROW. Return original url, maybe it's hosted elsewhere somehow?
+            // Actually, if we're here, it's definitely an error, but let's see.
+            throw new Error(`Локальный файл не найден: ${url}`);
+        }
+    }
+    return url;
+}
+
 function getProxiedUrl(url: string | undefined): string | undefined {
     if (!url) return undefined;
     if (url.startsWith('http')) {
@@ -184,8 +206,8 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
       // Check cache first (Cache for 30 days)
         const cacheKey = "v3_force_update_" + getCacheKey({ 
         route: "generate-reference-v28-gender-fixed", 
-        keyword, gender, ageRange, skinTone, faceShape, facialHair,
-        hairDensity, hairType, hairLength, hairlineStatus, hairQuality, idempotencyKey, clothingContext
+        keyword, description, gender, ageRange, skinTone, faceShape, facialHair,
+        hairDensity, hairType, hairLength, hairlineStatus, hairQuality, clothingContext
       });
       console.log("[generate-full] checking cache..."); 
 
@@ -205,29 +227,44 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         return res.status(500).json({ error: "FAL_KEY не установлен" });
       }
 
-      console.log("Generating reference via fal-ai/flux/schnell...");
+      console.log("Generating reference via fal-ai/flux/dev (Ultra-Realistic)...");
       try {
         const isFemale = (gender || "").toLowerCase() === "female" || (gender || "").toLowerCase().includes("жен");
         const isMale = !isFemale && ((gender || "").toLowerCase() === "male" || (gender || "").toLowerCase().includes("муж") || (gender || "").toLowerCase().includes("man") || (gender || "").toLowerCase().includes("boy"));
-        const femalePrompt = "Ultra-realistic amateur smartphone photo of a 25-year-old Caucasian woman looking directly at the camera. Natural skin texture, casual lighting, plain white wall background. Centered front-facing framing, unedited raw photography, no plastic smoothing. Entire hairstyle is fully visible. ";
-        const malePrompt = "Ultra-realistic amateur smartphone photo of a 28-year-old Caucasian man looking directly at the camera. Natural skin texture, pores, sparse stubble, casual lighting, plain white wall background. Centered front-facing framing, unedited raw photography, no plastic smoothing. Entire hairstyle is fully visible. ";
         
-        const base = isMale ? malePrompt : femalePrompt;
+        const safeAge = ageRange || (isMale ? "30" : "25");
+        const safeSkinTone = skinTone && skinTone !== "не указано" ? skinTone : "natural";
+        
+        // Build base prompt dynamically based on client features
+        let base = `Ultra-realistic amateur smartphone photo of a ${safeAge}-year-old ${isMale ? 'man' : 'woman'} looking directly at the camera. `;
+        base += `Skin tone: ${safeSkinTone}, natural skin texture, pores, casual lighting, plain white wall background. `;
+        
+        if (isMale) {
+            const hasBeard = (facialHair || "").toLowerCase().includes("бород") || (facialHair || "").toLowerCase().includes("усы") || (facialHair || "").toLowerCase().includes("beard");
+            if (!hasBeard) {
+                base += "Clean shaven, strictly no beard, no mustache, no stubble. ";
+            } else {
+                base += `Facial hair: ${facialHair}. `;
+            }
+        }
+        
+        base += "Centered front-facing framing, unedited raw photography, no plastic smoothing. NO PHONES, NO HANDS, NO MIRRORS in the frame. Entire hairstyle is fully visible. ";
+        
         const seedValue = Math.floor(Math.random() * 1000000);
         
-        // Pass original hair structure info if provided, otherwise default to natural straight to avoid unexpected curls
         const safeHairType = hairType && hairType.toLowerCase() !== "не указано" ? hairType : "straight/natural";
-        const hairDesc = (haircutName || keyword) + (description ? ", " + description : "") + ". Hair texture: " + safeHairType;
-        const colorDesc = "";
+        const safeHairColor = hairColor && hairColor.toLowerCase() !== "не указано" ? hairColor : "";
+        const hairDesc = (haircutName || keyword) + (description ? ", " + description : "") + ". Texture: " + safeHairType;
+        const colorDesc = safeHairColor ? `Color: ${safeHairColor}.` : "";
         
-        const finalPrompt = base + "Hair is " + hairDesc + "." + colorDesc;
+        const finalPrompt = base + "Hairstyle strictly applied: " + hairDesc + ". " + colorDesc;
 
         let falRes: globalThis.Response | null = null;
         let retries = 2;
         let lastErrorText = "";
         while (retries >= 0) {
             try {
-                falRes = await fetch("https://fal.run/fal-ai/flux/schnell", {
+                falRes = await fetch("https://fal.run/fal-ai/flux/dev", {
                     method: "POST",
                     headers: {
                         "Authorization": `Key ${falKey}`,
@@ -237,7 +274,8 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
                         prompt: finalPrompt,
                         image_size: "portrait_4_3",
                         seed: seedValue,
-                        num_inference_steps: 4
+                        num_inference_steps: 25,
+                        guidance_scale: 3.5
                     })
                 });
 
@@ -275,31 +313,25 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         const imageBuf = await imageFetch.arrayBuffer();
         finalImageUrl = `data:image/jpeg;base64,${Buffer.from(imageBuf).toString('base64')}`;
 
-      } catch (err: any) {
-        lastError += `[FAL Flux: ${err.message}]`;
-        console.error("FAL Flux Failed:", err);
+            } catch (err: any) {
+        console.error("\n\n[CRITICAL ERROR] GEMINI QUOTA EXCEEDED! PREVENTING BLIND FALLBACK TO SAVE MONEY AND AVOID 2-FACES.\n\n"); 
+        console.error("Gemini failed to generate prompt:", err?.message || err);
+        const errMsg = err?.message || String(err); 
+        logToTelegram(`❌ *БЛОКИРОВКА ГЕНЕРАЦИИ:* Ошибка квот Gemini API (${errMsg}). Генерация остановлена, чтобы не допустить брака (эффекта двух лиц из-за слепого промпта).`).catch(console.error);
+        
+        // Throw an error explicitly to stop the generation pipeline and refund token if logic permits
+        throw new Error("Лимит запросов к AI-анализатору исчерпан. Пожалуйста, подождите немного или обратитесь к администратору (Quota Exceeded).");
       }
 
-      if (!finalImageUrl) {
-          throw new Error(`К сожалению, не удалось сгенерировать референс прически. Ошибка: ${lastError}`);
-      } else {
-          // Save to cache for 30 days (30 * 24 * 60 * 60 seconds)
-          await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
-      }
-      
-      if (finalImageUrl) {
-           await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
-      }
-
-      res.json({ imageUrl: getProxiedUrl(finalImageUrl), debugError: lastError });
-    } catch (err: any) {
-      console.error("Reference gen error:", err);
-      res.status(500).json({ error: err.message || "Ошибка генерации референса" });
+        if (finalImageUrl) {
+            await setCachedValue(cacheKey, finalImageUrl, 30 * 24 * 60 * 60);
+            res.json({ imageUrl: getProxiedUrl(finalImageUrl) });
+        }
+    } catch (outerErr: any) {
+        console.error('Generate reference error:', outerErr);
+        res.status(500).json({ error: outerErr.message });
     }
-  });
-
-  
-
+});
 generateRouter.post("/generate-full/status", async (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -392,11 +424,11 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
       // Check cache first (Cache for 30 days)
        const cacheKey = "v3_force_update_" + getCacheKey({ 
         route: "generate-full-v9-reference-vision", 
-        userId, keyword, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
+        userId, keyword, description, hairColor, vtonStrength, targetImageUrl: finalTargetImageUrl,
         // using string truncation or full string to hash the selfie.
         // String hashing is deterministic.
         selfieHash: getCacheKey(selfieImage),
-        hairlineStatus, hairQuality, idempotencyKey
+        hairlineStatus, hairQuality
       });
       const cachedImage = await getCachedValue<string>(cacheKey);
       if (cachedImage) {
@@ -434,9 +466,7 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
         }
       }
       
-      if (req.body.gender === "Unknown" || req.body.gender === "Неизвестно" || req.body.faceShape === "Unknown" || req.body.faceShape === "Неизвестно" || !req.body.gender || !req.body.faceShape) {
-        return res.status(400).json({ error: "На фото не распознано лицо. Пожалуйста, загрузите более качественное фото анфас." });
-      }
+      if (req.body.gender === "Unknown" || req.body.gender === "Неизвестно" || req.body.faceShape === "Unknown" || req.body.faceShape === "Неизвестно" || !req.body.gender || !req.body.faceShape) { return res.status(400).json({ error: "На фото не распознано лицо. Пожалуйста, загрузите более качественное фото анфас." }); }
 
       const billingCheck = await checkAndDeductGeneration(userId, idempotencyKey, req.body.tgUserId, cacheKey, isDeveloper);
       if (!billingCheck.ok) {
@@ -448,7 +478,7 @@ let finalTargetImageUrl = await resolveImageToBase64(targetImageUrl);
          try {
            await adminDb.collection("jobs").doc(jobId).set({ status: "processing", createdAt: Date.now() });
          } catch (dbErr: any) {
-           console.error("[generate-full] Warning: Failed to set job status in Firestore:", dbErr.message);
+           // console.error("[generate-full] Warning: Failed to set job status in Firestore:", dbErr.message);
          }
       }
       
@@ -539,7 +569,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       if (typeof normalizedSelfie === 'string' && !normalizedSelfie.startsWith('data:') && !normalizedSelfie.startsWith('http')) {
           normalizedSelfie = 'data:image/jpeg;base64,' + normalizedSelfie;
       }
-      let swapImageUrlForFalPromise = normalizedSelfie.startsWith('data:') ? uploadImageToFal(normalizedSelfie) : Promise.resolve(normalizedSelfie);
+      let swapImageUrlForFalPromise = getUrlForFal(normalizedSelfie);
       swapImageUrlForFalPromise.catch(() => {}); // prevent unhandled rejection crash
 
       
@@ -550,7 +580,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       // Higher strength = more deviation from the base image.
       // We want high strength so the hair changes to match the prompt!
       // If we use 0.20, Flux barely changes the image.
-      fluxStrength = 0.50 + (uiStrength / 100) * 0.40; // 0.75 to 0.95 range
+      fluxStrength = 0.50 + (uiStrength / 100) * 0.20; // Range (0.50-0.70) to preserve clothes and pose
       if (keyword && keyword.includes("same exact current hairstyle")) {
           fluxStrength = 0.35; // keep original structure
       }
@@ -558,6 +588,7 @@ const resolvedSelfie = await resolveImageToBase64(selfieImage);
       // Target image is used by Gemini to guide the prompt; we still run Flux on the user's selfie.
 
       let promptEng = "";
+      if (!finalTargetImageUrl) {
         let systemInstruction = `You are an expert AI image generation prompt engineer.
 Your task is to write a highly detailed, photorealistic prompt for a text-to-image AI (e.g., Flux) to change a person's hairstyle in an image.
 We have the following specs from the user (some may be in Russian):
@@ -578,72 +609,35 @@ Instructions:
 5. If a hair color is specified, make it absolutely clear that it must be applied across the ENTIRE head without gradients/other shades. Use strict phrasing.
 6. Make sure to specify that the person's face structure (eyes, nose, mouth, chin, jawline, and core head shape) MUST remain completely unchanged.
 7. IMPORTANT: Do NOT alter the facial features. If the person is bald in the source image and you are adding hair, ensure the face strictly matches the source.
-8. The clothing/background instructions should be incorporated if present.
+8. CRITICAL: Analyze the ORIGINAL USER PHOTO provided. You MUST describe the user's EXACT clothing (color and type) and the background in extreme detail in your prompt, so the image generator does not change them.
 9. Start the prompt with [CRITICAL HAIRSTYLE TRANSFORMATION:].
 10. ABSOLUTELY CRITICAL: The person's head pose, angle, and gaze direction MUST strictly remain exactly as the original image (e.g. EN FACE if original is EN FACE). Never describe side-profile or semi-profile.
-11. ABSOLUTELY CRITICAL: Describe the exact requested haircut geometry accurately (e.g. if buzz cut, state extremely short cropped hair, no crest, no volume).
-12. CRITICAL: The entire response MUST be entirely in ENGLISH. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters. DO NOT translate to Russian under any circumstances.`;
+11. ABSOLUTELY CRITICAL: DO NOT add a beard, mustache, or stubble if the original facial hair spec says "None" or "clean shaven". If the original is clean shaven, explicitly add "clean shaven, strictly no beard, no mustache" to the prompt.
+12. ABSOLUTELY CRITICAL: Describe the exact requested haircut geometry accurately (e.g. if buzz cut, state extremely short cropped hair, no crest, no volume).
+13. ABSOLUTELY CRITICAL: Ensure NO PHONES, NO HANDS, NO MIRRORS are in the prompt.
+14. CRITICAL: The entire response MUST be entirely in ENGLISH. Return ONLY the final English prompt text. No extra text, no markdown. Max length 1500 characters. DO NOT translate to Russian under any circumstances.`;
       try {
         console.log("Generating prompt via Gemini AI...");
         const geminiApiKey = process.env.GEMINI_API_KEY;
-        if (!geminiApiKey) {
-            throw new Error("GEMINI_API_KEY не установлен");
-        }
+        if (!geminiApiKey) throw new Error("GEMINI_API_KEY is not set.");
         const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ 
-            apiKey: geminiApiKey, 
-            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
-        });
-        
-
-
-        let contentsPayload: any = [{ text: systemInstruction }];
-
-        if (finalTargetImageUrl) {
-            let base64Data = "";
-            let mimeType = "image/jpeg";
-            
-            if (finalTargetImageUrl.startsWith("data:image/")) {
-                mimeType = finalTargetImageUrl.split(';')[0].split(':')[1];
-                base64Data = finalTargetImageUrl.split(',')[1];
-            } else if (finalTargetImageUrl.startsWith("http")) {
-                try {
-                    console.log("[generate-full] Fetching target image URL for Gemini visual reference...");
-                    const imgRes = await fetch(finalTargetImageUrl);
-                    if (imgRes.ok) {
-                        const arrayBuffer = await imgRes.arrayBuffer();
-                        base64Data = Buffer.from(arrayBuffer).toString('base64');
-                        mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
-                    } else {
-                        console.log(`[generate-full] WARNING: Failed to fetch target image URL for Gemini. Status: ${imgRes.status}`);
-                    }
-                } catch (e) {
-                    console.error("[generate-full] Error fetching target image URL for Gemini:", e);
-                }
-            }
-
-            if (base64Data) {
-                // Resize reference image to save Gemini tokens and prevent OOM
-                try {
-                    const sharp = (await import('sharp')).default;
-                    const buf = Buffer.from(base64Data, 'base64');
-                    const resized = await sharp(buf).resize(512, 512, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer();
-                    base64Data = resized.toString('base64');
-                    mimeType = 'image/jpeg';
-                } catch (e) {
-                    console.error("Failed to resize reference image for Gemini", e);
-                }
-
-                contentsPayload.push({ text: `[IMAGE 1: TARGET HAIRSTYLE REFERENCE]\nCRITICAL INSTRUCTION: You MUST deeply analyze this image and describe the EXACT hairstyle shown in it in extreme visual detail (including hair length, parting, texture, volume, fade, and overall geometry). Use YOUR visual analysis of THIS image as the primary hairstyle description in your final prompt, ignoring any generic text name in 'Target Hairstyle' if it conflicts! Focus heavily on ensuring the exact haircut structure is transferred.` });
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        let contentsPayload: any[] = [{ text: systemInstruction + `\n\nTarget Hairstyle to generate: ${keyword} ${description}` }];
+        if (selfieImageFull.startsWith('data:')) {
+            try {
+                const sharp = (await import('sharp')).default;
+                const rawB64 = selfieImageFull.split(',')[1];
+                let buf = Buffer.from(rawB64, 'base64');
+                const resized = await sharp(buf).resize(512, 512, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer();
+                contentsPayload.push({ text: `[IMAGE 1: ORIGINAL USER PHOTO]\nCRITICAL INSTRUCTION: Analyze THIS original photo. In your final prompt, you MUST accurately describe the person's EXACT clothing (type, color), their body pose/head angle, and the background/environment visible in this image. This is required so the AI image generator recreates the body and background identically.` });
                 contentsPayload.push({
-                   inlineData: {
-                      data: base64Data,
-                      mimeType: mimeType
-                   }
+                   inlineData: { data: resized.toString('base64'), mimeType: 'image/jpeg' }
                 });
+            } catch (e) {
+                console.error("Failed to process selfie image for Gemini context", e);
             }
         }
-
+        
         const promptRes = await geminiQueue.add(async () => {
            return withRetry(async () => {
                try {
@@ -663,30 +657,12 @@ Instructions:
         });
         promptEng = promptRes?.text?.trim() || "";
       } catch (err: any) {
-        console.error("Gemini failed to generate prompt, falling back to Yandex text-only:", err?.message || err);
-        const errMsg = err?.message || String(err); logToTelegram(`⚠️ *Gemini Prompting:* Ошибка API: ${errMsg}. Переход на YandexGPT для генерации промпта (Текст-онли).`).catch(console.error);
-        try {
-            const { callLLM } = await import("../services/llm");
-            promptEng = await callLLM(systemInstruction, "Generate the prompt for the target hairstyle based on the text parameters. Ignore missing visual references.");
-            console.log("Successfully generated prompt via Yandex.");
-            promptEng = promptEng?.trim() || "";
-        } catch (yandexErr: any) {
-             console.error("Yandex fallback also failed, using basic prompt:", yandexErr?.message || yandexErr);
-             logToTelegram("⚠️ *Yandex Prompt Fallback Failed:* " + (yandexErr?.message || "")).catch(console.error);
-
-             // Better fallback prompt with basic translation for common rus words
-             let mappedKw = keyword || "";
-        if (mappedKw.includes("Пикси")) mappedKw = "Pixie haircut, very short elegant female cut";
-        if (mappedKw.includes("Классический Боб")) mappedKw = "Classic Bob haircut, elegant straight hair above shoulders";
-        if (mappedKw.includes("Удлиненный боб")) mappedKw = "Long Bob (Lob), collarbone length";
-        if (mappedKw.includes("с челкой")) mappedKw += " with bangs/fringe";
-        if (mappedKw.includes("Свой референс")) mappedKw = "Different elegant hairstyle based on reference";
+        console.error("\n\n[CRITICAL ERROR] GEMINI QUOTA EXCEEDED! PREVENTING BLIND FALLBACK TO SAVE MONEY AND AVOID 2-FACES.\n\n"); 
+        console.error("Gemini failed to generate prompt:", err?.message || err);
+        const errMsg = err?.message || String(err); 
+        logToTelegram(`❌ *БЛОКИРОВКА ГЕНЕРАЦИИ:* Ошибка квот Gemini API (${errMsg}). Генерация остановлена, чтобы не допустить брака (эффекта двух лиц из-за слепого промпта).`).catch(console.error);
         
-        promptEng = `A photorealistic portrait of a person. Age: ${ageRange || "unknown"}, Gender: ${gender || "unknown"}. New Hairstyle: ${mappedKw} - ${description || ""}. Desired Hair Color: ${finalColor || "original"}. The face features must remain exactly the same.`;
-        if (finalColor) {
-            promptEng = `[STRICTLY ${finalColor.toUpperCase()} HAIR COLOR] ` + promptEng;
-        }
-      }
+        throw new Error("Лимит запросов к AI-анализатору исчерпан. Пожалуйста, подождите немного или обратитесь к администратору (Quota Exceeded).");
       }
       
       promptEng = promptEng.substring(0, 1500).trim();
@@ -695,23 +671,25 @@ Instructions:
           console.log("Skipping Flux Image-to-Image entirely, directly using base image for FaceSwap...");
           finalImageUrl = baseImageForFlux;
       } else {
-        const blueprintCacheKey = crypto.createHash("md5").update(`${baseImageForFlux}_${finalColor}_${fluxStrength}_${keyword}`).digest("hex");
+        const blueprintCacheKey = crypto.createHash("md5").update(`v7_${baseImageForFlux}_${finalColor}_${fluxStrength}_${keyword}_${description || ""}`).digest("hex");
         if (customBlueprintCache.has(blueprintCacheKey)) {
             console.log("Using cached blueprint for:", finalColor, keyword);
-            finalImageUrl = customBlueprintCache.get(blueprintCacheKey)!;
+            finalImageUrl = customBlueprintCache.get(blueprintCacheKey);
         } else {
           try {
-                  console.log("Generating target blueprint via ImageGenerationService (Flux Dev Image-to-Image)... strength:", fluxStrength);
-             const fluxBaseImageUrl = await fluxBaseImageUrlPromise; 
-            // Removed data URI check because Fal supports data URIs
+            console.log(`Generating target blueprint via Fal.ai Flux Image-to-Image (strength: ${fluxStrength})...`);
             
-             const generatedBuffer = await defaultImageService.generateBaseImage({
-              prompt: promptEng,
-              imageUrl: fluxBaseImageUrl,
-              strength: fluxStrength
+            const uploadedBaseImage = await fluxBaseImageUrlPromise;
+            
+            const fluxPrompt = promptEng + " The person is wearing the exact same clothes, in the exact same background and environment as the original photo. Only the hair is changed. CRITICAL: en face portrait facing camera directly, exact same head pose and facial structure, looking straight ahead, NO head tilt.";
+            
+            const generatedBuffer = await defaultImageService.generateBaseImage({
+                prompt: fluxPrompt,
+                imageUrl: uploadedBaseImage,
+                strength: fluxStrength
             });
             
-             if (generatedBuffer) {
+            if (generatedBuffer) {
                 const uploadedUrl = await uploadBufferToFirebase(generatedBuffer, 'image/jpeg');
                 finalImageUrl = uploadedUrl;
                 customBlueprintCache.set(blueprintCacheKey, uploadedUrl);
@@ -723,13 +701,16 @@ Instructions:
           }
         }
       }
-
+      } else {
+          console.log("🔥 100% DIRECT FACESWAP MODE: Using target image as blueprint. Bypassing Gemini & Flux.");
+          finalImageUrl = finalTargetImageUrl;
+      }
       let imageBuffer: Buffer | null = null;
       // Always run FaceSwap to ensure 100% facial feature retention
       try {
             console.log("Starting Virtual Try-On FaceSwap via ImageGenerationService... finalImageUrl:", finalImageUrl);
          
-         const baseImageUrlForFal = finalImageUrl.startsWith('data:') ? await uploadImageToFal(finalImageUrl) : finalImageUrl;
+         const baseImageUrlForFal = await getUrlForFal(finalImageUrl);
           const swapImageUrlForFal = await swapImageUrlForFalPromise; 
          
          // Removed check for baseImageUrlForFal or swapImageUrlForFal being data URIs
@@ -851,7 +832,7 @@ Instructions:
              await adminDb.collection("jobs").doc(jobId).update({ status: "error", error: jobErrorMsg });
            }
          } catch (dbErr: any) {
-           console.warn("[generate-full] Failed to save job status to Firestore (async background):", dbErr.message);
+           // console.warn("[generate-full] Failed to save job status to Firestore (async background):", dbErr.message);
          }
       }
       
@@ -1214,3 +1195,4 @@ generateRouter.get('/user/last-generation', async (req, res) => {
      res.status(500).json({ error: err.message });
   }
 });
+

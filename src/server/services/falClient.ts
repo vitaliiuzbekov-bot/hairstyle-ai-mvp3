@@ -49,9 +49,9 @@ export async function uploadImageToFal(base64DataUri: string): Promise<string> {
       if (match) {
         const mimeType = `image/${match[1]}`;
         const buffer = Buffer.from(match[2], 'base64');
-        const blob = new Blob([buffer], { type: mimeType });
-        console.log("Uploading blob to fal.storage of size:", blob.size);
-        const uploadedUrl = await fal.storage.upload(blob);
+        console.log("Uploading File directly to fal.storage of size:", buffer.length);
+        const file = new File([buffer], `image_${Date.now()}.${match[1]}`, { type: mimeType });
+        const uploadedUrl = await fal.storage.upload(file);
         console.log("Upload success! URL:", uploadedUrl);
         return uploadedUrl;
       } else {
@@ -68,12 +68,12 @@ export async function generateReference(prompt: string): Promise<string> {
     return "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=600&auto=format&fit=crop&q=60";
   }
 
-  const result = await fal.subscribe('fal-ai/flux/schnell', {
+  const result = await fal.subscribe('fal-ai/flux/dev', {
     input: {
       prompt: prompt,
       negative_prompt: 'ugly, deformed, extra fingers, blurry, text, watermark',
-      num_inference_steps: 4,
-      // guidance_scale: 7.0,
+      num_inference_steps: 25,
+      guidance_scale: 3.5,
       image_size: 'portrait_4_3',
     },
     logs: false,

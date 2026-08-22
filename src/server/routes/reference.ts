@@ -4,7 +4,7 @@ import { FEMALE_LIBRARY, MALE_LIBRARY } from "../../data/haircutLibrary";
 import { Router, Request, Response } from "express";
 import { getCacheKey, getCachedValue, setCachedValue } from "../services/cache";
 import { getDetailedAgePromptEng, getHairstyleEnglishDescription } from "../utils/promptGenerator";
-import { generateReference } from "../services/falClient";
+import { uploadBufferToFirebase } from "../utils/firebaseStorage";
 
 class AsyncQueue {
   private queue: (() => Promise<void>)[] = [];
@@ -68,7 +68,13 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
     if (!isLibrary && hairColor) {
       cacheKeyParams.hairColor = hairColor;
     }
-    const cacheKey = "v2_" + getCacheKey(cacheKeyParams);
+    if (req.body.description) {
+      cacheKeyParams.description = req.body.description;
+    }
+    if (req.body.haircutName) {
+      cacheKeyParams.haircutName = req.body.haircutName;
+    }
+    const cacheKey = "v6_" + getCacheKey(cacheKeyParams);
     const cachedImage = await getCachedValue<string>(cacheKey);
     
     if (cachedImage) {
@@ -94,16 +100,24 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
       const kwLower = (keyword || "").toLowerCase();
       const isBaldStyle = kwLower.includes("bald") || kwLower.includes("shaved head") || kwLower.includes("zero hair") || kwLower.includes("no hair") || kwLower.includes("налысо") || kwLower.includes("лысый") || kwLower.includes("лысая") || kwLower.includes("без волос");
       const isBuzzStyle = !isBaldStyle && (kwLower.includes("buzz") || kwLower.includes("ежик") || (kwLower.includes("бокс") && !kwLower.includes("полубокс")) || kwLower.includes("под машинку") || kwLower.includes("под ноль") || kwLower.includes("ultra-short"));
-      const ageProps = "beautiful young adult around 25 years old, flawless glowing skin, perfect complexion, studio lighting, photorealistic, attractive";
-      const faceProps = "Symmetrical, highly attractive beautiful face. ";
-      const beardProps = isMale ? "Clean shaven face. " : "";
-      let finalKeyword = getHairstyleEnglishDescription(keyword);
+      const ageProps = req.body.ageRange ? `Age around ${req.body.ageRange}` : (isMale ? "30 years old" : "25 years old");
+      const faceProps = req.body.skinTone ? `Skin tone: ${req.body.skinTone}, smooth clear skin, natural soft lighting. ` : "Smooth clear skin, natural soft lighting. ";
+      let beardProps = "";
+      if (isMale) {
+          const hasBeard = (req.body.facialHair || "").toLowerCase().includes("бород") || (req.body.facialHair || "").toLowerCase().includes("усы") || (req.body.facialHair || "").toLowerCase().includes("beard");
+          if (!hasBeard && !isLibrary) {
+              beardProps = "Clean shaven, strictly no beard, no mustache, no stubble. ";
+          } else if (hasBeard && !isLibrary) {
+              beardProps = `Facial hair: ${req.body.facialHair}. `;
+          }
+      }
+      let finalKeyword = req.body.description ? req.body.description : getHairstyleEnglishDescription(keyword);
       let colorProps = (hairColor && !isLibrary) ? `Hair color: ${hairColor.toLowerCase()}. ` : "";
-      let hairDensProps = "Hair density: normal thick hair. ";
-      let hairlineProps = "Hairline: standard. ";
+      let hairDensProps = req.body.hairDensity && !isLibrary ? `Hair density: ${req.body.hairDensity}. ` : "Hair density: normal thick hair. ";
+      let hairlineProps = req.body.hairlineStatus && !isLibrary ? `Hairline: ${req.body.hairlineStatus}. ` : "Hairline: standard. ";
       
       let extraBaldInjunction = "";
-      let negativePrompt = "professional, studio lighting, airbrushed, retouched, perfect skin, cartoon, 3d, makeup, glamour";
+      let negativePrompt = "cartoon, 3d, makeup, glamour, artificial, smooth skin, plastic";
       if (isBaldStyle) {
         finalKeyword = "completely clean shaved head under zero, absolutely bald scalp, 100% hairless shorn head, zero hair, smooth shinny skull profile, человек абсолютно лысый налысо, у него голый бритый череп, полное отсутствие волос";
         colorProps = ""; 
@@ -119,9 +133,31 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
         negativePrompt = "длинные волосы, пышные волосы, прическа с объемом, кудри, парик, укладка, начес, челка, long hair, medium hair, fluffy hair, wig, curls, voluminous hair, puffy hair, bangs, hair locks, " + negativePrompt;
       }
       
-      let prompt = `Professional salon portrait photo of a highly attractive ${isMale ? 'man' : 'woman'}. ${ageProps}. ${faceProps}${colorProps}${hairDensProps}${hairlineProps}${beardProps} ${extraBaldInjunction}Style: ${finalKeyword}. High-end fashion editorial photography, flawless lighting, photorealistic, cinematic, highly detailed, beautiful benchmark hairstyle.`;
+      let prompt = `en face portrait facing camera directly, professional beauty salon photography, highly aesthetic, beautiful soft studio lighting, well-groomed healthy hair, of an attractive ${isMale ? 'man' : 'woman'}. ${ageProps}. ${faceProps}${colorProps}${hairDensProps}${hairlineProps}${beardProps} ${extraBaldInjunction}Hairstyle strictly applied: ${finalKeyword}. Photorealistic, cinematic 8k, fashion editorial style, elegant.`;
       
-      const imageUrl = await generateReference(prompt);
+      console.log("Generating reference via Gemini Imagen 3...", prompt);
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-image',
+          contents: { parts: [{ text: prompt.substring(0, 4000) }] },
+          config: { imageConfig: { aspectRatio: "3:4", imageSize: "1K" } }
+      });
+      
+      let base64Image = '';
+      for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+              base64Image = part.inlineData.data;
+              break;
+          }
+      }
+      
+      if (!base64Image) {
+          throw new Error("No image generated by Gemini");
+      }
+      
+      const generatedBuffer = Buffer.from(base64Image, 'base64');
+      const imageUrl = await uploadBufferToFirebase(generatedBuffer, 'image/jpeg');
       await setCachedValue(cacheKey, imageUrl, 30 * 24 * 60 * 60);
       return imageUrl;
     });

@@ -210,7 +210,7 @@ export async function callLLMChat(systemText: string, messages: {role: string, t
         contents: geminiMessages,
         config: {
             systemInstruction: systemText,
-            temperature: 0.85
+            temperature: 0.7
         }
       })));
       return res?.text || "";
@@ -233,7 +233,7 @@ export async function callLLMChat(systemText: string, messages: {role: string, t
       modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
       completionOptions: {
         stream: false,
-        temperature: 0.85,
+        temperature: 0.7,
         maxTokens: 2000
       },
       messages: [
@@ -271,7 +271,7 @@ export async function callLLMChat(systemText: string, messages: {role: string, t
         contents,
         config: {
           systemInstruction: systemText,
-          temperature: 0.85
+          temperature: 0.7
         }
       })));
       return response?.text?.trim() || "";
@@ -347,7 +347,7 @@ export async function callLLM(systemText: string, userText: string): Promise<str
         contents: userText,
         config: {
             systemInstruction: systemText,
-            temperature: 0.85
+            temperature: 0.7
         }
       })));
       return res?.text || "";
@@ -370,7 +370,7 @@ export async function callLLM(systemText: string, userText: string): Promise<str
       modelUri: `gpt://${cleanFolderId}/yandexgpt/latest`,
       completionOptions: {
         stream: false,
-        temperature: 0.85,
+        temperature: 0.7,
         maxTokens: 2000
       },
       messages: [
@@ -404,7 +404,7 @@ export async function callLLM(systemText: string, userText: string): Promise<str
         contents: userText,
         config: {
           systemInstruction: systemText,
-          temperature: 0.85
+          temperature: 0.7
         }
       })));
       return response?.text?.trim() || "";

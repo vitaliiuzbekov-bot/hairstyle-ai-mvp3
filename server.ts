@@ -1,3 +1,16 @@
+
+// --- ERROR HANDLING PATCH ---
+process.on('uncaughtException', (err: any) => {
+    if (err && (err as any).code === 'EPIPE') {
+        // Ignore EPIPE errors (client disconnected prematurely)
+    } else {
+        console.error('[Anti-Crash] UNCAUGHT EXCEPTION:', err);
+    }
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Anti-Crash] UNHANDLED REJECTION at:', promise, 'reason:', reason);
+});
+// ----------------------------
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";

@@ -29,7 +29,7 @@ export const LazyImage = memo(({
   onImageLoaded?: (url: string) => void;
   isPriority?: boolean; isLightMode?: boolean; isLibrary?: boolean;
 }) => {
-  const cacheKey = `${gender}_${keyword}_v4_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}`;  const isLib = isLibrary;
+  const cacheKey = `${gender}_${keyword}_v4_${results?.ageRange || ""}_${results?.hairlineStatus || ""}_${results?.hairDensity || ""}_${results?.hairColor || ""}_${description || ""}`;  const isLib = isLibrary;
   const finalCacheKey = isLib ? `LIB_${gender}_${keyword}` : cacheKey;
   const [loadedUrl, setLoadedUrl] = useState<string | null>(
     globalImageCache[finalCacheKey] || null,
