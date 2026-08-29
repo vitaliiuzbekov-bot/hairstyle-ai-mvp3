@@ -50,11 +50,15 @@ authRouter.post('/send-pdf', upload.single('pdf'), async (req: Request, res: Res
   }
 });
 
-const PACKAGES: Record<string, { title: string; description: string; amount: number; count: number }> = {
-  "basic": { title: "Базовый пакет", description: "1 стрижка + базовый цвет", amount: 99, count: 1 },
-  "popular": { title: "Популярный пакет", description: "3 стрижки + 3 цвета", amount: 199, count: 3 },
-  "premium": { title: "Премиум пакет", description: "3 стрижки + все цвета + PDF", amount: 349, count: 3 },
-  "master": { title: "Пакет мастера", description: "10 генераций для клиентов", amount: 500, count: 10 },
+export const PACKAGES: Record<string, { title: string; description: string; amount: number; count: number; rubPrice: number; label?: string }> = {
+  "start": { title: "10 генераций", description: "10 генераций • бессрочные", amount: 50, count: 10, rubPrice: 190, label: "Старт" },
+  "hit": { title: "50 генераций", description: "50 генераций • бессрочные", amount: 200, count: 50, rubPrice: 690, label: "Хит • Выгода 25%" },
+  "pro": { title: "150 генераций", description: "150 генераций • бессрочные", amount: 500, count: 150, rubPrice: 1690, label: "Профи • Выгода 40%" },
+  // Compatibility aliases
+  "basic": { title: "10 генераций", description: "10 генераций • бессрочные", amount: 50, count: 10, rubPrice: 190, label: "Старт" },
+  "popular": { title: "50 генераций", description: "50 генераций • бессрочные", amount: 200, count: 50, rubPrice: 690, label: "Хит • Выгода 25%" },
+  "premium": { title: "50 генераций", description: "50 генераций • бессрочные", amount: 200, count: 50, rubPrice: 690, label: "Хит • Выгода 25%" },
+  "master": { title: "150 генераций", description: "150 генераций • бессрочные", amount: 500, count: 150, rubPrice: 1690, label: "Профи • Выгода 40%" },
 };
 
 authRouter.post('/create-invoice', async (req: Request, res: Response) => {
@@ -80,7 +84,7 @@ authRouter.post('/create-invoice', async (req: Request, res: Response) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title: pkg.title,
+        title: `${pkg.title} (${pkg.count} шт.)`,
         description: pkg.description,
         payload: payload,
         currency: "XTR",
@@ -110,6 +114,94 @@ authRouter.post('/create-invoice', async (req: Request, res: Response) => {
   }
 });
 
+// Уведомление администратора о переводе по СБП
+authRouter.post('/payment/sbp-notify', async (req: Request, res: Response) => {
+  try {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    const { userId, tgUserId, tgUsername, packageId, selectedBank } = req.body;
+
+    const pkg = PACKAGES[packageId] || PACKAGES["hit"];
+    const requestId = `sbp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    if (adminDb) {
+      try {
+        await adminDb.collection("sbp_payments").doc(requestId).set({
+          requestId,
+          userId: userId || "unknown",
+          tgUserId: tgUserId || null,
+          tgUsername: tgUsername || null,
+          packageId,
+          count: pkg.count,
+          rubPrice: pkg.rubPrice,
+          selectedBank: selectedBank || "Озон банк / ОТП банк",
+          status: "pending",
+          createdAt: FieldValue.serverTimestamp()
+        });
+      } catch (dbErr) {
+        console.warn("Could not write sbp_payment to Firestore:", dbErr);
+      }
+    }
+
+    if (botToken && adminChatId) {
+      const userDisplay = tgUsername ? `@${tgUsername}` : (tgUserId ? `TG ID: ${tgUserId}` : `ID: ${userId}`);
+      const bankText = selectedBank || "Озон банк / ОТП банк";
+      const messageText = `💸 <b>Новая заявка на оплату СБП!</b>\n\n` +
+        `👤 <b>Пользователь:</b> ${userDisplay} (ID: <code>${userId}</code>)\n` +
+        `📦 <b>Пакет:</b> <b>${pkg.title}</b> (+${pkg.count} генераций)\n` +
+        `💵 <b>Сумма к получению:</b> <b>${pkg.rubPrice} ₽</b>\n` +
+        `🏦 <b>Выбранный банк:</b> ${bankText}\n` +
+        `📱 <b>Номер СБП:</b> <code>+79059804683</code>\n` +
+        `⏱ <b>Время:</b> ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (МСК)\n` +
+        `🆔 <b>ID заявки:</b> <code>${requestId}</code>\n\n` +
+        `<i>Проверьте поступление в банковском приложении и нажмите кнопку ниже:</i>`;
+
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: adminChatId,
+            text: messageText,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: `✅ Начислить ${pkg.count} ген. (${pkg.rubPrice} ₽)`, callback_data: `sbp_ok_${requestId}` },
+                  { text: `❌ Отклонить`, callback_data: `sbp_no_${requestId}` }
+                ]
+              ]
+            }
+          })
+        });
+      } catch (tgErr) {
+        console.error("Failed to send SBP admin notification to TG:", tgErr);
+      }
+    }
+
+    res.json({ success: true, requestId, count: pkg.count, rubPrice: pkg.rubPrice });
+  } catch (error: any) {
+    console.error("SBP Notify error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Подтверждение клиентом получения начисленных генераций в приложении
+authRouter.post('/payment/ack-sbp-award', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    if (userId && adminDb) {
+      await adminDb.collection("users").doc(userId).update({
+        pendingSbpAward: FieldValue.delete()
+      }).catch(() => {});
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Ack SBP award error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => {
   const adminSecret = req.headers["x-admin-secret"];
   if (!process.env.ADMIN_SETUP_SECRET || adminSecret !== process.env.ADMIN_SETUP_SECRET) {
@@ -131,7 +223,7 @@ authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => 
       body: JSON.stringify({
         url: `${webAppUrl.replace(/\/$/, "")}/api/webhook/telegram`,
         secret_token: secretToken,
-        allowed_updates: ["message", "pre_checkout_query"]
+        allowed_updates: ["message", "pre_checkout_query", "callback_query"]
       })
     });
     const data = await tgRes.json();
@@ -232,6 +324,154 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
     }
   }
 
+  // Обработка инлайн-кнопок администратора (подтверждение перевода СБП)
+  if (body.callback_query) {
+    const cb = body.callback_query;
+    const data = cb.data || "";
+    const cbId = cb.id;
+    const adminChatId = cb.message?.chat?.id;
+    const messageId = cb.message?.message_id;
+
+    if (data.startsWith("sbp_ok_") || data.startsWith("sbp_no_")) {
+      const isApprove = data.startsWith("sbp_ok_");
+      const requestId = data.replace(isApprove ? "sbp_ok_" : "sbp_no_", "");
+
+      if (adminDb) {
+        try {
+          const sbpRef = adminDb.collection("sbp_payments").doc(requestId);
+          const sbpDoc = await sbpRef.get();
+
+          if (!sbpDoc.exists) {
+            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callback_query_id: cbId, text: "❌ Заявка не найдена в базе", show_alert: true })
+            });
+            return res.status(200).send("OK");
+          }
+
+          const sbpData = sbpDoc.data();
+          if (sbpData?.status !== "pending") {
+            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callback_query_id: cbId, text: `ℹ️ Заявка уже обработана (статус: ${sbpData?.status})`, show_alert: true })
+            });
+            return res.status(200).send("OK");
+          }
+
+          if (isApprove) {
+            const { userId, tgUserId, count, rubPrice, packageId } = sbpData;
+
+            // 1. Обновляем баланс пользователя и статус заявки
+            await adminDb.runTransaction(async (t) => {
+              const userRef = adminDb.collection("users").doc(userId);
+              t.update(userRef, {
+                generationsLeft: FieldValue.increment(count),
+                fullAccess: true,
+                pendingSbpAward: {
+                  requestId,
+                  count,
+                  rubPrice,
+                  packageId,
+                  timestamp: Date.now()
+                }
+              });
+
+              t.update(sbpRef, {
+                status: "approved",
+                approvedAt: FieldValue.serverTimestamp()
+              });
+
+              const paymentRef = adminDb.collection("users").doc(userId).collection("payments").doc(requestId);
+              t.set(paymentRef, {
+                type: "sbp",
+                packageId,
+                amount: rubPrice,
+                count,
+                timestamp: FieldValue.serverTimestamp()
+              });
+            });
+
+            // 2. Отправляем сообщение пользователю в чат Telegram (если известен tgUserId)
+            if (tgUserId) {
+              try {
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: tgUserId,
+                    text: `🎉 <b>Оплата СБП подтверждена!</b>\n\nВам успешно начислено <b>+${count} генераций</b> (${rubPrice} ₽).\n\nОткройте приложение НейроСтилист, чтобы примерить новые стрижки и образы! ✂️✨`,
+                    parse_mode: 'HTML'
+                  })
+                });
+              } catch (e) {
+                console.error("Failed to notify user via TG bot:", e);
+              }
+            }
+
+            // 3. Обновляем сообщение администратора
+            if (adminChatId && messageId) {
+              await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: adminChatId,
+                  message_id: messageId,
+                  text: `✅ <b>Оплата СБП ПОДТВЕРЖДЕНА!</b>\n\n` +
+                    `👤 Пользователь ID: <code>${userId}</code>\n` +
+                    `📦 Начислено: <b>+${count} генераций</b> (${rubPrice} ₽)\n` +
+                    `⏱ Подтверждено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (МСК)`,
+                  parse_mode: 'HTML'
+                })
+              });
+            }
+
+            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callback_query_id: cbId, text: `✅ Успешно начислено +${count} генераций!` })
+            });
+
+          } else {
+            // Отклонение
+            await sbpRef.update({
+              status: "rejected",
+              rejectedAt: FieldValue.serverTimestamp()
+            });
+
+            if (adminChatId && messageId) {
+              await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: adminChatId,
+                  message_id: messageId,
+                  text: `❌ <b>Заявка СБП ОТКЛОНЕНА</b>\n\n🆔 Заявка: <code>${requestId}</code>`,
+                  parse_mode: 'HTML'
+                })
+              });
+            }
+
+            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callback_query_id: cbId, text: "❌ Заявка отклонена" })
+            });
+          }
+
+        } catch (e: any) {
+          console.error("Callback query SBP error:", e);
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: cbId, text: `Ошибка: ${e.message}`, show_alert: true })
+          });
+        }
+      }
+      return res.status(200).send("OK");
+    }
+  }
   
   if (body.pre_checkout_query) {
     try {

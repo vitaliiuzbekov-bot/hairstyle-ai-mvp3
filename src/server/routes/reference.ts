@@ -136,8 +136,12 @@ referenceRouter.post("/reference", referenceLimiter, async (req: Request, res: R
       let prompt = `en face portrait facing camera directly, professional beauty salon photography, highly aesthetic, beautiful soft studio lighting, well-groomed healthy hair, of an attractive ${isMale ? 'man' : 'woman'}. ${ageProps}. ${faceProps}${colorProps}${hairDensProps}${hairlineProps}${beardProps} ${extraBaldInjunction}Hairstyle strictly applied: ${finalKeyword}. Photorealistic, cinematic 8k, fashion editorial style, elegant.`;
       
       console.log("Generating reference via Gemini Imagen 3...", prompt);
+      const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+      if (!geminiApiKey) {
+        throw new Error("GEMINI_API_KEY is not set or empty in environment variables.");
+      }
       const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
       const response = await ai.models.generateContent({
           model: 'gemini-3.1-flash-image',
           contents: { parts: [{ text: prompt.substring(0, 4000) }] },

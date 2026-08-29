@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Zap, Loader2 } from "lucide-react";
+import { Zap, Loader2, Sparkles } from "lucide-react";
 
 import { Header } from "./components/Header";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -90,6 +90,9 @@ function App() {
     buyTokens,
     checkLimits,
     processPayment,
+    notifySbpPayment,
+    receivedSbpAward,
+    ackSbpAward,
     isBuying,
     showBuyModal,
     setShowBuyModal,
@@ -262,9 +265,37 @@ function App() {
               setShowBuyModal={setShowBuyModal}
               isBuying={isBuying}
               userId={userId}
+              generationsLeft={generationsLeft}
               processPayment={processPayment}
+              notifySbpPayment={notifySbpPayment}
               isLightMode={isLightMode}
             />
+          )}
+
+          {/* Модальное окно подтверждения начисления генераций по СБП */}
+          {receivedSbpAward && (
+            <div className="fixed-viewport z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+              <div className={`w-full max-w-sm rounded-[2rem] p-6 text-center border shadow-2xl relative overflow-hidden ${
+                isLightMode ? 'bg-white border-amber-300 text-gray-900' : 'bg-[#15102a] border-amber-500/40 text-white'
+              }`}>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center shadow-lg shadow-amber-500/30 animate-bounce">
+                  <Sparkles className="w-8 h-8 text-black fill-black" />
+                </div>
+                <h3 className="text-xl font-black mb-2 tracking-tight">Генерации начислены!</h3>
+                <p className={`text-xs sm:text-sm mb-5 leading-relaxed ${isLightMode ? 'text-gray-600' : 'text-white/75'}`}>
+                  Администратор подтвердил ваш перевод СБП ({receivedSbpAward.rubPrice} ₽). Баланс успешно пополнен:
+                </p>
+                <div className="py-3 px-6 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-2xl mb-6">
+                  +{receivedSbpAward.count} генераций ✨
+                </div>
+                <button
+                  onClick={ackSbpAward}
+                  className="w-full py-4 px-6 rounded-2xl font-black text-sm bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-black shadow-lg shadow-amber-500/25 hover:opacity-95 active:scale-[0.98] transition-all"
+                >
+                  👍 Я получил генерации
+                </button>
+              </div>
+            </div>
           )}
           {showWelcome && (
             <WelcomeModal

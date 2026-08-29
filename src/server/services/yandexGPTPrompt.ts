@@ -118,7 +118,7 @@ If the client has low density hair, generate a prompt for a balding or thin-hair
 Create a prompt (max 60 words) for a REFERENCE PHOTO of a MODEL with this hairstyle.
 Model: ~${input.userAge} years old, ${input.userGender}.
 Hair must be: ${input.hairParams.promptSuffixEn}.
-Style: professional salon photo, clean background, 3/4 angle.`;
+Style: professional salon photo, clean background, en face portrait facing camera directly, looking straight into lens.`;
 
   try {
     const response = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {

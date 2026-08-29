@@ -1,10 +1,18 @@
 import { useState, useEffect } from "react";
 import { trackEvent } from "../services/analytics";
 import { signInAnonymously } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { useUI } from "../context/UIContext";
 import { getHistory, saveHistory } from "../services/localHistory";
+
+export interface SbpAwardData {
+  requestId: string;
+  count: number;
+  rubPrice: number;
+  packageId: string;
+  timestamp: number;
+}
 
 export const useTokenManager = () => {
   const { addToast } = useUI();
@@ -15,6 +23,7 @@ export const useTokenManager = () => {
   const [initError, setInitError] = useState<string | null>(null);
   const [isBuying, setIsBuying] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [receivedSbpAward, setReceivedSbpAward] = useState<SbpAwardData | null>(null);
   const [isDeveloper, setIsDeveloper] = useState(() => {
     const isDevUrl = typeof window !== "undefined" && (
       window.location.hostname.includes("localhost")
@@ -107,7 +116,9 @@ export const useTokenManager = () => {
         }
 
         if (!userDoc || !userDoc.exists()) {
-          const startParam = tg?.initDataUnsafe?.start_param;
+          const urlParams = new URLSearchParams(window.location.search);
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+          const startParam = tg?.initDataUnsafe?.start_param || urlParams.get("startapp") || urlParams.get("tgWebAppStartParam") || hashParams.get("tgWebAppStartParam");
           let referredBy = null;
           let startGens = isDevUser ? 999 : 0;
           
@@ -128,10 +139,13 @@ export const useTokenManager = () => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       level: "info",
-                      message: `🎁 <b>Реферал!</b> Пользователь ${tgUser?.username || "anon"} пришел от ${referrerId}`,
+                      message: `🎁 <b>Реферал!</b> Пользователь ${tgUser?.username || "anon"} пришел по ссылке от ${referrerId}`,
                     }),
                   }).catch(() => {});
 
+                  window.dispatchEvent(new CustomEvent('show-toast', { 
+                    detail: { message: "🎁 Вам начислена 1 бесплатная генерация по приглашению друга!" } 
+                  }));
                 } catch(e) {}
              }
           }
@@ -236,6 +250,76 @@ export const useTokenManager = () => {
       window.removeEventListener("daily_reward_claimed", handleDailyReward);
     };
   }, [isDeveloper]);
+
+  // Реалтайм-слушатель состояния пользователя в Firestore (для мгновенного обновления баланса при подтверждении СБП админом)
+  useEffect(() => {
+    if (!userId || userId === "local-user") return;
+
+    try {
+      const userRef = doc(db, "users", userId);
+      const unsubscribe = onSnapshot(userRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data && typeof data.generationsLeft === "number") {
+            if (!isDeveloper) {
+              setGenerationsLeft(data.generationsLeft);
+            }
+          }
+          if (data?.pendingSbpAward) {
+            setReceivedSbpAward(data.pendingSbpAward);
+            if (tg?.HapticFeedback?.notificationOccurred) {
+              tg.HapticFeedback.notificationOccurred('success');
+            }
+          }
+        }
+      }, (err) => {
+        console.warn("User onSnapshot error:", err);
+      });
+
+      return () => unsubscribe();
+    } catch (e) {
+      console.warn("Could not attach user onSnapshot listener:", e);
+    }
+  }, [userId, isDeveloper]);
+
+  const notifySbpPayment = async (packageId: string, selectedBank: string) => {
+    setIsBuying(true);
+    try {
+      const res = await fetch("/api/payment/sbp-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userId || "local-user",
+          tgUserId: (tg as any)?.initDataUnsafe?.user?.id || null,
+          tgUsername: (tg as any)?.initDataUnsafe?.user?.username || null,
+          packageId,
+          selectedBank
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Не удалось отправить уведомление о переводе");
+      }
+      return data;
+    } finally {
+      setIsBuying(false);
+    }
+  };
+
+  const ackSbpAward = async () => {
+    setReceivedSbpAward(null);
+    if (userId && userId !== "local-user") {
+      try {
+        await fetch("/api/payment/ack-sbp-award", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId })
+        });
+      } catch (e) {
+        console.warn("Ack SBP award error:", e);
+      }
+    }
+  };
 
   const consumeToken = async () => {
     if (isDeveloper) {
@@ -456,6 +540,9 @@ export const useTokenManager = () => {
     buyTokens,
     checkLimits,
     processPayment,
+    notifySbpPayment,
+    receivedSbpAward,
+    ackSbpAward,
     isBuying,
     showBuyModal,
     setShowBuyModal,

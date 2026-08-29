@@ -236,7 +236,7 @@ generateRouter.post("/generate-reference", heavyImageLimiter, async (req, res) =
         const safeSkinTone = skinTone && skinTone !== "не указано" ? skinTone : "natural";
         
         // Build base prompt dynamically based on client features
-        let base = `Ultra-realistic amateur smartphone photo of a ${safeAge}-year-old ${isMale ? 'man' : 'woman'} looking directly at the camera. `;
+        let base = `Ultra-realistic amateur smartphone photo, en face portrait facing camera directly, of a ${safeAge}-year-old ${isMale ? 'man' : 'woman'} looking directly at the camera. `;
         base += `Skin tone: ${safeSkinTone}, natural skin texture, pores, casual lighting, plain white wall background. `;
         
         if (isMale) {
