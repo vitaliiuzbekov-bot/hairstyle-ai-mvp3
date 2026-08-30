@@ -6,8 +6,18 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
   if (isDev) {
     options.headers = { ...options.headers, "X-Developer-Mode": "true" };
   }
+
+  let finalUrl = url;
+  // Добавляем анти-кэш только для GET-запросов
+  if (!options?.method || options.method.toUpperCase() === 'GET') {
+      const separator = url.includes('?') ? '&' : '?';
+      // Приклеиваем уникальную метку времени к URL
+      finalUrl = `${url}${separator}_t=${Date.now()}`;
+      options = { ...options, cache: 'no-store' };
+  }
+
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(finalUrl, options);
     // Do not retry 4xx errors, only 5xx or network errors
     if (!response.ok && response.status >= 500 && retries > 0) {
       console.warn(`Server error ${response.status}. Retrying in ${backoff}ms...`);
@@ -27,7 +37,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           level: 'error',
-          message: `[fetchWithRetry] Network error (${url}): ${err.message}`,
+          message: `[fetchWithRetry] Network error (${finalUrl}): ${err.message}`,
           userId: localStorage.getItem('userId') || 'unknown'
         })
     }).catch(() => {});
