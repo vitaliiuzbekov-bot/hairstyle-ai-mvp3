@@ -191,9 +191,9 @@ authRouter.post('/payment/ack-sbp-award', async (req: Request, res: Response) =>
   try {
     const { userId } = req.body;
     if (userId && adminDb) {
-      await adminDb.collection("users").doc(userId).update({
+      await adminDb.collection("users").doc(userId).set({
         pendingSbpAward: FieldValue.delete()
-      }).catch(() => {});
+      }, { merge: true }).catch(() => {});
     }
     res.json({ success: true });
   } catch (error: any) {
@@ -366,7 +366,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
             // 1. Обновляем баланс пользователя и статус заявки
             await adminDb.runTransaction(async (t) => {
               const userRef = adminDb.collection("users").doc(userId);
-              t.update(userRef, {
+              t.set(userRef, {
                 generationsLeft: FieldValue.increment(count),
                 fullAccess: true,
                 pendingSbpAward: {
@@ -376,7 +376,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
                   packageId,
                   timestamp: Date.now()
                 }
-              });
+              }, { merge: true });
 
               t.update(sbpRef, {
                 status: "approved",
@@ -435,7 +435,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
 
           } else {
             // Отклонение
-            await sbpRef.update({
+            await sbpRef.set({
               status: "rejected",
               rejectedAt: FieldValue.serverTimestamp()
             });
@@ -510,19 +510,19 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
                   throw new Error("ALREADY_PROCESSED");
               }
               const userRef = adminDb.collection("users").doc(userId);
-              t.update(userRef, {
+              t.set(userRef, {
                 generationsLeft: FieldValue.increment(pkg.count),
                 fullAccess: true
-              });
+              }, { merge: true });
               t.set(paymentRef, {
                 packageId, amount: starsAmount, timestamp: FieldValue.serverTimestamp()
               });
            });
         } else {
-           await adminDb.collection("users").doc(userId).update({
+           await adminDb.collection("users").doc(userId).set({
              generationsLeft: FieldValue.increment(pkg.count),
              fullAccess: true
-           });
+           }, { merge: true });
         }
         
         await logToTelegram(`💰 <b>Успешная оплата Stars!</b>
@@ -571,9 +571,9 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
           const amount = parseInt(parts[2], 10);
           if (!isNaN(amount) && adminDb) {
             try {
-              await adminDb.collection("users").doc(uId).update({
+              await adminDb.collection("users").doc(uId).set({
                 generationsLeft: FieldValue.increment(amount)
-              });
+              }, { merge: true });
               await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -652,10 +652,10 @@ authRouter.post('/daily-reward', async (req: Request, res: Response) => {
           return res.status(400).json({ error: "Already claimed today" });
        }
        
-       await userRef.update({
+       await userRef.set({
           generationsLeft: FieldValue.increment(1),
           lastClaimedDate: today
-       });
+       }, { merge: true });
        res.json({ success: true, message: "Reward claimed" });
     } else {
        res.status(404).json({ error: "User not found" });
@@ -706,7 +706,7 @@ authRouter.post('/add-tokens', async (req: Request, res: Response) => {
     if (req.body.fullAccess) {
        updateData.fullAccess = true;
     }
-    await userRef.update(updateData);
+    await userRef.set(updateData, { merge: true });
     console.log(`Added ${amount} tokens to ${userId} for ${reason}`);
     res.json({ success: true });
   } catch (error: any) {
