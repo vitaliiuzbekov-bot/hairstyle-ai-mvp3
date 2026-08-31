@@ -86,17 +86,16 @@ export const useTokenManager = () => {
 
       if (isDevUser) {
         setIsDeveloper(true);
-        localStorage.setItem("isDeveloperMode", "true");
       }
 
       if (currentUid === "local-user") {
         const localGens = localStorage.getItem("localGenerationsLeft");
         if (localGens === null) {
-          const startingVal = isDevUser ? "999" : "0";
+          const startingVal = "0";
           localStorage.setItem("localGenerationsLeft", startingVal);
           setGenerationsLeft(parseInt(startingVal, 10));
         } else {
-          setGenerationsLeft(isDevUser ? 999 : parseInt(localGens, 10));
+          setGenerationsLeft(parseInt(localGens, 10));
         }
       }
 
@@ -120,7 +119,7 @@ export const useTokenManager = () => {
           const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
           const startParam = tg?.initDataUnsafe?.start_param || urlParams.get("startapp") || urlParams.get("tgWebAppStartParam") || hashParams.get("tgWebAppStartParam");
           let referredBy = null;
-          let startGens = isDevUser ? 999 : 0;
+          let startGens = 0;
           
           if (startParam && startParam.startsWith("ref_")) {
              const referrerId = startParam.substring(4);
@@ -177,7 +176,7 @@ export const useTokenManager = () => {
           }
         } else {
           const data = userDoc.data();
-          setGenerationsLeft(isDevUser ? 999 : (data?.generationsLeft ?? 0));
+          setGenerationsLeft(data?.generationsLeft ?? 0);
           
           // Фоновая синхронизация истории (тихая)
           const cloudHistoryStr = data?.historyCache;
@@ -206,11 +205,11 @@ export const useTokenManager = () => {
         }
         const localGens = localStorage.getItem("localGenerationsLeft");
         if (localGens === null) {
-          const startingVal = isDevUser ? "999" : "0";
+          const startingVal = "0";
           localStorage.setItem("localGenerationsLeft", startingVal);
           setGenerationsLeft(parseInt(startingVal, 10));
         } else {
-          setGenerationsLeft(isDevUser ? 999 : parseInt(localGens, 10));
+          setGenerationsLeft(parseInt(localGens, 10));
         }
         setUserId(isDevUser ? "8585130589" : "local-user");
         setInitError(null);
@@ -261,9 +260,7 @@ export const useTokenManager = () => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           if (data && typeof data.generationsLeft === "number") {
-            if (!isDeveloper) {
-              setGenerationsLeft(data.generationsLeft);
-            }
+            setGenerationsLeft(data.generationsLeft);
           }
           if (data?.pendingSbpAward) {
             setReceivedSbpAward(data.pendingSbpAward);
@@ -280,7 +277,7 @@ export const useTokenManager = () => {
     } catch (e) {
       console.warn("Could not attach user onSnapshot listener:", e);
     }
-  }, [userId, isDeveloper]);
+  }, [userId]);
 
   const notifySbpPayment = async (packageId: string, selectedBank: string) => {
     setIsBuying(true);
