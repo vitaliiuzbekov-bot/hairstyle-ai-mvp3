@@ -267,8 +267,35 @@ if (process.env.NODE_ENV !== "production") {
     next(err);
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Auto-sync Telegram Webhook on startup if configured
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const appUrl = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL;
+    if (botToken && appUrl) {
+      try {
+        const secretToken = crypto.createHash('sha256').update(botToken).digest('hex');
+        const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/webhook/telegram`;
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: webhookUrl,
+            secret_token: secretToken,
+            allowed_updates: ["message", "pre_checkout_query", "callback_query"]
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          console.log(`[Telegram] Webhook successfully auto-registered at: ${webhookUrl}`);
+        } else {
+          console.warn(`[Telegram] Webhook auto-registration note:`, data);
+        }
+      } catch (err: any) {
+        console.warn(`[Telegram] Could not auto-register webhook:`, err.message);
+      }
+    }
   });
 }
 

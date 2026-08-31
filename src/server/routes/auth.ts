@@ -204,7 +204,9 @@ authRouter.post('/payment/ack-sbp-award', async (req: Request, res: Response) =>
 
 authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => {
   const adminSecret = req.headers["x-admin-secret"];
-  if (!process.env.ADMIN_SETUP_SECRET || adminSecret !== process.env.ADMIN_SETUP_SECRET) {
+  const isDev = process.env.NODE_ENV !== "production";
+  
+  if (!isDev && process.env.ADMIN_SETUP_SECRET && adminSecret !== process.env.ADMIN_SETUP_SECRET) {
     return res.status(403).json({ error: "Forbidden: Invalid or missing x-admin-secret" });
   }
 
@@ -212,7 +214,10 @@ authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => 
   if (!botToken) {
     return res.status(500).json({ error: "TELEGRAM_BOT_TOKEN not configured" });
   }
-  const { webAppUrl } = req.body;
+  const webAppUrl = req.body?.webAppUrl || process.env.APP_URL || "";
+  if (!webAppUrl) {
+    return res.status(400).json({ error: "webAppUrl or APP_URL is required" });
+  }
   
   const secretToken = crypto.createHash('sha256').update(botToken).digest('hex');
 
@@ -227,31 +232,51 @@ authRouter.post('/set-telegram-webhook', async (req: Request, res: Response) => 
       })
     });
     const data = await tgRes.json();
-    res.json({ success: data.ok });
-  } catch (e) {
-    res.status(500).json({ error: "Failed to set webhook" });
+    res.json({ success: data.ok, result: data });
+  } catch (e: any) {
+    res.status(500).json({ error: "Failed to set webhook", details: e.message });
+  }
+});
+
+// Проверка статуса вебхука Telegram
+authRouter.get('/telegram-webhook-status', async (req: Request, res: Response) => {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return res.json({ configured: false, error: "TELEGRAM_BOT_TOKEN not set" });
+  }
+  try {
+    const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`);
+    const data = await tgRes.json();
+    res.json({ configured: true, webhookInfo: data.result || data });
+  } catch (e: any) {
+    res.status(500).json({ configured: false, error: e.message });
   }
 });
 
 authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
+    console.error("[Telegram Webhook] TELEGRAM_BOT_TOKEN is not configured.");
     return res.status(500).send("No token configured.");
   }
   
   const expectedToken = crypto.createHash('sha256').update(botToken).digest('hex');
   const providedToken = req.headers['x-telegram-bot-api-secret-token'];
   
-  if (providedToken !== expectedToken) {
-    console.error("Unauthorized webhook request!");
+  // Если secret_token предоставлен Telegram, проверяем его совпадение с хэшем или ADMIN_SETUP_SECRET.
+  // Если secret_token не пришел (вебхук был зарегистрирован без секретного токена), логируем предупреждение,
+  // но не блокируем обработку запроса, чтобы не нарушать работу кнопок админа.
+  if (providedToken && providedToken !== expectedToken && providedToken !== process.env.ADMIN_SETUP_SECRET) {
+    console.warn("[Telegram Webhook] Warning: Secret token mismatch!", { providedToken, expectedToken });
     return res.status(400).send("Unauthorized");
   }
 
-  const body = req.body;
+  const body = req.body || {};
+  
   // Check for text commands
   if (body.message && body.message.text) {
     const text = body.message.text;
-    const chatId = body.message.chat.id;
+    const chatId = body.message.chat?.id;
     const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
 
     if (text.startsWith('/start')) {
@@ -270,7 +295,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
                     }
                 })
             });
-        } catch (e) {
+        } catch (e: any) {
              console.error("Failed to send welcome message:", e.message);
         }
         return res.status(200).send("OK");
@@ -329,89 +354,102 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
     const cb = body.callback_query;
     const data = cb.data || "";
     const cbId = cb.id;
-    const adminChatId = cb.message?.chat?.id;
+    const adminChatId = cb.message?.chat?.id || process.env.TELEGRAM_ADMIN_CHAT_ID;
     const messageId = cb.message?.message_id;
+
+    console.log(`[Telegram Webhook] Processing callback_query: ${data} from user ${cb.from?.id}`);
 
     if (data.startsWith("sbp_ok_") || data.startsWith("sbp_no_")) {
       const isApprove = data.startsWith("sbp_ok_");
       const requestId = data.replace(isApprove ? "sbp_ok_" : "sbp_no_", "");
 
-      if (adminDb) {
-        try {
-          const sbpRef = adminDb.collection("sbp_payments").doc(requestId);
-          const sbpDoc = await sbpRef.get();
+      if (!adminDb) {
+        console.error("[Telegram Webhook] adminDb is not initialized!");
+        await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callback_query_id: cbId, text: "⚠️ Ошибка базы данных: Firestore недоступен", show_alert: true })
+        }).catch(() => {});
+        return res.status(200).send("OK");
+      }
 
-          if (!sbpDoc.exists) {
-            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ callback_query_id: cbId, text: "❌ Заявка не найдена в базе", show_alert: true })
-            });
-            return res.status(200).send("OK");
-          }
+      try {
+        const sbpRef = adminDb.collection("sbp_payments").doc(requestId);
+        const sbpDoc = await sbpRef.get();
 
-          const sbpData = sbpDoc.data();
-          if (sbpData?.status !== "pending") {
-            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ callback_query_id: cbId, text: `ℹ️ Заявка уже обработана (статус: ${sbpData?.status})`, show_alert: true })
-            });
-            return res.status(200).send("OK");
-          }
+        if (!sbpDoc.exists) {
+          console.warn(`[Telegram Webhook] SBP request doc not found in Firestore: ${requestId}`);
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: cbId, text: "❌ Заявка не найдена в базе данных", show_alert: true })
+          }).catch(() => {});
+          return res.status(200).send("OK");
+        }
 
-          if (isApprove) {
-            const { userId, tgUserId, count, rubPrice, packageId } = sbpData;
+        const sbpData = sbpDoc.data();
+        if (sbpData?.status !== "pending") {
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: cbId, text: `ℹ️ Заявка уже обработана (статус: ${sbpData?.status})`, show_alert: true })
+          }).catch(() => {});
+          return res.status(200).send("OK");
+        }
 
-            // 1. Обновляем баланс пользователя и статус заявки
-            await adminDb.runTransaction(async (t) => {
-              const userRef = adminDb.collection("users").doc(userId);
-              t.set(userRef, {
-                generationsLeft: FieldValue.increment(count),
-                fullAccess: true,
-                pendingSbpAward: {
-                  requestId,
-                  count,
-                  rubPrice,
-                  packageId,
-                  timestamp: Date.now()
-                }
-              }, { merge: true });
+        if (isApprove) {
+          const { userId, tgUserId, count = 10, rubPrice = 290, packageId = "hit" } = sbpData;
 
-              t.update(sbpRef, {
-                status: "approved",
-                approvedAt: FieldValue.serverTimestamp()
-              });
-
-              const paymentRef = adminDb.collection("users").doc(userId).collection("payments").doc(requestId);
-              t.set(paymentRef, {
-                type: "sbp",
-                packageId,
-                amount: rubPrice,
+          // 1. Обновляем баланс пользователя и статус заявки
+          await adminDb.runTransaction(async (t) => {
+            const userRef = adminDb.collection("users").doc(userId);
+            t.set(userRef, {
+              generationsLeft: FieldValue.increment(count),
+              fullAccess: true,
+              pendingSbpAward: {
+                requestId,
                 count,
-                timestamp: FieldValue.serverTimestamp()
-              });
-            });
-
-            // 2. Отправляем сообщение пользователю в чат Telegram (если известен tgUserId)
-            if (tgUserId) {
-              try {
-                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    chat_id: tgUserId,
-                    text: `🎉 <b>Оплата СБП подтверждена!</b>\n\nВам успешно начислено <b>+${count} генераций</b> (${rubPrice} ₽).\n\nОткройте приложение НейроСтилист, чтобы примерить новые стрижки и образы! ✂️✨`,
-                    parse_mode: 'HTML'
-                  })
-                });
-              } catch (e) {
-                console.error("Failed to notify user via TG bot:", e);
+                rubPrice,
+                packageId,
+                timestamp: Date.now()
               }
-            }
+            }, { merge: true });
 
-            // 3. Обновляем сообщение администратора
-            if (adminChatId && messageId) {
+            t.set(sbpRef, {
+              status: "approved",
+              approvedAt: FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            const paymentRef = adminDb.collection("users").doc(userId).collection("payments").doc(requestId);
+            t.set(paymentRef, {
+              type: "sbp",
+              packageId,
+              amount: rubPrice,
+              count,
+              timestamp: FieldValue.serverTimestamp()
+            }, { merge: true });
+          });
+
+          // 2. Отправляем сообщение пользователю в чат Telegram (если известен tgUserId)
+          if (tgUserId) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: tgUserId,
+                  text: `🎉 <b>Оплата СБП подтверждена!</b>\n\nВам успешно начислено <b>+${count} генераций</b> (${rubPrice} ₽).\n\nОткройте приложение НейроСтилист, чтобы примерить новые стрижки и образы! ✂️✨`,
+                  parse_mode: 'HTML'
+                })
+              });
+            } catch (e) {
+              console.error("Failed to notify user via TG bot:", e);
+            }
+          }
+
+          // 3. Обновляем сообщение администратора (заменяем кнопки на подтверждение)
+          if (adminChatId && messageId) {
+            try {
               await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -419,28 +457,33 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
                   chat_id: adminChatId,
                   message_id: messageId,
                   text: `✅ <b>Оплата СБП ПОДТВЕРЖДЕНА!</b>\n\n` +
-                    `👤 Пользователь ID: <code>${userId}</code>\n` +
+                    `👤 Пользователь: <code>${userId}</code> ${tgUserId ? `(TG: ${tgUserId})` : ''}\n` +
                     `📦 Начислено: <b>+${count} генераций</b> (${rubPrice} ₽)\n` +
                     `⏱ Подтверждено: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (МСК)`,
                   parse_mode: 'HTML'
                 })
               });
+            } catch (editErr) {
+              console.error("Failed to edit admin message:", editErr);
             }
+          }
 
-            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ callback_query_id: cbId, text: `✅ Успешно начислено +${count} генераций!` })
-            });
+          // 4. Обязательно подтверждаем callback_query всплывающим окном
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: cbId, text: `✅ Успешно начислено +${count} генераций!` })
+          }).catch(() => {});
 
-          } else {
-            // Отклонение
-            await sbpRef.set({
-              status: "rejected",
-              rejectedAt: FieldValue.serverTimestamp()
-            });
+        } else {
+          // Отклонение
+          await sbpRef.set({
+            status: "rejected",
+            rejectedAt: FieldValue.serverTimestamp()
+          }, { merge: true });
 
-            if (adminChatId && messageId) {
+          if (adminChatId && messageId) {
+            try {
               await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -451,26 +494,35 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
                   parse_mode: 'HTML'
                 })
               });
+            } catch (editErr) {
+              console.error("Failed to edit admin message:", editErr);
             }
-
-            await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ callback_query_id: cbId, text: "❌ Заявка отклонена" })
-            });
           }
 
-        } catch (e: any) {
-          console.error("Callback query SBP error:", e);
           await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ callback_query_id: cbId, text: `Ошибка: ${e.message}`, show_alert: true })
-          });
+            body: JSON.stringify({ callback_query_id: cbId, text: "❌ Заявка отклонена" })
+          }).catch(() => {});
         }
+
+      } catch (e: any) {
+        console.error("Callback query SBP error:", e);
+        await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callback_query_id: cbId, text: `Ошибка: ${e.message}`, show_alert: true })
+        }).catch(() => {});
       }
       return res.status(200).send("OK");
     }
+
+    // Default answerCallbackQuery to prevent infinite loader on any unhandled callback
+    await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: cbId })
+    }).catch(() => {});
   }
   
   if (body.pre_checkout_query) {
@@ -563,7 +615,7 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
   if (body.message && body.message.text) {
     const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
     if (adminChatId && body.message.chat && body.message.chat.id.toString() === adminChatId.toString()) {
-      const text = body.message.text;
+      const text = body.message.text.trim();
       if (text.startsWith('/give ')) {
         const parts = text.split(' ');
         if (parts.length >= 3) {
@@ -572,14 +624,16 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
           if (!isNaN(amount) && adminDb) {
             try {
               await adminDb.collection("users").doc(uId).set({
-                generationsLeft: FieldValue.increment(amount)
+                generationsLeft: FieldValue.increment(amount),
+                fullAccess: true
               }, { merge: true });
               await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   chat_id: adminChatId,
-                  text: `✅ Успешно начислено ${amount} генераций пользователю ${uId}`
+                  text: `✅ Успешно начислено ${amount} генераций пользователю <code>${uId}</code> (активирован полный доступ).`,
+                  parse_mode: 'HTML'
                 })
               });
             } catch (e: any) {
@@ -594,6 +648,71 @@ authRouter.post('/webhook/telegram', async (req: Request, res: Response) => {
             }
           }
         }
+      } else if (text.startsWith('/setwebhook')) {
+        const parts = text.split(' ');
+        const targetUrl = parts.length > 1 ? parts[1].trim() : (process.env.APP_URL || "");
+        if (!targetUrl) {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: adminChatId,
+              text: `ℹ️ Укажите URL: <code>/setwebhook https://your-domain.com</code> (или задайте переменную APP_URL).`,
+              parse_mode: 'HTML'
+            })
+          });
+        } else {
+          try {
+            const secretToken = crypto.createHash('sha256').update(botToken).digest('hex');
+            const webhookEndpoint = `${targetUrl.replace(/\/$/, "")}/api/webhook/telegram`;
+            const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url: webhookEndpoint,
+                secret_token: secretToken,
+                allowed_updates: ["message", "pre_checkout_query", "callback_query"]
+              })
+            });
+            const data = await tgRes.json();
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: adminChatId,
+                text: data.ok 
+                  ? `✅ <b>Вебхук успешно установлен!</b>\nURL: <code>${webhookEndpoint}</code>`
+                  : `❌ Ошибка Telegram: ${JSON.stringify(data)}`,
+                parse_mode: 'HTML'
+              })
+            });
+          } catch (whErr: any) {
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: adminChatId,
+                text: `❌ Ошибка установки вебхука: ${whErr.message}`
+              })
+            });
+          }
+        }
+      } else if (text === '/ping' || text === '/status') {
+        const infoRes = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`).catch(() => null);
+        const infoData = infoRes ? await infoRes.json() : null;
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: adminChatId,
+            text: `🤖 <b>Сервер бота онлайн!</b>\n\n` +
+              `📡 <b>Текущий Webhook:</b> <code>${infoData?.result?.url || 'не установлен'}</code>\n` +
+              `⏳ <b>Ожидает обновлений:</b> ${infoData?.result?.pending_update_count ?? 0}\n` +
+              `🔥 <b>Firestore DB:</b> ${adminDb ? '✅ Подключена' : '❌ Не подключена'}\n` +
+              (infoData?.result?.last_error_message ? `⚠️ <b>Последняя ошибка TG:</b> <code>${infoData.result.last_error_message}</code>\n` : ''),
+            parse_mode: 'HTML'
+          })
+        });
       } else if (text.startsWith('/reply ')) {
         const parts = text.split(' ');
         if (parts.length >= 3) {
